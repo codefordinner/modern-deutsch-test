@@ -5,7 +5,7 @@ import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
   const app = express();
-  const PORT = 3006;
+  const PORT = 3000;
 
   app.use(cors());
   app.use(express.json());
