@@ -24,14 +24,14 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: 680, height: '80vh' }}>
+      <div className="modal-content" style={{ maxWidth: 680, maxHeight: '80vh' }}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>Словарь ({words.length} слов)</h3>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
 
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 10 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 180px' }}>
             <Search size={16} style={{ position: 'absolute', left: 10, top: 12, color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -44,7 +44,7 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
           </div>
           <select
             className="text-input"
-            style={{ width: 160, fontSize: 13 }}
+            style={{ flex: '1 1 140px', minWidth: 0, fontSize: 13 }}
             value={filterCat}
             onChange={(e) => setFilterCat(e.target.value)}
           >
@@ -56,28 +56,30 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
         </div>
 
         <div className="modal-body" style={{ padding: 0 }}>
-          <table className="data-table">
-            <thead>
-              <tr><th>Немецкий</th><th>Перевод</th><th>Формы</th><th>Аудио</th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((w) => (
-                <tr key={w.id}>
-                  <td style={{ fontWeight: 600 }}>{w.de}</td>
-                  <td>{w.ru}</td>
-                  <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    {w.plural && <div>Pl: {w.plural}</div>}
-                    {w.praeteritum && <div>{w.praeteritum} / {w.partizip2}</div>}
-                  </td>
-                  <td>
-                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => speakGerman(w.de)}>
-                      <Volume2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr><th>Немецкий</th><th>Перевод</th><th>Формы</th><th>Аудио</th></tr>
+              </thead>
+              <tbody>
+                {filtered.map((w) => (
+                  <tr key={w.id}>
+                    <td style={{ fontWeight: 600 }}>{w.de}</td>
+                    <td>{w.ru}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {w.plural && <div>Pl: {w.plural}</div>}
+                      {w.praeteritum && <div>{w.praeteritum} / {w.partizip2}</div>}
+                    </td>
+                    <td>
+                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => speakGerman(w.de)}>
+                        <Volume2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

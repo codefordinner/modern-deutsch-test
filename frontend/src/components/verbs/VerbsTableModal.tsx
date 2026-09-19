@@ -23,7 +23,7 @@ export const VerbsTableModal: React.FC<VerbsTableModalProps> = ({ verbs, onClose
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: 740, height: '80vh' }}>
+      <div className="modal-content" style={{ maxWidth: 740, maxHeight: '80vh' }}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>Таблица 3-х форм глаголов ({verbs.length})</h3>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
@@ -44,34 +44,36 @@ export const VerbsTableModal: React.FC<VerbsTableModalProps> = ({ verbs, onClose
         </div>
 
         <div className="modal-body" style={{ padding: 0 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Infinitiv</th>
-                <th>Präteritum</th>
-                <th>Partizip II</th>
-                <th>Hilfsverb</th>
-                <th>Перевод</th>
-                <th>Аудио</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((v) => (
-                <tr key={v.id}>
-                  <td style={{ fontWeight: 700 }}>{v.de}</td>
-                  <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{v.praeteritum || '—'}</td>
-                  <td style={{ color: 'var(--success)', fontWeight: 600 }}>{v.partizip2 || '—'}</td>
-                  <td style={{ fontStyle: 'italic' }}>{v.hilfsverb || 'haben'}</td>
-                  <td>{v.ru}</td>
-                  <td>
-                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => speakGerman(`${v.de}, ${v.praeteritum || ''}, ${v.partizip2 || ''}`)}>
-                      <Volume2 size={14} />
-                    </button>
-                  </td>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Infinitiv</th>
+                  <th>Präteritum</th>
+                  <th>Partizip II</th>
+                  <th>Hilfsverb</th>
+                  <th>Перевод</th>
+                  <th>Аудио</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((v) => (
+                  <tr key={v.id}>
+                    <td style={{ fontWeight: 700 }}>{v.de}</td>
+                    <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{v.praeteritum || '—'}</td>
+                    <td style={{ color: 'var(--success)', fontWeight: 600 }}>{v.partizip2 || '—'}</td>
+                    <td style={{ fontStyle: 'italic' }}>{v.hilfsverb || 'haben'}</td>
+                    <td>{v.ru}</td>
+                    <td>
+                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => speakGerman(`${v.de}, ${v.praeteritum || ''}, ${v.partizip2 || ''}`)}>
+                        <Volume2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

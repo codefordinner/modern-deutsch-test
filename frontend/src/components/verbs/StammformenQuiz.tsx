@@ -60,7 +60,7 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
       <div className="question-subtext">{verb.ru}</div>
 
       <form onSubmit={onSubmit} style={{ width: '100%', maxWidth: 540 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10, marginBottom: 14 }}>
+        <div className="quiz-grid-3" style={{ marginBottom: 14 }}>
           <input
             type="text"
             className="text-input"

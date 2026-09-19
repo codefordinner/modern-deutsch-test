@@ -42,7 +42,7 @@ export const NumbersRangeModal: React.FC<NumbersRangeModalProps> = ({ settings, 
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2">
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Минимум</label>
               <input type="number" className="text-input" style={{ width: '100%' }} value={min} onChange={(e) => setMin(Number(e.target.value))} min={0} />

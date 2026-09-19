@@ -40,7 +40,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
               <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Название категории *</label>
               <input type="text" className="text-input" style={{ width: '100%' }} value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Иконка (Emoji)</label>
                 <input type="text" className="text-input" style={{ width: '100%' }} value={icon} onChange={(e) => setIcon(e.target.value)} />

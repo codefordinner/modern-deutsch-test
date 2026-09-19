@@ -80,7 +80,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Немецкий (с артиклем) *</label>
                 <input type="text" className="text-input" style={{ width: '100%' }} placeholder="der Tisch / sein" value={de} onChange={(e) => setDe(e.target.value)} required />
@@ -100,7 +100,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
               </select>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Множественное число (Plural)</label>
                 <input type="text" className="text-input" style={{ width: '100%' }} placeholder="die Tische" value={plural} onChange={(e) => setPlural(e.target.value)} />
@@ -113,7 +113,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
 
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Основные формы глагола (для глаголов)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div className="form-grid-3" style={{ marginBottom: 10 }}>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>Präteritum</label>
                   <input type="text" className="text-input" style={{ width: '100%' }} placeholder="war / ging" value={praeteritum} onChange={(e) => setPraeteritum(e.target.value)} />
@@ -145,7 +145,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
                     Формы настоящего времени (Präsens) — например, для <em>sein</em> (bin, bist, ist...):
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div className="form-grid-3">
                     <div>
                       <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>ich</label>
                       <input type="text" className="text-input" style={{ width: '100%' }} placeholder="bin" value={praesensIch} onChange={(e) => setPraesensIch(e.target.value)} />

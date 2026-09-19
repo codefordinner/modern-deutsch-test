@@ -4,6 +4,7 @@ import type { Word, SRSState } from '../../types';
 
 interface VerbsSRSModalProps {
   verbs: Word[];
+  pronouns: string[];
   srsState: Record<string, SRSState>;
   useSRS: boolean;
   onClose: () => void;
@@ -15,6 +16,7 @@ const QUIZ_MODES = ['praesens', 'stammformen', 'multiple_choice'] as const;
 
 export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
   verbs,
+  pronouns,
   srsState,
   useSRS,
   onClose,
@@ -22,13 +24,23 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
   onToggleUseSRS,
 }) => {
   // Each verb quiz mode has its own box per verb, so we count every
-  // (verb, mode) card rather than one bucket per verb.
+  // (verb, mode) card rather than one bucket per verb. Präsens additionally
+  // splits into one card per pronoun (ich/du/er-sie-es/wir/ihr/sie-Sie),
+  // since mastering one form of a verb shouldn't hide the others.
   const boxCounts = [0, 0, 0, 0, 0, 0];
   verbs.forEach((v) => {
     QUIZ_MODES.forEach((mode) => {
-      const item = srsState[`${v.id}:${mode}`];
-      const box = item ? item.box : 1;
-      boxCounts[box] = (boxCounts[box] || 0) + 1;
+      if (mode === 'praesens') {
+        pronouns.forEach((p) => {
+          const item = srsState[`${v.id}:${mode}:${p}`];
+          const box = item ? item.box : 1;
+          boxCounts[box] = (boxCounts[box] || 0) + 1;
+        });
+      } else {
+        const item = srsState[`${v.id}:${mode}`];
+        const box = item ? item.box : 1;
+        boxCounts[box] = (boxCounts[box] || 0) + 1;
+      }
     });
   });
 
@@ -51,7 +63,8 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
 
         <div className="modal-body">
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>
-            Каждая форма глагола — Präsens, 3 формы (Stammformen) и тест — отслеживается отдельно и распределяется по 5 ящикам.
+            Каждая форма глагола — Präsens (отдельно для каждого лица: ich, du, er/sie/es, wir, ihr, sie/Sie), 3 формы (Stammformen) и тест — отслеживается отдельно и распределяется по 5 ящикам.
+            Например, если вы хорошо выучили форму "ihr", это никак не влияет на ящик формы "du" — у каждой формы свой независимый прогресс.
             При правильном ответе карточка переходит на следующий уровень, при ошибке возвращается в Ящик 1.
           </p>
 

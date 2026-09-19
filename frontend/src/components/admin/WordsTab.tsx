@@ -28,8 +28,8 @@ export const WordsTab: React.FC<WordsTabProps> = ({
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 260 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 180px' }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -42,7 +42,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
           </div>
           <select
             className="text-input"
-            style={{ width: 180, fontSize: 14 }}
+            style={{ flex: '1 1 140px', minWidth: 0, fontSize: 14 }}
             value={selectedCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
           >

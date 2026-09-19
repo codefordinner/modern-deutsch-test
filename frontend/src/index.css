@@ -563,6 +563,41 @@ body {
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.3));
 }
 
+/* Responsive form/quiz grids.
+   Fixed multi-column grids (e.g. 3 text inputs side by side) get painfully
+   cramped on phone-width viewports, and even more so once the page is
+   pinch-zoomed (which shrinks the effective CSS width further). These
+   utility classes collapse to a single column below the breakpoints so
+   inputs and their placeholders stay legible and tappable instead of
+   overlapping. */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+/* Präteritum / Partizip II / Hilfsverb row in the verb quiz */
+.quiz-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 100px;
+  gap: 10px;
+}
+
+/* A horizontally-scrollable wrapper for wide tables, so a table with many
+   columns scrolls within itself on narrow screens instead of forcing the
+   whole modal/page to overflow sideways. */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 640px) {
   .header-inner {
     flex-direction: column;
@@ -577,5 +612,15 @@ body {
   .analog-clock-svg {
     width: 210px;
     height: 210px;
+  }
+  .form-grid-3,
+  .quiz-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
   }
 }

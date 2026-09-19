@@ -42,7 +42,11 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
 
   // Each verb quiz mode (Präsens / 3 Formen / Multiple choice) tracks its
   // own Leitner box per verb, so mastering one form doesn't hide the others.
-  const srsKey = (verbId: string, quizMode: string) => `${verbId}:${quizMode}`;
+  // Within Präsens, each pronoun (ich/du/er-sie-es/wir/ihr/sie-Sie) additionally
+  // gets its own box, so e.g. mastering "ihr" doesn't hide that "du" still
+  // needs practice — they're separate cards, not one shared box per verb.
+  const srsKey = (verbId: string, quizMode: string, pronoun?: string) =>
+    pronoun ? `${verbId}:${quizMode}:${pronoun}` : `${verbId}:${quizMode}`;
 
   useEffect(() => {
     setIsLoading(true);
@@ -61,8 +65,49 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
     localStorage.setItem('verbs_use_srs', JSON.stringify(val));
   };
 
+  const computeExpectedPraesens = (verb: Word, p: string): string => {
+    const stem = verb.de.replace(/en$/, '').replace(/n$/, '');
+    if (p === 'ich') return verb.praesensIch || (verb.de === 'sein' ? 'bin' : stem + 'e');
+    if (p === 'du') return verb.praesensDu || (verb.de === 'sein' ? 'bist' : stem + 'st');
+    if (p === 'er/sie/es') return verb.praesensErSieEs || (verb.de === 'sein' ? 'ist' : stem + 't');
+    if (p === 'wir') return verb.praesensWir || (verb.de === 'sein' ? 'sind' : verb.de);
+    if (p === 'ihr') return verb.praesensIhr || (verb.de === 'sein' ? 'seid' : stem + 't');
+    return verb.praesensSie || (verb.de === 'sein' ? 'sind' : verb.de); // sie/Sie
+  };
+
   const nextQuestion = useCallback(() => {
     if (verbs.length === 0) return;
+
+    setUserInput('');
+    setPraeteritumInput('');
+    setPartizip2Input('');
+    setHilfsverbInput('haben');
+    setFeedback(null);
+
+    if (mode === 'praesens') {
+      // Every (verb, pronoun) pair is its own card with its own Leitner box,
+      // so the pool to pick from spans all verbs × all six pronouns.
+      type Card = { verb: Word; pronoun: string };
+      const cards: Card[] = [];
+      for (const v of verbs) {
+        for (const p of pronouns) cards.push({ verb: v, pronoun: p });
+      }
+
+      let chosen: Card;
+      if (useSRS) {
+        const due = getDueCardsByKey(cards, srsMapRef.current, (c) => srsKey(c.verb.id, mode, c.pronoun));
+        chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : cards[Math.floor(Math.random() * cards.length)];
+      } else {
+        chosen = cards[Math.floor(Math.random() * cards.length)];
+      }
+
+      setCurrentVerb(chosen.verb);
+      setCurrentPronoun(chosen.pronoun);
+      setExpectedPraesens(computeExpectedPraesens(chosen.verb, chosen.pronoun));
+      return;
+    }
+
+    // stammformen / multiple_choice: one card, one box, per verb.
     let chosen: Word;
     if (useSRS) {
       const due = getDueCardsByKey(verbs, srsMapRef.current, (v) => srsKey(v.id, mode));
@@ -71,25 +116,8 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
       chosen = verbs[Math.floor(Math.random() * verbs.length)];
     }
     setCurrentVerb(chosen);
-    setUserInput('');
-    setPraeteritumInput('');
-    setPartizip2Input('');
-    setHilfsverbInput('haben');
-    setFeedback(null);
 
-    if (mode === 'praesens') {
-      const p = pronouns[Math.floor(Math.random() * pronouns.length)];
-      setCurrentPronoun(p);
-      const stem = chosen.de.replace(/en$/, '').replace(/n$/, '');
-      let exp = stem + 'e';
-      if (p === 'ich') exp = chosen.praesensIch || (chosen.de === 'sein' ? 'bin' : stem + 'e');
-      else if (p === 'du') exp = chosen.praesensDu || (chosen.de === 'sein' ? 'bist' : stem + 'st');
-      else if (p === 'er/sie/es') exp = chosen.praesensErSieEs || (chosen.de === 'sein' ? 'ist' : stem + 't');
-      else if (p === 'wir') exp = chosen.praesensWir || (chosen.de === 'sein' ? 'sind' : chosen.de);
-      else if (p === 'ihr') exp = chosen.praesensIhr || (chosen.de === 'sein' ? 'seid' : stem + 't');
-      else if (p === 'sie/Sie') exp = chosen.praesensSie || (chosen.de === 'sein' ? 'sind' : chosen.de);
-      setExpectedPraesens(exp);
-    } else if (mode === 'multiple_choice') {
+    if (mode === 'multiple_choice') {
       const correctP2 = chosen.partizip2 || `ge${chosen.de.replace(/en$/, '')}t`;
       const fake1 = `ge${chosen.de.replace(/en$/, '')}en`;
       const fake2 = `be${chosen.de.replace(/en$/, '')}t`;
@@ -103,7 +131,7 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
   const recordResult = (ok: boolean) => {
     if (!currentVerb) return;
     if (useSRS) {
-      const key = srsKey(currentVerb.id, mode);
+      const key = mode === 'praesens' ? srsKey(currentVerb.id, mode, currentPronoun) : srsKey(currentVerb.id, mode);
       const updated = updateSRS(srsMap, key, ok);
       setSrsMap(updated);
       localStorage.setItem('verbs_srs_state', JSON.stringify(updated));
@@ -167,7 +195,7 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
         />
       ) : currentVerb && mode === 'praesens' ? (
         <PraesensQuiz
-          verb={currentVerb} srsItem={srsMap[srsKey(currentVerb.id, mode)]} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
+          verb={currentVerb} srsItem={srsMap[srsKey(currentVerb.id, mode, currentPronoun)]} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
           onInputChange={setUserInput} onSubmit={handlePraesensSubmit} onNext={nextQuestion} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'multiple_choice' ? (
@@ -188,6 +216,7 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
       {isSrsOpen && (
         <VerbsSRSModal
           verbs={verbs}
+          pronouns={pronouns as unknown as string[]}
           srsState={srsMap}
           useSRS={useSRS}
           onClose={() => setIsSrsOpen(false)}
