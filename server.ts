@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import apiRouter from './backend/src/api';
 
 async function startServer() {
   const app = express();
@@ -10,7 +11,10 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // API Routes
+  // Mount API router
+  app.use('/api', apiRouter);
+
+  // API Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running!' });
   });

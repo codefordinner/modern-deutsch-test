@@ -5,10 +5,52 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  icon      String?
+  color     String?
+  isBuiltin Boolean  @default(false)
+  words     Word[]
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Word {
+  id              String   @id @default(cuid())
+  de              String
+  ru              String
+  plural          String?
+  feminine        String?
+  femininePlural  String?
+  praeteritum     String?
+  partizip2       String?
+  hilfsverb       String?
+  praesens        String?
+  praesensIch     String?
+  praesensDu      String?
+  praesensErSieEs String?
+  praesensWir     String?
+  praesensIhr     String?
+  praesensSie     String?
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  trainerType String?
+  isCorrect   Boolean?
+  ipAddress   String?
+  userAgent   String?
+  browser     String?
+  os          String?
+  device      String?
+  timestamp   DateTime @default(now())
 }

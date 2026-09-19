@@ -1,133 +1,92 @@
-import { useState, useEffect } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { Scorebar } from './components/Scorebar';
+import { NumbersTrainer } from './components/NumbersTrainer';
+import { WordsTrainer } from './components/WordsTrainer';
+import { VerbsTrainer } from './components/VerbsTrainer';
+import { TimeTrainer } from './components/TimeTrainer';
+import { AdminPanel } from './components/AdminPanel';
+import { Footer } from './components/Footer';
+import type { TrainerTab, ScoreState } from './types';
+import { trackEvent } from './utils/analytics';
 
-function App() {
-  const [count, setCount] = useState(0)
-  const [apiStatus, setApiStatus] = useState<string>('Checking backend...')
+const initialScore: ScoreState = { correct: 0, total: 0, streak: 0, bestStreak: 0 };
+
+const titles: Record<TrainerTab, string> = {
+  numbers: '🔢 Числительные',
+  words: '📚 Словарь',
+  verbs: '⚡ Глаголы (Präsens, Präteritum, Partizip II)',
+  time: '⏰ Немецкое время (Uhrzeit)',
+  admin: '⚙️ Панель управления',
+};
+
+export function App() {
+  const [activeTab, setActiveTab] = useState<TrainerTab>('numbers');
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('theme');
+    return saved ? saved === 'dark' : true; // Default dark theme
+  });
+
+  const [scores, setScores] = useState<Record<string, ScoreState>>({
+    numbers: { ...initialScore }, words: { ...initialScore }, verbs: { ...initialScore }, time: { ...initialScore },
+  });
 
   useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setApiStatus(data.message || 'Connected'))
-      .catch(() => setApiStatus('Backend offline or unreachable'))
-  }, [])
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDark]);
+
+  const handleAnswer = (isCorrect: boolean) => {
+    trackEvent('quiz_answer', activeTab, isCorrect);
+    setScores((prev) => {
+      const cur = prev[activeTab] || { ...initialScore };
+      const nextStreak = isCorrect ? cur.streak + 1 : 0;
+      return {
+        ...prev,
+        [activeTab]: {
+          correct: isCorrect ? cur.correct + 1 : cur.correct,
+          total: cur.total + 1,
+          streak: nextStreak,
+          bestStreak: Math.max(cur.bestStreak, nextStreak),
+        },
+      };
+    });
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p style={{ marginBottom: '12px' }}>
-            Backend Status: <code>{apiStatus}</code>
-          </p>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Navbar
+        activeTab={activeTab}
+        onSelectTab={(tab) => { setActiveTab(tab); trackEvent('tab_switch', tab); }}
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((p) => !p)}
+      />
 
-      <div className="ticks"></div>
+      <main className="app-container">
+        {activeTab !== 'admin' && (
+          <Scorebar
+            score={scores[activeTab] || initialScore}
+            onReset={() => setScores((p) => ({ ...p, [activeTab]: { ...initialScore } }))}
+            trainerName={titles[activeTab]}
+          />
+        )}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {activeTab === 'numbers' && <NumbersTrainer score={scores.numbers || initialScore} onAnswer={handleAnswer} />}
+        {activeTab === 'words' && <WordsTrainer score={scores.words || initialScore} onAnswer={handleAnswer} />}
+        {activeTab === 'verbs' && <VerbsTrainer score={scores.verbs || initialScore} onAnswer={handleAnswer} />}
+        {activeTab === 'time' && <TimeTrainer score={scores.time || initialScore} onAnswer={handleAnswer} />}
+        {activeTab === 'admin' && <AdminPanel />}
+      </main>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <Footer />
+    </div>
+  );
 }
 
-export default App
+export default App;
