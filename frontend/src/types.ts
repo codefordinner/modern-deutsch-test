@@ -38,6 +38,14 @@ export interface SRSRecord {
   nextReview: string; // ISO
 }
 
+export type SRSState = SRSRecord;
+
+export interface NumberRangeSettings {
+  min: number;
+  max: number;
+  allowLarge?: boolean;
+}
+
 export type TrainerTab = 'numbers' | 'words' | 'verbs' | 'time' | 'admin';
 
 export interface ScoreState {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, HelpCircle } from 'lucide-react';
+import { Sliders } from 'lucide-react';
 import { NumbersQuizCard } from './numbers/NumbersQuizCard';
 import { NumbersRangeModal } from './numbers/NumbersRangeModal';
 import { numberToGermanWords } from '../utils/numbers-generator';
