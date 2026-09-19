@@ -42,6 +42,12 @@ export function App() {
     }
   }, [isDark]);
 
+  // Fired once per app load so the admin panel can show visitor stats
+  // (total visits, unique visitors, visits over time) instead of word stats.
+  useEffect(() => {
+    trackEvent('visit');
+  }, []);
+
   const handleAnswer = (isCorrect: boolean) => {
     trackEvent('quiz_answer', activeTab, isCorrect);
     setScores((prev) => {

@@ -22,27 +22,55 @@ router.post('/event', async (req: Request, res: Response) => {
   }
 });
 
+// Visitor statistics for the admin panel. `eventType: 'visit'` is fired once
+// per app load from the frontend (see App.tsx), and `tab_switch` is fired
+// whenever someone navigates between trainer tabs.
 router.get('/stats', requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const events = await prisma.analyticsEvent.findMany({
-      where: { eventType: 'quiz_answer' },
-      take: 2000,
+    const visitEvents = await prisma.analyticsEvent.findMany({
+      where: { eventType: 'visit' },
+      select: { ipAddress: true, timestamp: true },
       orderBy: { timestamp: 'desc' },
+      take: 5000,
     });
 
-    const totalAnswers = events.length;
-    const correctAnswers = events.filter((e) => e.isCorrect === true).length;
-    const overallAccuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
+    const totalVisits = visitEvents.length;
+    const uniqueVisitors = new Set(visitEvents.map((e) => e.ipAddress || 'unknown')).size;
 
-    const byTrainer: Record<string, { total: number; correct: number }> = {};
-    for (const ev of events) {
-      const t = ev.trainerType || 'other';
-      if (!byTrainer[t]) byTrainer[t] = { total: 0, correct: 0 };
-      byTrainer[t].total += 1;
-      if (ev.isCorrect) byTrainer[t].correct += 1;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const visitsToday = visitEvents.filter((e) => e.timestamp >= startOfToday).length;
+
+    // Build a fixed 7-day window (including days with zero visits) so the
+    // chart on the frontend always has consistent buckets.
+    const dayBuckets: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dayBuckets[key] = 0;
     }
+    visitEvents.forEach((e) => {
+      const key = e.timestamp.toISOString().slice(0, 10);
+      if (key in dayBuckets) dayBuckets[key] += 1;
+    });
+    const last7Days = Object.entries(dayBuckets).map(([date, count]) => ({ date, count }));
 
-    res.json({ totalAnswers, correctAnswers, overallAccuracy, byTrainer });
+    const tabEvents = await prisma.analyticsEvent.findMany({
+      where: { eventType: 'tab_switch' },
+      select: { trainerType: true },
+      take: 5000,
+    });
+    const tabCounts: Record<string, number> = {};
+    tabEvents.forEach((e) => {
+      const t = e.trainerType || 'other';
+      tabCounts[t] = (tabCounts[t] || 0) + 1;
+    });
+    const topTabs = Object.entries(tabCounts)
+      .map(([tab, count]) => ({ tab, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ totalVisits, uniqueVisitors, visitsToday, last7Days, topTabs });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch stats' });
   }

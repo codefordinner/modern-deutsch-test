@@ -4,12 +4,20 @@ import { WordsQuizCard } from './words/WordsQuizCard';
 import { WordsDictionaryModal } from './words/WordsDictionaryModal';
 import { WordsSRSModal } from './words/WordsSRSModal';
 import { WordsSettingsModal } from './words/WordsSettingsModal';
-import { getDueCards, updateSRS } from '../utils/srs';
+import { getDueCardsByKey, updateSRS } from '../utils/srs';
 import type { Word, Category, ScoreState, SRSState } from '../types';
+
+type Direction = 'ru_to_de' | 'de_to_ru';
+type FormType = 'base' | 'plural' | 'feminine';
+
+// Each (word, direction, form) combination tracks its own Leitner box, so
+// e.g. knowing "der Tisch" ru→de doesn't hide that its plural or de→ru
+// direction still needs practice.
+const srsKey = (wordId: string, direction: Direction, formType: FormType) => `${wordId}:${direction}:${formType}`;
 
 export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
   const [directionMode, setDirectionMode] = useState<'ru_to_de' | 'de_to_ru' | 'mixed'>('ru_to_de');
-  const [activeDirection, setActiveDirection] = useState<'ru_to_de' | 'de_to_ru'>('ru_to_de');
+  const [activeDirection, setActiveDirection] = useState<Direction>('ru_to_de');
   const [words, setWords] = useState<Word[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +36,7 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
   });
 
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
-  const [currentFormType, setCurrentFormType] = useState<'base' | 'plural' | 'feminine'>('base');
+  const [currentFormType, setCurrentFormType] = useState<FormType>('base');
   const [userInput, setUserInput] = useState('');
   const [feedback, setFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
   const [srsMap, setSrsMap] = useState<Record<string, SRSState>>(() => {
@@ -68,30 +76,36 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
     const activePool = words.filter((w) => isAll || selectedCats.includes(w.categoryId));
     if (activePool.length === 0) { setCurrentWord(null); return; }
 
-    let chosen: Word;
+    const directions: Direction[] = directionMode === 'mixed' ? ['ru_to_de', 'de_to_ru'] : [directionMode];
+
+    type Card = { word: Word; direction: Direction; formType: FormType };
+    const cards: Card[] = [];
+    for (const w of activePool) {
+      const possibleForms: FormType[] = [];
+      if (enableBase) possibleForms.push('base');
+      if (enablePlural && w.plural) possibleForms.push('plural');
+      if (enableFeminine && w.feminine) possibleForms.push('feminine');
+      const forms = possibleForms.length > 0 ? possibleForms : (['base'] as FormType[]);
+      for (const direction of directions) {
+        for (const formType of forms) {
+          cards.push({ word: w, direction, formType });
+        }
+      }
+    }
+
+    if (cards.length === 0) { setCurrentWord(null); return; }
+
+    let chosenCard: Card;
     if (useSRS) {
-      const due = getDueCards(activePool, srsMapRef.current);
-      chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : activePool[Math.floor(Math.random() * activePool.length)];
+      const due = getDueCardsByKey(cards, srsMapRef.current, (c) => srsKey(c.word.id, c.direction, c.formType));
+      chosenCard = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : cards[Math.floor(Math.random() * cards.length)];
     } else {
-      chosen = activePool[Math.floor(Math.random() * activePool.length)];
-    }
-    setCurrentWord(chosen);
-
-    // Pick direction if mixed
-    if (directionMode === 'mixed') {
-      setActiveDirection(Math.random() > 0.5 ? 'ru_to_de' : 'de_to_ru');
-    } else {
-      setActiveDirection(directionMode);
+      chosenCard = cards[Math.floor(Math.random() * cards.length)];
     }
 
-    // Pick form type
-    const possibleForms: ('base' | 'plural' | 'feminine')[] = [];
-    if (enableBase) possibleForms.push('base');
-    if (enablePlural && chosen.plural) possibleForms.push('plural');
-    if (enableFeminine && chosen.feminine) possibleForms.push('feminine');
-    const chosenForm = possibleForms.length > 0 ? possibleForms[Math.floor(Math.random() * possibleForms.length)] : 'base';
-    setCurrentFormType(chosenForm);
-
+    setCurrentWord(chosenCard.word);
+    setActiveDirection(chosenCard.direction);
+    setCurrentFormType(chosenCard.formType);
     setUserInput('');
     setFeedback(null);
   }, [words, selectedCats, useSRS, directionMode, enableBase, enablePlural, enableFeminine]);
@@ -124,7 +138,8 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
     }
 
     if (useSRS) {
-      const updatedSRS = updateSRS(srsMap, currentWord.id, isCorrect);
+      const key = srsKey(currentWord.id, activeDirection, currentFormType);
+      const updatedSRS = updateSRS(srsMap, key, isCorrect);
       setSrsMap(updatedSRS);
       localStorage.setItem('words_srs_state', JSON.stringify(updatedSRS));
     }
@@ -181,7 +196,8 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
         </div>
       ) : currentWord ? (
         <WordsQuizCard
-          currentWord={currentWord} direction={activeDirection} formType={currentFormType} srsItem={srsMap[currentWord.id]} useSRS={useSRS}
+          currentWord={currentWord} direction={activeDirection} formType={currentFormType}
+          srsItem={srsMap[srsKey(currentWord.id, activeDirection, currentFormType)]} useSRS={useSRS}
           userInput={userInput} feedback={feedback} onInputChange={setUserInput}
           onSubmit={handleSubmit} onNext={nextWord} onInsertChar={(c) => setUserInput((p) => p + c)}
         />

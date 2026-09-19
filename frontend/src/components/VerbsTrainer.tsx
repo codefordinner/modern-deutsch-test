@@ -5,7 +5,7 @@ import { VerbsSRSModal } from './verbs/VerbsSRSModal';
 import { PraesensQuiz } from './verbs/PraesensQuiz';
 import { StammformenQuiz } from './verbs/StammformenQuiz';
 import { MultipleChoiceQuiz } from './verbs/MultipleChoiceQuiz';
-import { getDueCards, updateSRS } from '../utils/srs';
+import { getDueCardsByKey, updateSRS } from '../utils/srs';
 import type { Word, ScoreState, SRSState } from '../types';
 
 const pronouns = ['ich', 'du', 'er/sie/es', 'wir', 'ihr', 'sie/Sie'] as const;
@@ -40,6 +40,10 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
   const srsMapRef = useRef(srsMap);
   srsMapRef.current = srsMap;
 
+  // Each verb quiz mode (Präsens / 3 Formen / Multiple choice) tracks its
+  // own Leitner box per verb, so mastering one form doesn't hide the others.
+  const srsKey = (verbId: string, quizMode: string) => `${verbId}:${quizMode}`;
+
   useEffect(() => {
     setIsLoading(true);
     fetch('/api/words?limit=500')
@@ -61,7 +65,7 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
     if (verbs.length === 0) return;
     let chosen: Word;
     if (useSRS) {
-      const due = getDueCards(verbs, srsMapRef.current);
+      const due = getDueCardsByKey(verbs, srsMapRef.current, (v) => srsKey(v.id, mode));
       chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : verbs[Math.floor(Math.random() * verbs.length)];
     } else {
       chosen = verbs[Math.floor(Math.random() * verbs.length)];
@@ -99,7 +103,8 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
   const recordResult = (ok: boolean) => {
     if (!currentVerb) return;
     if (useSRS) {
-      const updated = updateSRS(srsMap, currentVerb.id, ok);
+      const key = srsKey(currentVerb.id, mode);
+      const updated = updateSRS(srsMap, key, ok);
       setSrsMap(updated);
       localStorage.setItem('verbs_srs_state', JSON.stringify(updated));
     }
@@ -156,18 +161,18 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
         </div>
       ) : currentVerb && mode === 'stammformen' ? (
         <StammformenQuiz
-          verb={currentVerb} srsItem={srsMap[currentVerb.id]} praeteritumInput={praeteritumInput} partizip2Input={partizip2Input} hilfsverbInput={hilfsverbInput} feedback={feedback}
+          verb={currentVerb} srsItem={srsMap[srsKey(currentVerb.id, mode)]} praeteritumInput={praeteritumInput} partizip2Input={partizip2Input} hilfsverbInput={hilfsverbInput} feedback={feedback}
           onPraeteritumChange={setPraeteritumInput} onPartizip2Change={setPartizip2Input} onHilfsverbChange={setHilfsverbInput}
           onSubmit={handleStammSubmit} onNext={nextQuestion} onInsertChar={(c) => setPraeteritumInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'praesens' ? (
         <PraesensQuiz
-          verb={currentVerb} srsItem={srsMap[currentVerb.id]} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
+          verb={currentVerb} srsItem={srsMap[srsKey(currentVerb.id, mode)]} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
           onInputChange={setUserInput} onSubmit={handlePraesensSubmit} onNext={nextQuestion} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'multiple_choice' ? (
         <MultipleChoiceQuiz
-          verb={currentVerb} srsItem={srsMap[currentVerb.id]} options={mcOptions} feedback={feedback}
+          verb={currentVerb} srsItem={srsMap[srsKey(currentVerb.id, mode)]} options={mcOptions} feedback={feedback}
           onSelectOption={(opt) => {
             const ok = opt === currentVerb.partizip2;
             setFeedback({ isCorrect: ok, message: `${currentVerb.de} -> Partizip II: ${currentVerb.partizip2}` });

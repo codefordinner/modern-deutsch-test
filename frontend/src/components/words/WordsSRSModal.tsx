@@ -11,6 +11,8 @@ interface WordsSRSModalProps {
   onToggleUseSRS: (val: boolean) => void;
 }
 
+const DIRECTIONS = ['ru_to_de', 'de_to_ru'] as const;
+
 export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   words,
   srsState,
@@ -19,11 +21,21 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   onResetSRS,
   onToggleUseSRS,
 }) => {
+  // Each direction (ru→de / de→ru) and each applicable form (base/plural/
+  // feminine) has its own box per word, so we count every such card.
   const boxCounts = [0, 0, 0, 0, 0, 0];
   words.forEach((w) => {
-    const item = srsState[w.id];
-    const box = item ? item.box : 1;
-    boxCounts[box] = (boxCounts[box] || 0) + 1;
+    const forms: ('base' | 'plural' | 'feminine')[] = ['base'];
+    if (w.plural) forms.push('plural');
+    if (w.feminine) forms.push('feminine');
+
+    DIRECTIONS.forEach((direction) => {
+      forms.forEach((formType) => {
+        const item = srsState[`${w.id}:${direction}:${formType}`];
+        const box = item ? item.box : 1;
+        boxCounts[box] = (boxCounts[box] || 0) + 1;
+      });
+    });
   });
 
   const boxLabels = [
@@ -45,7 +57,9 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
 
         <div className="modal-body">
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>
-            Слова распределяются по 5 ящикам. Правильный ответ переносит карточку в следующий ящик, ошибка возвращает в Ящик 1.
+            Каждое направление (рус→нем / нем→рус) и каждая форма слова (база, множественное число, женский род)
+            отслеживаются отдельно и распределяются по 5 ящикам. Правильный ответ переносит карточку в следующий ящик,
+            ошибка возвращает в Ящик 1.
           </p>
 
           <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>

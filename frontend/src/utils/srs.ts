@@ -103,6 +103,14 @@ export function updateSRS(
   const newStreak = isCorrect ? (current.streak || 0) + 1 : 0;
   const newMistakes = !isCorrect ? (current.mistakes || 0) + 1 : current.mistakes || 0;
 
+  // IMPORTANT FIX: this previously never set `nextReview`, which meant the
+  // due-card selector always treated every reviewed card as "not due" (it
+  // compared `now` against `new Date(undefined)`, i.e. NaN). Compute it
+  // properly from the Leitner box interval so due-based selection works.
+  const daysUntilNext = SRS_INTERVALS_DAYS[newBox] ?? 1;
+  const now = new Date();
+  const nextReview = new Date(now.getTime() + daysUntilNext * 24 * 60 * 60 * 1000).toISOString();
+
   return {
     ...records,
     [id]: {
@@ -110,13 +118,52 @@ export function updateSRS(
       box: newBox,
       streak: newStreak,
       mistakes: newMistakes,
-      lastReviewed: new Date().toISOString(),
+      lastReviewed: now.toISOString(),
+      nextReview,
     },
   };
 }
 
-export function getDueCards<T extends { id: string }>(words: T[], _records: Record<string, any>): T[] {
-  return sortWordsBySRSPriority(words);
+// Sorts/selects "due" items from any collection using a caller-provided key.
+// Using a composite key (e.g. `${word.id}:${direction}:${formType}` or
+// `${verb.id}:${mode}`) lets the same word/verb carry independent Leitner
+// progress per direction, per form (plural/feminine/base), or per verb-quiz
+// mode, instead of sharing a single box across all of them.
+export function getDueCardsByKey<T>(
+  items: T[],
+  records: Record<string, any>,
+  keyFn: (item: T) => string
+): T[] {
+  const now = new Date().getTime();
+
+  return [...items].sort((a, b) => {
+    const srsA = records[keyFn(a)];
+    const srsB = records[keyFn(b)];
+
+    const boxA = srsA?.box || 1;
+    const boxB = srsB?.box || 1;
+
+    const nextReviewA = srsA?.nextReview ? new Date(srsA.nextReview).getTime() : 0;
+    const nextReviewB = srsB?.nextReview ? new Date(srsB.nextReview).getTime() : 0;
+
+    const dueA = nextReviewA <= now ? 0 : 1;
+    const dueB = nextReviewB <= now ? 0 : 1;
+
+    if (dueA !== dueB) return dueA - dueB; // Due first
+    if (boxA !== boxB) return boxA - boxB; // Lower box first
+
+    return Math.random() - 0.5; // Jitter for equal priority
+  });
+}
+
+// IMPORTANT FIX: previously this ignored the `records` argument completely
+// and read from an unrelated localStorage store (`sortWordsBySRSPriority`,
+// backed by `modern_deutsch_srs_data`) that nothing else in the app ever
+// wrote to. Due-card selection was therefore completely disconnected from
+// the actual box progress shown in the SRS modals. Kept for compatibility,
+// now delegates to getDueCardsByKey using the item's own id.
+export function getDueCards<T extends { id: string }>(words: T[], records: Record<string, any>): T[] {
+  return getDueCardsByKey(words, records, (w) => w.id);
 }
 
 export function getSRSStats(wordIds: string[]): any {

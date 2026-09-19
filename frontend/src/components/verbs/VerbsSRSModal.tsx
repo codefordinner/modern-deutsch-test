@@ -11,6 +11,8 @@ interface VerbsSRSModalProps {
   onToggleUseSRS: (val: boolean) => void;
 }
 
+const QUIZ_MODES = ['praesens', 'stammformen', 'multiple_choice'] as const;
+
 export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
   verbs,
   srsState,
@@ -19,11 +21,15 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
   onResetSRS,
   onToggleUseSRS,
 }) => {
+  // Each verb quiz mode has its own box per verb, so we count every
+  // (verb, mode) card rather than one bucket per verb.
   const boxCounts = [0, 0, 0, 0, 0, 0];
   verbs.forEach((v) => {
-    const item = srsState[v.id];
-    const box = item ? item.box : 1;
-    boxCounts[box] = (boxCounts[box] || 0) + 1;
+    QUIZ_MODES.forEach((mode) => {
+      const item = srsState[`${v.id}:${mode}`];
+      const box = item ? item.box : 1;
+      boxCounts[box] = (boxCounts[box] || 0) + 1;
+    });
   });
 
   const boxLabels = [
@@ -45,7 +51,8 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
 
         <div className="modal-body">
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>
-            Глаголы распределяются по 5 ящикам. При правильном ответе карточка переходит на следующий уровень, при ошибке возвращается в Ящик 1.
+            Каждая форма глагола — Präsens, 3 формы (Stammformen) и тест — отслеживается отдельно и распределяется по 5 ящикам.
+            При правильном ответе карточка переходит на следующий уровень, при ошибке возвращается в Ящик 1.
           </p>
 
           <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
@@ -69,7 +76,7 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
             {[1, 2, 3, 4, 5].map((box) => (
               <div key={box} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{boxLabels[box]}</span>
-                <span className={`leitner-badge box-${box}`}>{boxCounts[box]} глаголов</span>
+                <span className={`leitner-badge box-${box}`}>{boxCounts[box]} карточек</span>
               </div>
             ))}
           </div>
