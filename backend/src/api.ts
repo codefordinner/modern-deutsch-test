@@ -6,10 +6,13 @@ import analyticsRoutes from './routes/analytics.routes';
 
 const router = Router();
 
-router.use('/auth', authRoutes);
-router.use('/admin', authRoutes); // alias for admin login
-router.use('/words', wordsRoutes);
-router.use('/categories', categoriesRoutes);
-router.use('/analytics', analyticsRoutes);
+const getRouter = (mod: any) => (mod && mod.default ? mod.default : mod);
 
+router.use('/auth', getRouter(authRoutes));
+router.use('/admin', getRouter(authRoutes)); // alias for admin login
+router.use('/words', getRouter(wordsRoutes));
+router.use('/categories', getRouter(categoriesRoutes));
+router.use('/analytics', getRouter(analyticsRoutes));
+
+export const apiRouter = router;
 export default router;
