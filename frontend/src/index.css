@@ -1,0 +1,867 @@
+:root {
+  --bg-primary: #0e1015;
+  --bg-secondary: #16181f;
+  --bg-tertiary: #20232b;
+  --bg-elevated: #262a34;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: #10b981;
+  --accent-primary: #10b981;
+  --accent-hover: #059669;
+  --accent-light: rgba(16, 185, 129, 0.15);
+  --success: #10b981;
+  --success-light: rgba(16, 185, 129, 0.15);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --error: #ef4444;
+  --error-light: rgba(239, 68, 68, 0.15);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.15);
+  --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 12px -2px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 16px 24px -4px rgba(0, 0, 0, 0.65);
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+html.light {
+  /* Redesigned for more visual hierarchy and contrast: previously
+     --bg-primary/--bg-secondary/--accent-light were all near-white, so
+     cards, active tabs and buttons barely stood out from the page and the
+     whole theme read as flat/washed out. */
+  --bg-primary: #eef1f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f4f9;
+  --bg-elevated: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5871;
+  --text-muted: #8996a8;
+  --border-color: #dde3ec;
+  --border-focus: #059669;
+  --accent-primary: #059669;
+  --accent-hover: #047857;
+  --accent-light: #d3f5e6;
+  --success: #059669;
+  --success-light: #ecfdf5;
+  --success-border: #a7f3d0;
+  --error: #dc2626;
+  --error-light: #fef2f2;
+  --error-border: #fecaca;
+  --warning: #b45309;
+  --warning-light: #fff7e6;
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 8px 18px -6px rgba(15, 23, 42, 0.14);
+  --shadow-lg: 0 22px 34px -12px rgba(15, 23, 42, 0.2);
+}
+
+/* The Leitner box badges use fixed pastel-on-transparent colors tuned for
+   the dark background (light text on a dark card). On a white card those
+   same light pastel text colors have poor contrast and look washed out, so
+   the light theme gets its own darker, more legible palette here. */
+html.light .box-1 { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+html.light .box-2 { background: rgba(217, 119, 6, 0.14); color: #b45309; }
+html.light .box-3 { background: rgba(180, 83, 9, 0.14); color: #92400e; }
+html.light .box-4 { background: rgba(13, 148, 136, 0.14); color: #0f766e; }
+html.light .box-5 { background: rgba(5, 150, 105, 0.14); color: #047857; }
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Together with overflow-x: hidden on body, this is the second half of the
+     fix for very long, unbroken German compound words (numbers, verb forms)
+     forcing the page wider than the viewport and enabling unwanted
+     horizontal pinch/scroll/zoom on phones. */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  /* Safety net: nothing in the layout should ever need to push the page
+     wider than the viewport, but this guarantees a stray/oversized
+     element can't create a horizontal scrollbar or let the user pan the
+     whole page sideways (most noticeable on phones and when the page is
+     pinch-zoomed). Only the x-axis is constrained so the sticky header
+     keeps working normally. */
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  /* Top padding restores the breathing room that used to come from the
+     old "Статистика" button row's own margin, which no longer exists now
+     that the trigger lives in the header. */
+  padding: 24px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Header & Nav */
+.app-header {
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(8px);
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.header-inner {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  /* Was `wrap`: since .nav-tabs previously had no min-width override, its
+     flex-basis defaulted to its full unshrunk content width, so on
+     medium-width desktop windows there wasn't "room" for header-actions
+     next to it and the whole block dropped to a second line at the
+     bottom-left. Now that .nav-tabs can shrink and scroll internally (see
+     below), everything reliably stays on one row down to the mobile
+     breakpoint, where the column layout takes over instead. */
+  flex-wrap: nowrap;
+}
+
+.brand-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.brand-flag {
+  width: 28px;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+.flag-stripe-black { background: #000000; height: 33.33%; }
+.flag-stripe-red { background: #dd0000; height: 33.33%; }
+.flag-stripe-gold { background: #ffce00; height: 33.34%; }
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.brand-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  /* Lets this flex child shrink below its content's natural width and
+     scroll internally, instead of forcing the parent .header-inner to grow
+     or wrap when the window is narrower than "brand + all tabs + actions". */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nav-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.nav-tab-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.nav-tab-btn.active {
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Score Bar */
+.score-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin: 20px 0;
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+
+.score-stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--mono);
+}
+
+/* Umlauts Bar */
+.umlaut-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 20px;
+  flex-wrap: wrap;
+}
+
+.umlaut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 38px;
+  padding: 0 10px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.umlaut-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.umlaut-btn:active {
+  transform: translateY(1px);
+}
+
+/* Card */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.trainer-modes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.mode-pill {
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-pill:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.mode-pill.active {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+}
+
+/* Question Area */
+.question-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  margin: 16px 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.question-prompt-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.question-text {
+  /* Fixed 38px overflowed the viewport for very long, unbroken German
+     compound words (numbers like "zweihundertdreiundfünfzigtausend...",
+     long verb forms, etc). clamp() shrinks it a bit on narrow screens, and
+     overflow-wrap/hyphens let a single long "word" break and wrap inside
+     its container instead of forcing the page wider than the screen
+     (which is what made pinch-zoom/horizontal scroll appear on mobile). */
+  font-size: clamp(22px, 7vw, 38px);
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 14px;
+  line-height: 1.25;
+  width: 100%;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.question-subtext {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+  overflow-wrap: anywhere;
+}
+
+.input-group {
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 18px;
+  font-size: 17px;
+  font-family: inherit;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.text-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-primary);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Feedback */
+.feedback-box {
+  width: 100%;
+  max-width: 540px;
+  margin-top: 18px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+
+.feedback-success {
+  background: var(--success-light);
+  border: 1px solid var(--success-border);
+  color: var(--success);
+}
+
+.feedback-error {
+  background: var(--error-light);
+  border: 1px solid var(--error-border);
+  color: var(--error);
+}
+
+/* Answer comparison: "Вы ввели" / "Правильно" with the difference highlighted */
+.feedback-box-compare {
+  align-items: flex-start;
+}
+
+.feedback-box-compare .feedback-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.answer-compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.answer-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.answer-compare-list > .answer-compare + .answer-compare,
+.answer-compare-list > .answer-compare-ok + .answer-compare,
+.answer-compare-list > .answer-compare + .answer-compare-ok {
+  padding-top: 2px;
+}
+
+.answer-compare-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+.answer-compare-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.answer-compare-tag {
+  flex: 0 0 86px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.answer-compare-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* What the user typed */
+.answer-compare-user {
+  color: var(--error);
+}
+
+.answer-diff-wrong {
+  font-weight: 400;
+  background: var(--error-border);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.answer-compare-empty {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+/* The correct answer — the part that differs is bold */
+.answer-compare-expected {
+  color: var(--text-primary);
+}
+
+.answer-diff-right {
+  font-weight: 800;
+  color: var(--success);
+  /* a single bold letter is easy to miss — underline it as well */
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* A missing or wrong space would be invisible when merely bold */
+.answer-diff-space {
+  background: var(--success-border);
+  border-radius: 3px;
+}
+
+.answer-compare-alt {
+  margin-left: 96px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* A field that was answered correctly inside an otherwise wrong multi-field answer */
+.answer-compare-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--success);
+}
+
+.answer-compare-ok strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .answer-compare-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .answer-compare-tag {
+    flex-basis: auto;
+  }
+  .answer-compare-alt {
+    margin-left: 0;
+  }
+}
+
+/* SRS Badges */
+.leitner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.box-1 { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.box-2 { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+.box-3 { background: rgba(217, 119, 6, 0.2); color: #fcd34d; }
+.box-4 { background: rgba(13, 148, 136, 0.2); color: #99f6e4; }
+.box-5 { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--bg-tertiary);
+}
+
+/* Data Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+
+.data-table th, .data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.data-table tr:hover td {
+  background: var(--bg-tertiary);
+}
+
+/* Analog Clock */
+.clock-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.analog-clock-svg {
+  width: 260px;
+  height: 260px;
+  max-width: 100%;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.3));
+}
+
+/* Responsive form/quiz grids.
+   Fixed multi-column grids (e.g. 3 text inputs side by side) get painfully
+   cramped on phone-width viewports, and even more so once the page is
+   pinch-zoomed (which shrinks the effective CSS width further). These
+   utility classes collapse to a single column below the breakpoints so
+   inputs and their placeholders stay legible and tappable instead of
+   overlapping. */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+/* Präteritum / Partizip II / Hilfsverb row in the verb quiz */
+.quiz-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 100px;
+  gap: 10px;
+}
+
+/* A horizontally-scrollable wrapper for wide tables, so a table with many
+   columns scrolls within itself on narrow screens instead of forcing the
+   whole modal/page to overflow sideways. */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  /* Once .header-inner switches to a column, its default cross-axis
+     sizing (stretch) makes each child as wide as the header, but
+     .nav-tabs still needs an explicit width/min-width so the browser
+     knows to wrap its *own* overflow into a horizontal scrollbar
+     instead of letting the row of tab buttons grow past the edge of
+     the screen and drag the whole page/menu off-screen with it. */
+  .nav-tabs {
+    width: 100%;
+    min-width: 0;
+  }
+  .header-actions {
+    align-self: flex-end;
+  }
+  /* The subtitle under the logo is purely decorative and was one of the
+     biggest contributors to header height on phones. */
+  .brand-sub {
+    display: none;
+  }
+  .question-subtext {
+    font-size: 14px;
+  }
+  .input-group {
+    flex-direction: column;
+  }
+  .analog-clock-svg {
+    width: 210px;
+    height: 210px;
+  }
+  .form-grid-3,
+  .quiz-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Icon-only tabs: keeps the nav on one compact row instead of wrapping
+     to a second line and pushing content down further. */
+  .nav-tab-btn span {
+    display: none;
+  }
+  .nav-tab-btn {
+    padding: 9px 11px;
+  }
+  .brand-title {
+    font-size: 16px;
+  }
+  .brand-area {
+    gap: 8px;
+  }
+  .app-container {
+    padding: 16px 12px 28px;
+  }
+  .question-card {
+    padding: 24px 14px;
+    margin: 12px 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
