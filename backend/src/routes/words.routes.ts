@@ -11,7 +11,7 @@ router.get('/', async (req: Request, res: Response) => {
     if (categoryId && categoryId !== 'all') where.categoryId = String(categoryId);
     if (search) {
       const q = String(search).trim();
-      where.OR = [{ de: { contains: q } }, { ru: { contains: q } }];
+      where.OR = [{ de: { contains: q } }, { ru: { contains: q } }, { hint: { contains: q } }];
     }
 
     const take = Math.min(Number(limit) || 200, 1000);
@@ -33,6 +33,7 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     const {
       de,
       ru,
+      hint,
       plural,
       feminine,
       praeteritum,
@@ -52,6 +53,7 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
       data: {
         de,
         ru,
+        hint,
         plural,
         feminine,
         praeteritum,
@@ -78,6 +80,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     const {
       de,
       ru,
+      hint,
       plural,
       feminine,
       praeteritum,
@@ -96,6 +99,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       data: {
         de,
         ru,
+        hint,
         plural,
         feminine,
         praeteritum,
@@ -142,7 +146,8 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
         const de = parts[0];
         const ru = parts[1];
         const plural = parts[2] || null;
-        await prisma.word.create({ data: { de, ru, plural, categoryId: defaultCategoryId } });
+        const hint = parts[3] || null;
+        await prisma.word.create({ data: { de, ru, plural, hint, categoryId: defaultCategoryId } });
         importedCount++;
       }
     }

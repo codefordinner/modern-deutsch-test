@@ -75,7 +75,10 @@ export const WordsTab: React.FC<WordsTabProps> = ({
               words.map((w) => (
                 <tr key={w.id}>
                   <td style={{ fontWeight: 600 }}>{w.de}</td>
-                  <td>{w.ru}</td>
+                  <td>
+                    {w.ru}
+                    {w.hint && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>{w.hint}</div>}
+                  </td>
                   <td><span style={{ fontSize: 12, background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: 6 }}>{w.category?.icon} {w.category?.name}</span></td>
                   <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                     {w.plural && <div>Pl: {w.plural}</div>}

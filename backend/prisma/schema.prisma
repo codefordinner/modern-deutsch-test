@@ -23,6 +23,7 @@ model Word {
   id              String   @id @default(cuid())
   de              String
   ru              String
+  hint            String?
   plural          String?
   feminine        String?
   femininePlural  String?

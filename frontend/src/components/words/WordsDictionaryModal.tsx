@@ -18,7 +18,8 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
     const matchSearch =
       !search ||
       w.de.toLowerCase().includes(search.toLowerCase()) ||
-      w.ru.toLowerCase().includes(search.toLowerCase());
+      w.ru.toLowerCase().includes(search.toLowerCase()) ||
+      (w.hint || '').toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
@@ -65,7 +66,10 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
                 {filtered.map((w) => (
                   <tr key={w.id}>
                     <td style={{ fontWeight: 600 }}>{w.de}</td>
-                    <td>{w.ru}</td>
+                    <td>
+                      {w.ru}
+                      {w.hint && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>{w.hint}</div>}
+                    </td>
                     <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                       {w.plural && <div>Pl: {w.plural}</div>}
                       {w.praeteritum && <div>{w.praeteritum} / {w.partizip2}</div>}

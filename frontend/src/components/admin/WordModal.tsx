@@ -12,6 +12,7 @@ interface WordModalProps {
 export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose, onSave }) => {
   const [de, setDe] = useState('');
   const [ru, setRu] = useState('');
+  const [hint, setHint] = useState('');
   const [plural, setPlural] = useState('');
   const [feminine, setFeminine] = useState('');
   const [praeteritum, setPraeteritum] = useState('');
@@ -31,6 +32,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
     if (word) {
       setDe(word.de);
       setRu(word.ru);
+      setHint(word.hint || '');
       setPlural(word.plural || '');
       setFeminine(word.feminine || '');
       setPraeteritum(word.praeteritum || '');
@@ -60,6 +62,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
     onSave({
       de,
       ru,
+      hint: hint || null,
       plural: plural || null,
       feminine: feminine || null,
       praeteritum: praeteritum || null,
@@ -93,6 +96,11 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Русский перевод *</label>
                 <input type="text" className="text-input" style={{ width: '100%' }} placeholder="стол / быть" value={ru} onChange={(e) => setRu(e.target.value)} required />
               </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Подсказка (чтобы отличать похожие переводы)</label>
+              <input type="text" className="text-input" style={{ width: '100%' }} placeholder="напр. «коса (причёска)» или «замок (здание)»" value={hint} onChange={(e) => setHint(e.target.value)} />
             </div>
 
             <div>

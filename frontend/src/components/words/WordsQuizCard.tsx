@@ -81,6 +81,11 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
       </div>
 
       {subText && <div className="question-subtext">{subText}</div>}
+      {currentWord.hint && (
+        <div className="question-subtext" style={{ fontStyle: 'italic', opacity: 0.85 }}>
+          💡 {currentWord.hint}
+        </div>
+      )}
 
       <form onSubmit={onSubmit} style={{ width: '100%' }}>
         <div className="input-group">

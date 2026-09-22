@@ -165,9 +165,10 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
       };
     }
 
+    const hintSuffix = currentWord.hint ? ` (${currentWord.hint})` : '';
     setFeedback({
       isCorrect,
-      message: `Отлично! ${expectedTarget} = ${currentWord.ru}`,
+      message: `Отлично! ${expectedTarget} = ${currentWord.ru}${hintSuffix}`,
       checks: [check],
     });
     onAnswer(isCorrect);

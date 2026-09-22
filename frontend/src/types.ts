@@ -13,6 +13,8 @@ export interface Word {
   id: string;
   de: string;
   ru: string;
+  /** Short clarifying note (e.g. meaning/context) to tell apart words that translate the same way. */
+  hint?: string | null;
   plural?: string | null;
   feminine?: string | null;
   femininePlural?: string | null;
