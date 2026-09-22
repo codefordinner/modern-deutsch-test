@@ -40,7 +40,7 @@ export const TimeTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean) 
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+      <div className="trainer-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <div className="trainer-modes" style={{ margin: 0 }}>
           <button className={`mode-pill ${stepMode === 'any' ? 'active' : ''}`} onClick={() => setStepMode('any')}>
             <Sparkles size={13} /> Любая минута (kurz vor / nach)

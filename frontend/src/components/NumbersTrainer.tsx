@@ -66,7 +66,7 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+      <div className="trainer-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <div className="trainer-modes" style={{ margin: 0 }}>
           <button className={`mode-pill ${directionMode === 'num_to_de' ? 'active' : ''}`} onClick={() => setDirectionMode('num_to_de')}>Цифры → Немецкий</button>
           <button className={`mode-pill ${directionMode === 'de_to_num' ? 'active' : ''}`} onClick={() => setDirectionMode('de_to_num')}>Немецкий → Цифры</button>

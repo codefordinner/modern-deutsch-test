@@ -175,7 +175,7 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+      <div className="trainer-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <div className="trainer-modes" style={{ margin: 0 }}>
           <button className={`mode-pill ${directionMode === 'ru_to_de' ? 'active' : ''}`} onClick={() => setDirectionMode('ru_to_de')}>Русский → Немецкий</button>
           <button className={`mode-pill ${directionMode === 'de_to_ru' ? 'active' : ''}`} onClick={() => setDirectionMode('de_to_ru')}>Немецкий → Русский</button>

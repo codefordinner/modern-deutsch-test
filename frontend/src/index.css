@@ -865,3 +865,39 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Trainer toolbar: keep mode controls and actions aligned on narrow screens. */
+.trainer-toolbar {
+  min-width: 0;
+}
+.trainer-toolbar > .trainer-modes {
+  min-width: 0;
+}
+.trainer-toolbar > .trainer-modes .mode-pill {
+  white-space: normal;
+}
+@media (max-width: 640px) {
+  .trainer-toolbar {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 8px !important;
+  }
+  .trainer-toolbar > .trainer-modes {
+    width: 100%;
+    margin-bottom: 0;
+  }
+  .trainer-toolbar > .trainer-modes .mode-pill {
+    flex: 1 1 auto;
+  }
+  .trainer-toolbar > :last-child {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .trainer-toolbar > :last-child > button {
+    min-height: 36px;
+  }
+}

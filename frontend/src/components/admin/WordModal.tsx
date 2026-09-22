@@ -25,6 +25,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   const [praesensSie, setPraesensSie] = useState('');
   const [showConjugation, setShowConjugation] = useState(false);
   const [categoryId, setCategoryId] = useState('');
+  const LAST_CATEGORY_KEY = 'admin_last_word_category_id';
 
   useEffect(() => {
     if (word) {
@@ -46,13 +47,16 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       }
       setCategoryId(word.categoryId);
     } else if (categories.length > 0) {
-      setCategoryId(categories[0].id);
+      const savedCategoryId = localStorage.getItem(LAST_CATEGORY_KEY);
+      const savedCategoryExists = savedCategoryId && categories.some((c) => c.id === savedCategoryId);
+      setCategoryId(savedCategoryExists ? savedCategoryId : categories[0].id);
     }
   }, [word, categories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!de || !ru || !categoryId) return;
+    localStorage.setItem(LAST_CATEGORY_KEY, categoryId);
     onSave({
       de,
       ru,
