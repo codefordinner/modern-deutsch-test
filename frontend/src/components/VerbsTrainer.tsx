@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BookOpen, Layers } from 'lucide-react';
 import { VerbsTableModal } from './verbs/VerbsTableModal';
 import { VerbsSRSModal } from './verbs/VerbsSRSModal';
@@ -6,9 +6,9 @@ import { PraesensQuiz } from './verbs/PraesensQuiz';
 import { StammformenQuiz } from './verbs/StammformenQuiz';
 import { MultipleChoiceQuiz } from './verbs/MultipleChoiceQuiz';
 import { FormToInfinitiveQuiz } from './verbs/FormToInfinitiveQuiz';
-import { getDueCardsByKey, updateSRS } from '../utils/srs';
+import { useSRSProgress } from '../hooks/useSRSProgress';
 import { buildKnownPraesensCards, hasStammformen, hasPartizip2, hasPraeteritum } from '../utils/verbConjugation';
-import type { Word, ScoreState, SRSState, Feedback } from '../types';
+import type { Word, ScoreState, Feedback } from '../types';
 
 type Mode = 'praesens' | 'stammformen' | 'multiple_choice';
 
@@ -62,20 +62,7 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isTableOpen, setIsTableOpen] = useState(false);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
-  const [useSRS, setUseSRS] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('verbs_use_srs');
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
-  });
-  const [srsMap, setSrsMap] = useState<Record<string, SRSState>>(() => {
-    try { return JSON.parse(localStorage.getItem('verbs_srs_state') || '{}'); } catch { return {}; }
-  });
-
-  const srsMapRef = useRef(srsMap);
-  srsMapRef.current = srsMap;
+  const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('verbs');
 
   // Each verb quiz mode (Präsens / 3 Formen / Multiple choice) tracks its
   // own Leitner box per verb, so mastering one form doesn't hide the
@@ -109,11 +96,6 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
-
-  const handleToggleUseSRS = (val: boolean) => {
-    setUseSRS(val);
-    localStorage.setItem('verbs_use_srs', JSON.stringify(val));
-  };
 
   const handleSetPraesensSubMode = (val: PraesensSubMode) => {
     setPraesensSubMode(val);
@@ -180,7 +162,6 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
         for (const v of praeteritumReversePool) pool.push({ kind: 'reverse_praeteritum', verb: v, form: v.praeteritum as string });
         for (const v of partizip2ReversePool) pool.push({ kind: 'reverse_partizip2', verb: v, form: v.partizip2 as string });
       }
-      if (pool.length === 0) { setCurrentVerb(null); return; }
 
       const keyFor = (e: PoolEntry): string => {
         if (e.kind === 'forward') return srsKey(e.verb.id, 'praesens', e.pronoun);
@@ -189,13 +170,8 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
         return reverseFormSrsKey(e.verb.id, 'partizip2', '');
       };
 
-      let chosen: PoolEntry;
-      if (useSRS) {
-        const due = getDueCardsByKey(pool, srsMapRef.current, keyFor);
-        chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : pool[Math.floor(Math.random() * pool.length)];
-      } else {
-        chosen = pool[Math.floor(Math.random() * pool.length)];
-      }
+      const chosen = pickCard(pool, keyFor);
+      if (!chosen) { setCurrentVerb(null); return; }
 
       setCurrentVerb(chosen.verb);
       if (chosen.kind === 'forward') {
@@ -222,27 +198,14 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
     }
 
     if (mode === 'stammformen') {
-      if (stammPool.length === 0) { setCurrentVerb(null); return; }
-      let chosen: Word;
-      if (useSRS) {
-        const due = getDueCardsByKey(stammPool, srsMapRef.current, (v) => srsKey(v.id, mode));
-        chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : stammPool[Math.floor(Math.random() * stammPool.length)];
-      } else {
-        chosen = stammPool[Math.floor(Math.random() * stammPool.length)];
-      }
-      setCurrentVerb(chosen);
+      const chosen = pickCard(stammPool, (v) => srsKey(v.id, mode));
+      setCurrentVerb(chosen ?? null);
       return;
     }
 
     // multiple_choice
-    if (mcPool.length === 0) { setCurrentVerb(null); return; }
-    let chosen: Word;
-    if (useSRS) {
-      const due = getDueCardsByKey(mcPool, srsMapRef.current, (v) => srsKey(v.id, mode));
-      chosen = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : mcPool[Math.floor(Math.random() * mcPool.length)];
-    } else {
-      chosen = mcPool[Math.floor(Math.random() * mcPool.length)];
-    }
+    const chosen = pickCard(mcPool, (v) => srsKey(v.id, mode));
+    if (!chosen) { setCurrentVerb(null); return; }
     setCurrentVerb(chosen);
     const correctP2 = chosen.partizip2 as string;
     const fake1 = `ge${chosen.de.replace(/en$/, '')}en`;
@@ -250,25 +213,21 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
     const fake3 = `ver${chosen.de.replace(/en$/, '')}t`;
     const fakes = Array.from(new Set([fake1, fake2, fake3])).filter((f) => f !== correctP2);
     setMcOptions([correctP2, ...fakes].slice(0, 4).sort(() => Math.random() - 0.5));
-  }, [mode, useSRS, praesensCards, stammPool, mcPool, praesensSubMode, praesensPoolEmpty, praeteritumReversePool, partizip2ReversePool]);
+  }, [mode, pickCard, praesensCards, stammPool, mcPool, praesensSubMode, praesensPoolEmpty, praeteritumReversePool, partizip2ReversePool]);
 
   useEffect(() => { if (verbs.length > 0) nextQuestion(); }, [verbs, mode, useSRS, praesensSubMode]);
 
   const recordResult = (ok: boolean) => {
     if (!currentVerb) return;
-    if (useSRS) {
-      let key: string;
-      if (mode === 'praesens' && currentPraesensType === 'praesens') {
-        key = srsKey(currentVerb.id, 'praesens', currentPronoun);
-      } else if (mode === 'praesens' && currentPraesensType === 'form_to_infinitive') {
-        key = reverseFormSrsKey(currentVerb.id, currentFormSource, currentPronoun);
-      } else {
-        key = srsKey(currentVerb.id, mode);
-      }
-      const updated = updateSRS(srsMap, key, ok);
-      setSrsMap(updated);
-      localStorage.setItem('verbs_srs_state', JSON.stringify(updated));
+    let key: string;
+    if (mode === 'praesens' && currentPraesensType === 'praesens') {
+      key = srsKey(currentVerb.id, 'praesens', currentPronoun);
+    } else if (mode === 'praesens' && currentPraesensType === 'form_to_infinitive') {
+      key = reverseFormSrsKey(currentVerb.id, currentFormSource, currentPronoun);
+    } else {
+      key = srsKey(currentVerb.id, mode);
     }
+    recordAnswer(key, ok);
     onAnswer(ok);
   };
 
@@ -441,8 +400,8 @@ export const VerbsTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean)
           srsState={srsMap}
           useSRS={useSRS}
           onClose={() => setIsSrsOpen(false)}
-          onResetSRS={() => { setSrsMap({}); localStorage.removeItem('verbs_srs_state'); }}
-          onToggleUseSRS={handleToggleUseSRS}
+          onResetSRS={resetSRS}
+          onToggleUseSRS={setUseSRS}
         />
       )}
     </div>

@@ -1,6 +1,5 @@
 {
   "name": "Modern Deutsch Test",
   "description": "Full-stack application with Express backend and React frontend.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }

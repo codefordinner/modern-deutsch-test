@@ -17,8 +17,7 @@ async function startServer() {
     app.use(express.json());
 
     // Mount API router
-    const resolvedApi = (apiRouter && (apiRouter as any).default) || apiRouter;
-    app.use('/api', resolvedApi);
+    app.use('/api', apiRouter);
 
     // API Health Check
     app.get('/api/health', (req, res) => {

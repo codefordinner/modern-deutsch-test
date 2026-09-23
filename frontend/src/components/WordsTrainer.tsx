@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sliders, BookOpen, Layers } from 'lucide-react';
 import { WordsQuizCard } from './words/WordsQuizCard';
 import { WordsDictionaryModal } from './words/WordsDictionaryModal';
 import { WordsSRSModal } from './words/WordsSRSModal';
 import { WordsSettingsModal } from './words/WordsSettingsModal';
-import { getDueCardsByKey, updateSRS } from '../utils/srs';
+import { useSRSProgress } from '../hooks/useSRSProgress';
 import { pickClosestAnswer } from '../utils/answerDiff';
-import type { Word, Category, ScoreState, SRSState, Feedback, AnswerCheck } from '../types';
+import type { Word, Category, ScoreState, Feedback, AnswerCheck } from '../types';
 
 type Direction = 'ru_to_de' | 'de_to_ru';
 type FormType = 'base' | 'plural' | 'feminine';
@@ -27,25 +27,12 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
   const [enableBase, setEnableBase] = useState(true);
   const [enablePlural, setEnablePlural] = useState(true);
   const [enableFeminine, setEnableFeminine] = useState(true);
-  const [useSRS, setUseSRS] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('words_use_srs');
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
-  });
+  const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('words');
 
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
   const [currentFormType, setCurrentFormType] = useState<FormType>('base');
   const [userInput, setUserInput] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [srsMap, setSrsMap] = useState<Record<string, SRSState>>(() => {
-    try { return JSON.parse(localStorage.getItem('words_srs_state') || '{}'); } catch { return {}; }
-  });
-
-  const srsMapRef = useRef(srsMap);
-  srsMapRef.current = srsMap;
 
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
@@ -61,11 +48,6 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
-
-  const handleUseSRSChange = (val: boolean) => {
-    setUseSRS(val);
-    localStorage.setItem('words_use_srs', JSON.stringify(val));
-  };
 
   const nextWord = useCallback(() => {
     if (selectedCats.length === 0) {
@@ -96,20 +78,15 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
 
     if (cards.length === 0) { setCurrentWord(null); return; }
 
-    let chosenCard: Card;
-    if (useSRS) {
-      const due = getDueCardsByKey(cards, srsMapRef.current, (c) => srsKey(c.word.id, c.direction, c.formType));
-      chosenCard = due.length > 0 ? due[Math.floor(Math.random() * due.length)] : cards[Math.floor(Math.random() * cards.length)];
-    } else {
-      chosenCard = cards[Math.floor(Math.random() * cards.length)];
-    }
+    const chosenCard = pickCard(cards, (c) => srsKey(c.word.id, c.direction, c.formType));
+    if (!chosenCard) { setCurrentWord(null); return; }
 
     setCurrentWord(chosenCard.word);
     setActiveDirection(chosenCard.direction);
     setCurrentFormType(chosenCard.formType);
     setUserInput('');
     setFeedback(null);
-  }, [words, selectedCats, useSRS, directionMode, enableBase, enablePlural, enableFeminine]);
+  }, [words, selectedCats, pickCard, directionMode, enableBase, enablePlural, enableFeminine]);
 
   useEffect(() => {
     if (words.length > 0) {
@@ -138,12 +115,7 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
       isCorrect = currentWord.ru.toLowerCase().split(/[,;/]/).map((s) => s.trim()).includes(cleanIn);
     }
 
-    if (useSRS) {
-      const key = srsKey(currentWord.id, activeDirection, currentFormType);
-      const updatedSRS = updateSRS(srsMap, key, isCorrect);
-      setSrsMap(updatedSRS);
-      localStorage.setItem('words_srs_state', JSON.stringify(updatedSRS));
-    }
+    recordAnswer(srsKey(currentWord.id, activeDirection, currentFormType), isCorrect);
 
     // What to show as "Правильно" and what to compare the input against.
     let check: AnswerCheck;
@@ -233,8 +205,8 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
           srsState={srsMap}
           useSRS={useSRS}
           onClose={() => setIsSrsOpen(false)}
-          onResetSRS={() => { setSrsMap({}); localStorage.removeItem('words_srs_state'); }}
-          onToggleUseSRS={handleUseSRSChange}
+          onResetSRS={resetSRS}
+          onToggleUseSRS={setUseSRS}
         />
       )}
       {isSettingsOpen && (
@@ -243,7 +215,7 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
           enableBase={enableBase} enablePlural={enablePlural} enableFeminine={enableFeminine} useSRS={useSRS}
           onClose={() => setIsSettingsOpen(false)} onCategoriesChange={setSelectedCats} onRequireArticleChange={setRequireArticle}
           onEnableBaseChange={setEnableBase} onEnablePluralChange={setEnablePlural} onEnableFeminineChange={setEnableFeminine}
-          onUseSRSChange={handleUseSRSChange}
+          onUseSRSChange={setUseSRS}
         />
       )}
     </div>

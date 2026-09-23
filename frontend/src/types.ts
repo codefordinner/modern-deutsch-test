@@ -21,7 +21,6 @@ export interface Word {
   praeteritum?: string | null;
   partizip2?: string | null;
   hilfsverb?: string | null;
-  praesens?: string | null;
   praesensIch?: string | null;
   praesensDu?: string | null;
   praesensErSieEs?: string | null;

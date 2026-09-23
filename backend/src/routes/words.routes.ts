@@ -4,23 +4,38 @@ import { requireAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
+// SQLite's LIKE (which Prisma's `contains` compiles to) is case-insensitive only
+// for ASCII, and neither Prisma's `mode: 'insensitive'` nor SQLite's lower()
+// covers Cyrillic or umlauts (Ä/ä, Ö/ö, Ü/ü). So text search is done in JS with
+// a Unicode-aware lowercase; the word list is small enough for that.
+const normalizeForSearch = (value: string | null | undefined): string => (value ?? '').normalize('NFC').toLowerCase();
+
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { categoryId, search, limit = '200', page = '1' } = req.query;
-    const where: any = {};
+    const where: { categoryId?: string } = {};
     if (categoryId && categoryId !== 'all') where.categoryId = String(categoryId);
-    if (search) {
-      const q = String(search).trim();
-      where.OR = [{ de: { contains: q } }, { ru: { contains: q } }, { hint: { contains: q } }];
-    }
 
     const take = Math.min(Number(limit) || 200, 1000);
     const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
+    const query = search ? normalizeForSearch(String(search).trim()) : '';
 
-    const [words, total] = await Promise.all([
-      prisma.word.findMany({ where, include: { category: true }, take, skip, orderBy: { de: 'asc' } }),
-      prisma.word.count({ where }),
-    ]);
+    let words;
+    let total: number;
+
+    if (!query) {
+      [words, total] = await Promise.all([
+        prisma.word.findMany({ where, include: { category: true }, take, skip, orderBy: { de: 'asc' } }),
+        prisma.word.count({ where }),
+      ]);
+    } else {
+      const candidates = await prisma.word.findMany({ where, include: { category: true }, orderBy: { de: 'asc' } });
+      const matched = candidates.filter((w) =>
+        [w.de, w.ru, w.hint].some((field) => normalizeForSearch(field).includes(query))
+      );
+      total = matched.length;
+      words = matched.slice(skip, skip + take);
+    }
 
     res.json({ words, total, page: Number(page), limit: take });
   } catch (error) {

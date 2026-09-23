@@ -30,7 +30,6 @@ model Word {
   praeteritum     String?
   partizip2       String?
   hilfsverb       String?
-  praesens        String?
   praesensIch     String?
   praesensDu      String?
   praesensErSieEs String?
