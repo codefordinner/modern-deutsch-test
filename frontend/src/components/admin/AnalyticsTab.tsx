@@ -1,27 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, RefreshCw, Eye, CalendarDays } from 'lucide-react';
-
-interface DayCount {
-  date: string;
-  count: number;
-}
-
-interface TabCount {
-  tab: string;
-  count: number;
-}
-
-interface StatsResponse {
-  totalVisits: number;
-  uniqueVisitors: number;
-  visitsToday: number;
-  last7Days: DayCount[];
-  topTabs: TabCount[];
-}
-
-interface AnalyticsTabProps {
-  token: string | null;
-}
+import { getErrorMessage, getStats } from '../../api/client';
+import type { AnalyticsStats } from '../../types';
 
 const tabLabels: Record<string, string> = {
   numbers: '🔢 Числительные',
@@ -32,26 +12,20 @@ const tabLabels: Record<string, string> = {
   other: 'Прочее',
 };
 
-export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ token }) => {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+export const AnalyticsTab: React.FC = () => {
+  const [stats, setStats] = useState<AnalyticsStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch('/api/analytics/stats', { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      // Defend against an old/mismatched backend build (or an auth error
-      // payload like { error: '...' }) that doesn't have the expected shape.
-      if (res.ok && data && Array.isArray(data.last7Days) && Array.isArray(data.topTabs)) {
-        setStats(data);
-      } else {
-        console.error('Unexpected /api/analytics/stats response:', data);
-        setStats(null);
-      }
+      setStats(await getStats());
     } catch (e) {
       console.error('Failed to load analytics stats:', e);
       setStats(null);
+      setError(getErrorMessage(e, 'Не удалось загрузить статистику'));
     } finally {
       setLoading(false);
     }
@@ -66,6 +40,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ token }) => {
     return (
       <div style={{ textAlign: 'center', padding: 40 }}>
         <div style={{ marginBottom: 12 }}>Не удалось загрузить статистику посетителей.</div>
+        {error && <div style={{ fontSize: 13, color: 'var(--error)', marginBottom: 8 }}>{error}</div>}
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
           Убедитесь, что backend пересобран и задеплоен с обновлённым /api/analytics/stats.
         </div>

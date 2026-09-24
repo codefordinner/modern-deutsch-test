@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, RotateCcw } from 'lucide-react';
-import type { Word, SRSState } from '../../types';
+import { srsKeys } from '../../utils/srs';
+import type { Word, SRSState, WordDirection, WordFormType } from '../../types';
 
 interface WordsSRSModalProps {
   words: Word[];
@@ -11,7 +12,7 @@ interface WordsSRSModalProps {
   onToggleUseSRS: (val: boolean) => void;
 }
 
-const DIRECTIONS = ['ru_to_de', 'de_to_ru'] as const;
+const DIRECTIONS: WordDirection[] = ['ru_to_de', 'de_to_ru'];
 
 export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   words,
@@ -25,13 +26,13 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   // feminine) has its own box per word, so we count every such card.
   const boxCounts = [0, 0, 0, 0, 0, 0];
   words.forEach((w) => {
-    const forms: ('base' | 'plural' | 'feminine')[] = ['base'];
+    const forms: WordFormType[] = ['base'];
     if (w.plural) forms.push('plural');
     if (w.feminine) forms.push('feminine');
 
     DIRECTIONS.forEach((direction) => {
       forms.forEach((formType) => {
-        const item = srsState[`${w.id}:${direction}:${formType}`];
+        const item = srsState[srsKeys.word(w.id, direction, formType)];
         const box = item ? item.box : 1;
         boxCounts[box] = (boxCounts[box] || 0) + 1;
       });

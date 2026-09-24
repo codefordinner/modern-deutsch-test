@@ -85,3 +85,42 @@ export interface Feedback {
   /** When set, a wrong answer is explained with these comparisons instead of `message`. */
   checks?: AnswerCheck[];
 }
+
+// ---- Trainer card dimensions (shared by the trainers and the SRS screens) ----
+
+export type WordDirection = 'ru_to_de' | 'de_to_ru';
+export type WordFormType = 'base' | 'plural' | 'feminine';
+
+/**
+ * Which underlying verb form a "форма → инфинитив" question quizzes on.
+ * Präsens forms are per-pronoun; Präteritum and Partizip II are a single
+ * fixed form per verb (no pronoun involved).
+ */
+export type VerbFormSource = 'praesens' | 'praeteritum' | 'partizip2';
+
+// ---- API payloads ----
+
+export interface WordsPage {
+  words: Word[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface DayCount {
+  date: string;
+  count: number;
+}
+
+export interface TabCount {
+  tab: string;
+  count: number;
+}
+
+export interface AnalyticsStats {
+  totalVisits: number;
+  uniqueVisitors: number;
+  visitsToday: number;
+  last7Days: DayCount[];
+  topTabs: TabCount[];
+}

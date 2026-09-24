@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BookOpen, Tag, ArrowLeftRight, BarChart3, LogOut } from 'lucide-react';
 import { AdminLogin } from './admin/AdminLogin';
 import { WordsTab } from './admin/WordsTab';
@@ -7,10 +7,15 @@ import { ImportExportTab } from './admin/ImportExportTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
+import {
+  UNAUTHORIZED_EVENT, authToken, createCategory, createWord, deleteCategory, deleteWord,
+  getCategories, getWords, logout, updateCategory, updateWord,
+} from '../api/client';
+import { reportError, showToast } from '../utils/toast';
 import type { Word, Category } from '../types';
 
 export const AdminPanel: React.FC = () => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('admin_token'));
+  const [isAuthed, setIsAuthed] = useState<boolean>(() => authToken.get() !== null);
   const [tab, setTab] = useState<'words' | 'categories' | 'import' | 'analytics'>('words');
   const [words, setWords] = useState<Word[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -21,17 +26,92 @@ export const AdminPanel: React.FC = () => {
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [isCatOpen, setIsCatOpen] = useState(false);
 
-  const fetchCats = () => fetch('/api/categories').then((r) => r.json()).then(setCategories).catch(() => {});
-  const fetchWords = () => {
-    const q = new URLSearchParams({ categoryId: category, search, limit: '500' });
-    fetch(`/api/words?${q}`).then((r) => r.json()).then((d) => setWords(d.words || [])).catch(() => {});
+  // The API client drops the token and fires this when the server rejects it (e.g. the session expired).
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setIsAuthed(false);
+      showToast('Сессия истекла. Войдите снова.');
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      setCategories(await getCategories());
+    } catch (e) {
+      reportError(e, 'Не удалось загрузить категории');
+    }
+  }, []);
+
+  // Search fires on every keystroke; only the latest request may update the list.
+  const wordsRequestId = useRef(0);
+  const loadWords = useCallback(async () => {
+    const requestId = ++wordsRequestId.current;
+    try {
+      const page = await getWords({ categoryId: category, search, limit: 500 });
+      if (requestId === wordsRequestId.current) setWords(page.words || []);
+    } catch (e) {
+      if (requestId === wordsRequestId.current) reportError(e, 'Не удалось загрузить слова');
+    }
+  }, [category, search]);
+
+  useEffect(() => { if (isAuthed) loadCategories(); }, [isAuthed, loadCategories]);
+  useEffect(() => { if (isAuthed) loadWords(); }, [isAuthed, loadWords]);
+
+  const handleLogin = (token: string) => { authToken.set(token); setIsAuthed(true); };
+
+  const handleLogout = () => {
+    logout().catch(() => {}); // best effort: also clears the HttpOnly auth cookie
+    authToken.clear();
+    setIsAuthed(false);
   };
 
-  useEffect(() => { if (token) { fetchCats(); fetchWords(); } }, [token, category, search]);
+  const handleDeleteWord = async (id: string) => {
+    if (!confirm('Удалить слово?')) return;
+    try {
+      await deleteWord(id);
+      loadWords();
+    } catch (e) {
+      reportError(e, 'Не удалось удалить слово');
+    }
+  };
 
-  const handleLogout = () => { localStorage.removeItem('admin_token'); setToken(null); };
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Удалить категорию?')) return;
+    try {
+      await deleteCategory(id);
+      loadCategories();
+      loadWords();
+    } catch (e) {
+      reportError(e, 'Не удалось удалить категорию');
+    }
+  };
 
-  if (!token) return <AdminLogin onLogin={(t) => { localStorage.setItem('admin_token', t); setToken(t); }} />;
+  // On failure the modal stays open so the admin doesn't lose what they typed.
+  const handleSaveWord = async (word: Partial<Word>) => {
+    try {
+      if (editingWord) await updateWord(editingWord.id, word);
+      else await createWord(word);
+      setIsWordOpen(false);
+      loadWords();
+    } catch (e) {
+      reportError(e, 'Не удалось сохранить слово');
+    }
+  };
+
+  const handleSaveCategory = async (cat: Partial<Category>) => {
+    try {
+      if (editingCat) await updateCategory(editingCat.id, cat);
+      else await createCategory(cat);
+      setIsCatOpen(false);
+      loadCategories();
+    } catch (e) {
+      reportError(e, 'Не удалось сохранить категорию');
+    }
+  };
+
+  if (!isAuthed) return <AdminLogin onLogin={handleLogin} />;
 
   return (
     <div>
@@ -51,7 +131,7 @@ export const AdminPanel: React.FC = () => {
           onSearchChange={setSearch} onCategoryChange={setCategory}
           onAddWord={() => { setEditingWord(null); setIsWordOpen(true); }}
           onEditWord={(w) => { setEditingWord(w); setIsWordOpen(true); }}
-          onDeleteWord={async (id) => { if (confirm('Удалить слово?')) { await fetch(`/api/words/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); fetchWords(); } }}
+          onDeleteWord={handleDeleteWord}
         />
       )}
       {tab === 'categories' && (
@@ -59,28 +139,14 @@ export const AdminPanel: React.FC = () => {
           categories={categories}
           onAddCategory={() => { setEditingCat(null); setIsCatOpen(true); }}
           onEditCategory={(c) => { setEditingCat(c); setIsCatOpen(true); }}
-          onDeleteCategory={async (id) => { if (confirm('Удалить категорию?')) { await fetch(`/api/categories/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); fetchCats(); } }}
+          onDeleteCategory={handleDeleteCategory}
         />
       )}
-      {tab === 'import' && <ImportExportTab categories={categories} token={token} onRefresh={() => { fetchCats(); fetchWords(); }} />}
-      {tab === 'analytics' && <AnalyticsTab token={token} />}
+      {tab === 'import' && <ImportExportTab categories={categories} onRefresh={() => { loadCategories(); loadWords(); }} />}
+      {tab === 'analytics' && <AnalyticsTab />}
 
-      {isWordOpen && (
-        <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={async (w) => {
-          const url = editingWord ? `/api/words/${editingWord.id}` : '/api/words';
-          await fetch(url, { method: editingWord ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(w) });
-          setIsWordOpen(false);
-          fetchWords();
-        }} />
-      )}
-      {isCatOpen && (
-        <CategoryModal category={editingCat} onClose={() => setIsCatOpen(false)} onSave={async (c) => {
-          const url = editingCat ? `/api/categories/${editingCat.id}` : '/api/categories';
-          await fetch(url, { method: editingCat ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(c) });
-          setIsCatOpen(false);
-          fetchCats();
-        }} />
-      )}
+      {isWordOpen && <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={handleSaveWord} />}
+      {isCatOpen && <CategoryModal category={editingCat} onClose={() => setIsCatOpen(false)} onSave={handleSaveCategory} />}
     </div>
   );
 };

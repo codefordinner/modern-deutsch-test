@@ -1,150 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Sliders, BookOpen, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sliders, BookOpen, Layers, RefreshCw } from 'lucide-react';
 import { WordsQuizCard } from './words/WordsQuizCard';
 import { WordsDictionaryModal } from './words/WordsDictionaryModal';
 import { WordsSRSModal } from './words/WordsSRSModal';
 import { WordsSettingsModal } from './words/WordsSettingsModal';
-import { useSRSProgress } from '../hooks/useSRSProgress';
-import { pickClosestAnswer } from '../utils/answerDiff';
-import type { Word, Category, ScoreState, Feedback, AnswerCheck } from '../types';
-
-type Direction = 'ru_to_de' | 'de_to_ru';
-type FormType = 'base' | 'plural' | 'feminine';
-
-// Each (word, direction, form) combination tracks its own Leitner box, so
-// e.g. knowing "der Tisch" ru→de doesn't hide that its plural or de→ru
-// direction still needs practice.
-const srsKey = (wordId: string, direction: Direction, formType: FormType) => `${wordId}:${direction}:${formType}`;
+import { useWordsQuizEngine } from '../hooks/useWordsQuizEngine';
+import type { ScoreState } from '../types';
 
 export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
-  const [directionMode, setDirectionMode] = useState<'ru_to_de' | 'de_to_ru' | 'mixed'>('ru_to_de');
-  const [activeDirection, setActiveDirection] = useState<Direction>('ru_to_de');
-  const [words, setWords] = useState<Word[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedCats, setSelectedCats] = useState<string[]>(['all']);
-  const [requireArticle, setRequireArticle] = useState(true);
-  const [enableBase, setEnableBase] = useState(true);
-  const [enablePlural, setEnablePlural] = useState(true);
-  const [enableFeminine, setEnableFeminine] = useState(true);
-  const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('words');
-
-  const [currentWord, setCurrentWord] = useState<Word | null>(null);
-  const [currentFormType, setCurrentFormType] = useState<FormType>('base');
-  const [userInput, setUserInput] = useState('');
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const {
+    words, categories, isLoading, loadError, reload,
+    directionMode, setDirectionMode, selectedCats, setSelectedCats,
+    requireArticle, setRequireArticle, enableBase, setEnableBase,
+    enablePlural, setEnablePlural, enableFeminine, setEnableFeminine,
+    useSRS, setUseSRS, srsMap, resetSRS,
+    currentWord, activeDirection, currentFormType, currentSrsItem,
+    userInput, setUserInput, feedback, nextWord, handleSubmit,
+  } = useWordsQuizEngine(onAnswer);
 
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    setIsLoading(true);
-    Promise.all([fetch('/api/words?limit=1000').then((r) => r.json()), fetch('/api/categories').then((r) => r.json())])
-      .then(([wData, cData]) => {
-        setWords(wData.words || []);
-        setCategories(cData || []);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  const nextWord = useCallback(() => {
-    if (selectedCats.length === 0) {
-      setCurrentWord(null);
-      return;
-    }
-
-    const isAll = selectedCats.includes('all');
-    const activePool = words.filter((w) => isAll || selectedCats.includes(w.categoryId));
-    if (activePool.length === 0) { setCurrentWord(null); return; }
-
-    const directions: Direction[] = directionMode === 'mixed' ? ['ru_to_de', 'de_to_ru'] : [directionMode];
-
-    type Card = { word: Word; direction: Direction; formType: FormType };
-    const cards: Card[] = [];
-    for (const w of activePool) {
-      const possibleForms: FormType[] = [];
-      if (enableBase) possibleForms.push('base');
-      if (enablePlural && w.plural) possibleForms.push('plural');
-      if (enableFeminine && w.feminine) possibleForms.push('feminine');
-      const forms = possibleForms.length > 0 ? possibleForms : (['base'] as FormType[]);
-      for (const direction of directions) {
-        for (const formType of forms) {
-          cards.push({ word: w, direction, formType });
-        }
-      }
-    }
-
-    if (cards.length === 0) { setCurrentWord(null); return; }
-
-    const chosenCard = pickCard(cards, (c) => srsKey(c.word.id, c.direction, c.formType));
-    if (!chosenCard) { setCurrentWord(null); return; }
-
-    setCurrentWord(chosenCard.word);
-    setActiveDirection(chosenCard.direction);
-    setCurrentFormType(chosenCard.formType);
-    setUserInput('');
-    setFeedback(null);
-  }, [words, selectedCats, pickCard, directionMode, enableBase, enablePlural, enableFeminine]);
-
-  useEffect(() => {
-    if (words.length > 0) {
-      nextWord();
-    }
-  }, [words, selectedCats, directionMode, useSRS, enableBase, enablePlural, enableFeminine]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (feedback) { nextWord(); return; }
-    if (!currentWord) return;
-
-    let isCorrect = false;
-    let expectedTarget = currentWord.de;
-    if (currentFormType === 'plural' && currentWord.plural) expectedTarget = currentWord.plural;
-    if (currentFormType === 'feminine' && currentWord.feminine) expectedTarget = currentWord.feminine;
-
-    const cleanIn = userInput.trim().toLowerCase();
-    if (cleanIn.length === 0) {
-      isCorrect = false;
-    } else if (activeDirection === 'ru_to_de') {
-      const cleanDe = expectedTarget.trim().toLowerCase();
-      if (requireArticle) isCorrect = cleanIn === cleanDe;
-      else isCorrect = cleanIn === cleanDe.replace(/^(der|die|das)\s+/, '');
-    } else {
-      isCorrect = currentWord.ru.toLowerCase().split(/[,;/]/).map((s) => s.trim()).includes(cleanIn);
-    }
-
-    recordAnswer(srsKey(currentWord.id, activeDirection, currentFormType), isCorrect);
-
-    // What to show as "Правильно" and what to compare the input against.
-    let check: AnswerCheck;
-    if (activeDirection === 'ru_to_de') {
-      // With the article requirement off, the article is displayed but not
-      // part of the comparison (the user wasn't asked to type it).
-      const article = requireArticle ? undefined : expectedTarget.match(/^(der|die|das)\s+/i)?.[0];
-      check = { user: userInput, expected: expectedTarget, isCorrect, neutralPrefix: article };
-    } else {
-      // Several translations may be accepted ("a, b / c") — diff against the
-      // one the user came closest to and list the rest.
-      const variants = currentWord.ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
-      const closest = pickClosestAnswer(userInput, variants);
-      check = {
-        user: userInput,
-        expected: closest || currentWord.ru,
-        isCorrect,
-        alternatives: variants.length > 1 ? variants : undefined,
-      };
-    }
-
-    const hintSuffix = currentWord.hint ? ` (${currentWord.hint})` : '';
-    setFeedback({
-      isCorrect,
-      message: `Отлично! ${expectedTarget} = ${currentWord.ru}${hintSuffix}`,
-      checks: [check],
-    });
-    onAnswer(isCorrect);
-  };
 
   return (
     <div>
@@ -163,6 +39,13 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
 
       {isLoading ? (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>Загрузка слов...</div>
+      ) : loadError ? (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+          <h3 style={{ margin: '0 0 8px' }}>Не удалось загрузить слова</h3>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: 420, margin: '0 auto 16px', fontSize: 14 }}>{loadError}</p>
+          <button className="btn-secondary" onClick={reload}><RefreshCw size={14} /> Повторить</button>
+        </div>
       ) : words.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📚</div>
@@ -190,7 +73,7 @@ export const WordsTrainer: React.FC<{ score: ScoreState; onAnswer: (isCorrect: b
       ) : currentWord ? (
         <WordsQuizCard
           currentWord={currentWord} direction={activeDirection} formType={currentFormType}
-          srsItem={srsMap[srsKey(currentWord.id, activeDirection, currentFormType)]} useSRS={useSRS}
+          srsItem={currentSrsItem} useSRS={useSRS}
           userInput={userInput} feedback={feedback} onInputChange={setUserInput}
           onSubmit={handleSubmit} onNext={nextWord} onInsertChar={(c) => setUserInput((p) => p + c)}
         />

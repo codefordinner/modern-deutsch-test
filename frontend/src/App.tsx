@@ -8,7 +8,8 @@ import { VerbsTrainer } from './components/VerbsTrainer';
 import { TimeTrainer } from './components/TimeTrainer';
 import { AdminPanel } from './components/AdminPanel';
 import type { TrainerTab, ScoreState } from './types';
-import { trackEvent } from './utils/analytics';
+import { trackEvent } from './api/client';
+import { ToastHost } from './components/ToastHost';
 
 const initialScore: ScoreState = { correct: 0, total: 0, streak: 0, bestStreak: 0 };
 
@@ -100,6 +101,8 @@ export function App() {
       />
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
+
+      <ToastHost />
     </div>
   );
 }

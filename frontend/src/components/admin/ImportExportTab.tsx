@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { exportWords, getErrorMessage, importWords } from '../../api/client';
+import { reportError } from '../../utils/toast';
 import type { Category } from '../../types';
 
 interface ImportExportTabProps {
   categories: Category[];
-  token: string | null;
   onRefresh: () => void;
 }
 
-export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, token, onRefresh }) => {
+export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, onRefresh }) => {
   const [importText, setImportText] = useState('');
   const [targetCategory, setTargetCategory] = useState(categories[0]?.id || '');
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -18,36 +19,27 @@ export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, to
     setStatusMsg(null);
 
     try {
-      const res = await fetch('/api/words/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ data: importText, defaultCategoryId: targetCategory }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStatusMsg({ type: 'success', text: `Успешно импортировано: ${data.importedCount} слов` });
-        setImportText('');
-        onRefresh();
-      } else {
-        setStatusMsg({ type: 'error', text: data.error || 'Ошибка импорта' });
-      }
-    } catch {
-      setStatusMsg({ type: 'error', text: 'Ошибка соединения с сервером' });
+      const { importedCount } = await importWords(importText, targetCategory);
+      setStatusMsg({ type: 'success', text: `Успешно импортировано: ${importedCount} слов` });
+      setImportText('');
+      onRefresh();
+    } catch (e) {
+      setStatusMsg({ type: 'error', text: getErrorMessage(e, 'Ошибка импорта') });
     }
   };
 
   const handleExport = async () => {
     try {
-      const res = await fetch('/api/words/export', { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
+      const data = await exportWords();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `deutsch-words-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
-    } catch {
-      alert('Ошибка экспорта');
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      reportError(e, 'Ошибка экспорта');
     }
   };
 

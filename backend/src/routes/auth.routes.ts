@@ -1,45 +1,36 @@
 import { Router, Request, Response } from 'express';
-import crypto from 'crypto';
-import { validTokens, getAdminPassword } from '../middleware/auth.middleware';
+import {
+  AUTH_COOKIE_NAME,
+  TOKEN_TTL_SECONDS,
+  isAdminRequest,
+  isValidAdminPassword,
+  signAdminToken,
+} from '../middleware/auth.middleware';
 
 const router = Router();
 
 router.post('/login', (req: Request, res: Response) => {
-  const { password } = req.body;
-  const expected = getAdminPassword();
+  const { password } = req.body ?? {};
 
-  if (password && password === expected) {
-    const token = crypto.randomBytes(24).toString('hex');
-    validTokens.add(token);
-
-    res.setHeader('Set-Cookie', `admin_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
-    res.json({ success: true, token, message: 'Authenticated successfully' });
-  } else {
-    res.status(401).json({ success: false, error: 'Неверный пароль' });
+  if (!isValidAdminPassword(password)) {
+    return res.status(401).json({ success: false, error: 'Неверный пароль' });
   }
+
+  const token = signAdminToken();
+  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_TTL_SECONDS}`);
+  res.json({ success: true, token, message: 'Authenticated successfully' });
 });
 
-router.post('/logout', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (token) validTokens.delete(token);
-
-  res.setHeader('Set-Cookie', 'admin_token=; Path=/; HttpOnly; Max-Age=0');
+// Tokens are stateless JWTs, so there is nothing to revoke server-side: logging
+// out drops the cookie (the client also discards its copy) and the token simply
+// expires on its own after TOKEN_TTL_SECONDS.
+router.post('/logout', (_req: Request, res: Response) => {
+  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
   res.json({ success: true, message: 'Logged out' });
 });
 
 router.get('/check', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const cookieToken = req.headers.cookie
-    ?.split(';')
-    .find((c) => c.trim().startsWith('admin_token='))
-    ?.split('=')[1];
-
-  const activeToken = token || cookieToken;
-  const isAuth = Boolean(activeToken && validTokens.has(activeToken));
-
-  res.json({ authenticated: isAuth });
+  res.json({ authenticated: isAdminRequest(req) });
 });
 
 export default router;

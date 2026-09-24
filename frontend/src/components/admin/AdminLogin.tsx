@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
+import { getErrorMessage, login } from '../../api/client';
 
 interface AdminLoginProps {
   onLogin: (token: string) => void;
@@ -14,20 +15,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setLoginError('');
 
     try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.token) {
-        onLogin(data.token);
-      } else {
-        setLoginError(data.error || 'Неверный пароль администратора');
-      }
-    } catch {
-      setLoginError('Ошибка подключения к серверу');
+      const { token } = await login(password);
+      onLogin(token);
+    } catch (e) {
+      setLoginError(getErrorMessage(e, 'Ошибка подключения к серверу'));
     }
   };
 

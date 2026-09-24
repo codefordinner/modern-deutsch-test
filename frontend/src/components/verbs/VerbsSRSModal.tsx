@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import type { Word, SRSState } from '../../types';
+import { srsKeys } from '../../utils/srs';
 import { buildKnownPraesensCards, hasStammformen, hasPartizip2, hasPraeteritum } from '../../utils/verbConjugation';
 
 interface VerbsSRSModalProps {
@@ -47,13 +48,13 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
   };
 
   praesensCards.forEach((c) => {
-    bump(`${c.verb.id}:praesens:${c.pronoun}`);
-    bump(`${c.verb.id}:form_to_infinitive:${c.pronoun}`);
+    bump(srsKeys.verb.praesens(c.verb.id, c.pronoun));
+    bump(srsKeys.verb.formToInfinitive(c.verb.id, 'praesens', c.pronoun));
   });
-  stammPool.forEach((v) => bump(`${v.id}:stammformen`));
-  mcPool.forEach((v) => bump(`${v.id}:multiple_choice`));
-  praeteritumReversePool.forEach((v) => bump(`${v.id}:form_to_infinitive_praeteritum`));
-  partizip2ReversePool.forEach((v) => bump(`${v.id}:form_to_infinitive_partizip2`));
+  stammPool.forEach((v) => bump(srsKeys.verb.stammformen(v.id)));
+  mcPool.forEach((v) => bump(srsKeys.verb.multipleChoice(v.id)));
+  praeteritumReversePool.forEach((v) => bump(srsKeys.verb.formToInfinitive(v.id, 'praeteritum')));
+  partizip2ReversePool.forEach((v) => bump(srsKeys.verb.formToInfinitive(v.id, 'partizip2')));
 
   const totalCards =
     praesensCards.length * 2 + stammPool.length + mcPool.length + praeteritumReversePool.length + partizip2ReversePool.length;
