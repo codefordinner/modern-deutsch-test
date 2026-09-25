@@ -3,14 +3,22 @@ import type { AnalyticsStats, Category, PartOfSpeech, Word, WordsPage } from '..
 /** Dispatched on `window` when the server rejects our admin session (expired / invalid). */
 export const UNAUTHORIZED_EVENT = 'api:unauthorized';
 
-// The admin session lives in an HttpOnly cookie that the browser attaches by
-// itself; JavaScript never sees the token. (Older builds also kept a copy in
-// localStorage, readable by any injected script — drop it if it is still around.)
-try {
-  localStorage.removeItem('admin_token');
-} catch {
-  // Storage unavailable: nothing to clean up.
-}
+const getToken = (): string | null => {
+  try {
+    return localStorage.getItem('admin_token');
+  } catch {
+    return null;
+  }
+};
+
+const setToken = (token: string | null) => {
+  try {
+    if (token) localStorage.setItem('admin_token', token);
+    else localStorage.removeItem('admin_token');
+  } catch {
+    // Storage unavailable
+  }
+};
 
 // ---- Errors ----
 
@@ -43,6 +51,9 @@ async function request<T>(path: string, { method = 'GET', body, auth = false }: 
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
@@ -64,7 +75,10 @@ async function request<T>(path: string, { method = 'GET', body, auth = false }: 
   }
 
   if (!res.ok) {
-    if (res.status === 401 && auth) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    if (res.status === 401 && auth) {
+      setToken(null);
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     const serverMessage = (data as { error?: unknown } | null)?.error;
     throw new ApiError(
       typeof serverMessage === 'string' && serverMessage ? serverMessage : `Ошибка сервера (${res.status})`,
@@ -108,12 +122,17 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
 // ---- Admin endpoints ----
 
 /** Signs in; on success the server sets the session cookie. */
-export function login(password: string): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>('/admin/login', { method: 'POST', body: { password } });
+export async function login(password: string): Promise<{ success: boolean; token?: string }> {
+  const result = await request<{ success: boolean; token?: string }>('/admin/login', { method: 'POST', body: { password } });
+  if (result.token) setToken(result.token);
+  return result;
 }
 
 /** Asks the server to drop the session cookie. */
-export const logout = () => request<unknown>('/admin/logout', { method: 'POST' });
+export const logout = async () => {
+  setToken(null);
+  return request<unknown>('/admin/logout', { method: 'POST' });
+};
 
 /** Whether the browser currently holds a valid admin session (the cookie itself is invisible to scripts). */
 export async function checkSession(): Promise<boolean> {

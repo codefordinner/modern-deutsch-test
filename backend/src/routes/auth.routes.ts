@@ -19,8 +19,9 @@ router.post('/login', (req: Request, res: Response) => {
     return res.status(401).json({ success: false, error: 'Неверный пароль' });
   }
 
-  setAuthCookie(req, res, signAdminToken());
-  res.json({ success: true, message: 'Authenticated successfully' });
+  const token = signAdminToken();
+  setAuthCookie(req, res, token);
+  res.json({ success: true, message: 'Authenticated successfully', token });
 });
 
 // Tokens are stateless JWTs, so there is nothing to revoke server-side: logging
