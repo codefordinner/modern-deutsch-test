@@ -17,25 +17,25 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = ({
 }) => {
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>Категории словаря ({categories.length})</h3>
+      <div className="section-toolbar">
+        <h3 className="section-heading">Категории словаря ({categories.length})</h3>
         <button className="btn-primary" onClick={onAddCategory}><Plus size={16} /> Добавить категорию</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+      <div className="category-cards">
         {categories.map((cat) => (
-          <div key={cat.id} className="card" style={{ margin: 0, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 24 }}>{cat.icon || '📌'}</span>
+          <div key={cat.id} className="card category-card">
+            <div className="category-card-main">
+              <span className="category-card-icon">{cat.icon || '📌'}</span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{cat.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{cat._count?.words ?? 0} слов</div>
+                <div className="category-card-name">{cat.name}</div>
+                <div className="category-card-count">{cat._count?.words ?? 0} слов</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => onEditCategory(cat)}><Edit2 size={14} /></button>
+            <div className="row-actions">
+              <button className="icon-btn icon-btn--sm" onClick={() => onEditCategory(cat)} aria-label={`Редактировать: ${cat.name}`}><Edit2 size={14} /></button>
               {!cat.isBuiltin && (
-                <button className="icon-btn" style={{ width: 30, height: 30, color: 'var(--error)' }} onClick={() => onDeleteCategory(cat.id)}><Trash2 size={14} /></button>
+                <button className="icon-btn icon-btn--sm icon-btn--danger" onClick={() => onDeleteCategory(cat.id)} aria-label={`Удалить: ${cat.name}`}><Trash2 size={14} /></button>
               )}
             </div>
           </div>

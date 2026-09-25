@@ -37,20 +37,20 @@ export const NumbersQuizCard: React.FC<NumbersQuizCardProps> = ({
         {isGermanToDigits ? 'Напишите число цифрами' : 'Напишите число прописью по-немецки'}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{isGermanToDigits ? expectedGerman : currentNumber.toLocaleString('de-DE')}</h2>
         <button
           type="button"
-          className="icon-btn"
-          style={{ width: 34, height: 34 }}
+          className="icon-btn quiz-audio-btn"
           onClick={() => speakGerman(expectedGerman)}
           title="Озвучить"
+          aria-label="Озвучить"
         >
           <Volume2 size={18} />
         </button>
       </div>
 
-      <form onSubmit={onSubmit} style={{ width: '100%' }}>
+      <form onSubmit={onSubmit} className="question-form">
         <div className="input-group">
           <input
             type="text"

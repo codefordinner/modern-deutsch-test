@@ -1,55 +1,36 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { getErrorMessage, getWords } from '../api/client';
+import { getErrorMessage } from '../api/client';
+import { useVerbs } from './useDictionary';
 import { useSRSProgress } from './useSRSProgress';
-import { srsKeys } from '../utils/srs';
-import { buildKnownPraesensCards, hasStammformen, hasPartizip2, hasPraeteritum } from '../utils/verbConjugation';
-import type { Word, Feedback, SRSRecord, VerbFormSource } from '../types';
+import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
+import { buildVerbCards, isCardInSelection, selectVerbCards } from '../utils/verbCards';
+import type { PraesensSubMode, VerbCard, VerbQuizMode } from '../utils/verbCards';
+import { buildPartizip2Options } from '../utils/verbQuiz';
+import type { Feedback, SRSRecord } from '../types';
 
-export type VerbQuizMode = 'praesens' | 'stammformen' | 'multiple_choice';
-
-// Within the "Спряжение / Форма → Инфинитив" mode:
-//  - 'praesens'           only asks the forward direction: given the
-//                         pronoun + infinitive, produce the conjugated
-//                         Präsens form.
-//  - 'form_to_infinitive' only asks reverse directions: given a form,
-//                         produce the infinitive. The form shown can come
-//                         from Präsens (per pronoun), Präteritum, or
-//                         Partizip II — whichever the verb has data for.
-//  - 'both'               draws from either direction at random, per
-//                         question, so they can turn up in the same session.
-export type PraesensSubMode = 'praesens' | 'form_to_infinitive' | 'both';
+export type { PraesensSubMode, VerbQuizMode } from '../utils/verbCards';
 
 const SUBMODE_STORAGE_KEY = 'verbs_praesens_submode';
 
 /**
- * State and rules of the verbs trainer: loading, the per-mode card pools,
- * choosing the next question, checking answers and recording SRS progress.
- * `VerbsTrainer` is left with layout only.
+ * State and rules of the verbs trainer: loading, choosing the next question,
+ * checking answers and recording SRS progress. `VerbsTrainer` is left with
+ * layout only.
  *
- * Each verb quiz mode (Präsens / 3 Formen / Multiple choice) tracks its own
- * Leitner box per verb (see `srsKeys.verb`), so mastering one form doesn't
- * hide the others. Within Präsens, each pronoun *and* each direction
- * (Спряжение vs Форма→Инфинитив) is a separate card as well.
+ * What can be asked is defined by the cards from `utils/verbCards.ts` (the SRS
+ * screen counts the same cards). Each card has its own Leitner box: every verb
+ * quiz mode, every Präsens pronoun and each direction (Спряжение vs
+ * Форма → Инфинитив) is tracked separately, so mastering one form doesn't hide
+ * the others.
  */
 export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const [mode, setMode] = useState<VerbQuizMode>('stammformen');
-  const [verbs, setVerbs] = useState<Word[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  const { verbs, error, hasData, isLoading: isFetchingVerbs, refetch } = useVerbs();
+  const loadError = !hasData && error !== undefined ? getErrorMessage(error, 'Не удалось загрузить глаголы') : null;
+  const isLoading = !loadError && isFetchingVerbs;
 
-  const [currentVerb, setCurrentVerb] = useState<Word | null>(null);
-  const [currentPronoun, setCurrentPronoun] = useState<string>('du');
-  const [expectedPraesens, setExpectedPraesens] = useState('');
-  const [currentFormText, setCurrentFormText] = useState('');
-  // Which direction the *current* praesens-mode question is asking in.
-  // Only meaningful when mode === 'praesens'; when praesensSubMode is
-  // 'both' this is chosen at random per question in nextQuestion().
-  const [currentPraesensType, setCurrentPraesensType] = useState<'praesens' | 'form_to_infinitive'>('praesens');
-  // Only meaningful for 'form_to_infinitive': which form the displayed word
-  // is, so we know whether a pronoun applies and which SRS box to use.
-  const [currentFormSource, setCurrentFormSource] = useState<VerbFormSource>('praesens');
+  const [currentCard, setCurrentCard] = useState<VerbCard | null>(null);
   const [praesensSubMode, setPraesensSubMode] = useState<PraesensSubMode>(() => {
     try {
       const saved = localStorage.getItem(SUBMODE_STORAGE_KEY);
@@ -67,30 +48,9 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('verbs');
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setLoadError(null);
-    getWords({ limit: 500 })
-      .then((data) => {
-        if (cancelled) return;
-        const vList = (data.words || []).filter((w) => w.praeteritum || w.partizip2 || w.category?.name.toLowerCase().includes('глагол'));
-        setVerbs(vList);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        console.error(e);
-        setLoadError(getErrorMessage(e, 'Не удалось загрузить глаголы'));
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken]);
-
-  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+  const reload = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const handleSetPraesensSubMode = (val: PraesensSubMode) => {
     setPraesensSubMode(val);
@@ -101,27 +61,13 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     }
   };
 
-  // Not every verb has every form filled in by the admin, and for Präsens we
-  // never guess a missing conjugation (see utils/verbConjugation.ts) — so
-  // each mode gets its own pool, limited to verbs/pronouns we actually have
-  // reliable data for. Modes with an empty pool show a dedicated message
-  // instead of a broken, unsolvable question.
-  const praesensCards = useMemo(() => buildKnownPraesensCards(verbs), [verbs]);
-  const stammPool = useMemo(() => verbs.filter(hasStammformen), [verbs]);
-  const mcPool = useMemo(() => verbs.filter(hasPartizip2), [verbs]);
-  // Reused for the "Partizip II → Инфинитив" reverse card — same
-  // requirement (a known Partizip II) as the multiple-choice pool.
-  const partizip2ReversePool = mcPool;
-  const praeteritumReversePool = useMemo(() => verbs.filter(hasPraeteritum), [verbs]);
-
-  // Whether the combined "Спряжение / Форма → Инфинитив" pool has anything to
-  // ask for the selected direction(s). 'form_to_infinitive' and 'both' share
-  // the same formula because 'both' is only truly empty when the reverse pool
-  // (which already includes the Präsens-sourced reverse cards) is also empty.
-  const praesensPoolEmpty = useMemo(() => {
-    if (praesensSubMode === 'praesens') return praesensCards.length === 0;
-    return praesensCards.length === 0 && praeteritumReversePool.length === 0 && partizip2ReversePool.length === 0;
-  }, [praesensSubMode, praesensCards, praeteritumReversePool, partizip2ReversePool]);
+  const allCards = useMemo(() => buildVerbCards(verbs), [verbs]);
+  const pool = useMemo(() => selectVerbCards(allCards, mode, praesensSubMode), [allCards, mode, praesensSubMode]);
+  // Wrong options of the multiple-choice question are other verbs' real Partizip II forms.
+  const partizip2Pool = useMemo(
+    () => allCards.filter((c) => c.kind === 'multiple_choice').map((c) => c.verb),
+    [allCards]
+  );
 
   const nextQuestion = useCallback(() => {
     setUserInput('');
@@ -130,86 +76,10 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     setHilfsverbInput('haben');
     setFeedback(null);
 
-    if (mode === 'praesens') {
-      if (praesensPoolEmpty) { setCurrentVerb(null); return; }
-
-      // Build the pool for whichever direction(s) are enabled:
-      //  - 'forward'            : infinitive + pronoun -> Präsens form
-      //  - 'reverse_praesens'   : Präsens form + pronoun -> infinitive
-      //  - 'reverse_praeteritum': Präteritum form (no pronoun) -> infinitive
-      //  - 'reverse_partizip2'  : Partizip II form (no pronoun) -> infinitive
-      // Each kind keeps its own independent SRS box (see srsKeys.verb), so
-      // mastering one never hides that another still needs practice.
-      type PoolEntry =
-        | { kind: 'forward'; verb: Word; pronoun: string; form: string }
-        | { kind: 'reverse_praesens'; verb: Word; pronoun: string; form: string }
-        | { kind: 'reverse_praeteritum'; verb: Word; form: string }
-        | { kind: 'reverse_partizip2'; verb: Word; form: string };
-
-      const wantForward = praesensSubMode === 'praesens' || praesensSubMode === 'both';
-      const wantReverse = praesensSubMode === 'form_to_infinitive' || praesensSubMode === 'both';
-
-      const pool: PoolEntry[] = [];
-      if (wantForward) {
-        for (const c of praesensCards) pool.push({ kind: 'forward', verb: c.verb, pronoun: c.pronoun, form: c.form });
-      }
-      if (wantReverse) {
-        for (const c of praesensCards) pool.push({ kind: 'reverse_praesens', verb: c.verb, pronoun: c.pronoun, form: c.form });
-        for (const v of praeteritumReversePool) pool.push({ kind: 'reverse_praeteritum', verb: v, form: v.praeteritum as string });
-        for (const v of partizip2ReversePool) pool.push({ kind: 'reverse_partizip2', verb: v, form: v.partizip2 as string });
-      }
-
-      const keyFor = (e: PoolEntry): string => {
-        if (e.kind === 'forward') return srsKeys.verb.praesens(e.verb.id, e.pronoun);
-        if (e.kind === 'reverse_praesens') return srsKeys.verb.formToInfinitive(e.verb.id, 'praesens', e.pronoun);
-        if (e.kind === 'reverse_praeteritum') return srsKeys.verb.formToInfinitive(e.verb.id, 'praeteritum');
-        return srsKeys.verb.formToInfinitive(e.verb.id, 'partizip2');
-      };
-
-      const chosen = pickCard(pool, keyFor);
-      if (!chosen) { setCurrentVerb(null); return; }
-
-      setCurrentVerb(chosen.verb);
-      if (chosen.kind === 'forward') {
-        setCurrentPronoun(chosen.pronoun);
-        setCurrentPraesensType('praesens');
-        setExpectedPraesens(chosen.form);
-      } else if (chosen.kind === 'reverse_praesens') {
-        setCurrentPronoun(chosen.pronoun);
-        setCurrentPraesensType('form_to_infinitive');
-        setCurrentFormSource('praesens');
-        setCurrentFormText(chosen.form);
-      } else if (chosen.kind === 'reverse_praeteritum') {
-        setCurrentPronoun('');
-        setCurrentPraesensType('form_to_infinitive');
-        setCurrentFormSource('praeteritum');
-        setCurrentFormText(chosen.form);
-      } else {
-        setCurrentPronoun('');
-        setCurrentPraesensType('form_to_infinitive');
-        setCurrentFormSource('partizip2');
-        setCurrentFormText(chosen.form);
-      }
-      return;
-    }
-
-    if (mode === 'stammformen') {
-      const chosen = pickCard(stammPool, (v) => srsKeys.verb.stammformen(v.id));
-      setCurrentVerb(chosen ?? null);
-      return;
-    }
-
-    // multiple_choice
-    const chosen = pickCard(mcPool, (v) => srsKeys.verb.multipleChoice(v.id));
-    if (!chosen) { setCurrentVerb(null); return; }
-    setCurrentVerb(chosen);
-    const correctP2 = chosen.partizip2 as string;
-    const fake1 = `ge${chosen.de.replace(/en$/, '')}en`;
-    const fake2 = `be${chosen.de.replace(/en$/, '')}t`;
-    const fake3 = `ver${chosen.de.replace(/en$/, '')}t`;
-    const fakes = Array.from(new Set([fake1, fake2, fake3])).filter((f) => f !== correctP2);
-    setMcOptions([correctP2, ...fakes].slice(0, 4).sort(() => Math.random() - 0.5));
-  }, [mode, pickCard, praesensCards, stammPool, mcPool, praesensSubMode, praesensPoolEmpty, praeteritumReversePool, partizip2ReversePool]);
+    const chosen = pickCard(pool, (card) => card.key);
+    setCurrentCard(chosen ?? null);
+    if (chosen?.kind === 'multiple_choice') setMcOptions(buildPartizip2Options(chosen.verb, partizip2Pool));
+  }, [pool, pickCard, partizip2Pool]);
 
   // `nextQuestion` changes exactly when the verbs, the mode, the sub-mode or
   // the SRS switch change, so this re-deals a question whenever any of them does.
@@ -217,34 +87,29 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     if (verbs.length > 0) nextQuestion();
   }, [verbs.length, nextQuestion]);
 
-  /** SRS key of the question currently on screen. */
-  const currentCardKey = (verb: Word): string => {
-    if (mode === 'praesens') {
-      return currentPraesensType === 'praesens'
-        ? srsKeys.verb.praesens(verb.id, currentPronoun)
-        : srsKeys.verb.formToInfinitive(verb.id, currentFormSource, currentPronoun);
-    }
-    return mode === 'stammformen' ? srsKeys.verb.stammformen(verb.id) : srsKeys.verb.multipleChoice(verb.id);
-  };
+  // Right after a mode switch the old card is still in state for one render; never show it in the new mode.
+  const card = currentCard && isCardInSelection(currentCard.kind, mode, praesensSubMode) ? currentCard : null;
+  const currentVerb = card?.verb ?? null;
+  const isReverse = card !== null && card.kind.startsWith('infinitive_from_');
 
-  const currentSrsItem: SRSRecord | undefined = currentVerb ? srsMap[currentCardKey(currentVerb)] : undefined;
+  const currentSrsItem: SRSRecord | undefined = card ? srsMap[card.key] : undefined;
 
   const recordResult = (ok: boolean) => {
-    if (!currentVerb) return;
-    recordAnswer(currentCardKey(currentVerb), ok);
+    if (!card) return;
+    recordAnswer(card.key, ok);
     onAnswer(ok);
   };
 
   const handlePraesensSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
-    if (!currentVerb) return;
-    const cleanIn = userInput.trim().toLowerCase();
-    const ok = cleanIn.length > 0 && cleanIn === expectedPraesens.toLowerCase();
+    if (!card || card.kind !== 'praesens') return;
+    const expected = card.form ?? '';
+    const ok = answersMatch(userInput, expected, currentMatchOptions());
     setFeedback({
       isCorrect: ok,
-      message: `Верно: ${currentPronoun} ${expectedPraesens}`,
-      checks: [{ user: userInput, expected: expectedPraesens, isCorrect: ok }],
+      message: `Верно: ${card.pronoun} ${expected}`,
+      checks: [{ user: userInput, expected, isCorrect: ok }],
     });
     recordResult(ok);
   };
@@ -252,16 +117,16 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const handleFormToInfinitiveSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
-    if (!currentVerb) return;
-    const cleanIn = userInput.trim().toLowerCase();
-    const ok = cleanIn.length > 0 && cleanIn === currentVerb.de.trim().toLowerCase();
+    if (!card || !isReverse) return;
+    const infinitive = card.verb.de.trim();
+    const ok = answersMatch(userInput, infinitive, currentMatchOptions());
     // Präsens-sourced forms are shown with their pronoun (ich/du/...);
     // Präteritum and Partizip II are a single fixed form with no pronoun.
-    const shownForm = currentFormSource === 'praesens' ? `${currentPronoun} ${currentFormText}` : currentFormText;
+    const shownForm = card.kind === 'infinitive_from_praesens' ? `${card.pronoun} ${card.form}` : card.form;
     setFeedback({
       isCorrect: ok,
-      message: `Верно: ${shownForm} → ${currentVerb.de}`,
-      checks: [{ user: userInput, expected: currentVerb.de.trim(), isCorrect: ok }],
+      message: `Верно: ${shownForm} → ${card.verb.de}`,
+      checks: [{ user: userInput, expected: infinitive, isCorrect: ok }],
     });
     recordResult(ok);
   };
@@ -269,21 +134,21 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const handleStammSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
-    if (!currentVerb) return;
-    const cleanPr = praeteritumInput.trim().toLowerCase();
-    const cleanP2 = partizip2Input.trim().toLowerCase();
-    const okPr = cleanPr.length > 0 && cleanPr === (currentVerb.praeteritum || '').toLowerCase();
-    const okP2 = cleanP2.length > 0 && cleanP2 === (currentVerb.partizip2 || '').toLowerCase();
-    const okH = hilfsverbInput.trim().toLowerCase() === (currentVerb.hilfsverb || 'haben').toLowerCase();
+    if (!card || card.kind !== 'stammformen') return;
+    const verb = card.verb;
+    const options = currentMatchOptions();
+    const expectedHilfsverb = verb.hilfsverb || 'haben';
+    const okPr = answersMatch(praeteritumInput, verb.praeteritum || '', options);
+    const okP2 = answersMatch(partizip2Input, verb.partizip2 || '', options);
+    const okH = answersMatch(hilfsverbInput, expectedHilfsverb);
     const ok = okPr && okP2 && okH;
-    const expectedHilfsverb = currentVerb.hilfsverb || 'haben';
     setFeedback({
       isCorrect: ok,
-      message: `${currentVerb.de} – ${currentVerb.praeteritum || '—'} – ${currentVerb.partizip2 || '—'} (${expectedHilfsverb})`,
+      message: `${verb.de} – ${verb.praeteritum || '—'} – ${verb.partizip2 || '—'} (${expectedHilfsverb})`,
       // All three fields are listed: the wrong ones as "Вы ввели / Правильно", the right ones as a single ✓ line.
       checks: [
-        { label: 'Präteritum', user: praeteritumInput, expected: currentVerb.praeteritum || '', isCorrect: okPr },
-        { label: 'Partizip II', user: partizip2Input, expected: currentVerb.partizip2 || '', isCorrect: okP2 },
+        { label: 'Präteritum', user: praeteritumInput, expected: verb.praeteritum || '', isCorrect: okPr },
+        { label: 'Partizip II', user: partizip2Input, expected: verb.partizip2 || '', isCorrect: okP2 },
         { label: 'Hilfsverb', user: hilfsverbInput, expected: expectedHilfsverb, isCorrect: okH, userLabel: 'Вы выбрали' },
       ],
     });
@@ -291,17 +156,13 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   };
 
   const handleSelectOption = (option: string) => {
-    if (!currentVerb) return;
-    const ok = option === currentVerb.partizip2;
-    setFeedback({ isCorrect: ok, message: `${currentVerb.de} -> Partizip II: ${currentVerb.partizip2}` });
+    if (!card || card.kind !== 'multiple_choice') return;
+    const ok = option === card.verb.partizip2?.trim();
+    setFeedback({ isCorrect: ok, message: `${card.verb.de} -> Partizip II: ${card.verb.partizip2}` });
     recordResult(ok);
   };
 
-  const isPoolEmpty =
-    !isLoading && verbs.length > 0 && !currentVerb &&
-    ((mode === 'stammformen' && stammPool.length === 0) ||
-      (mode === 'multiple_choice' && mcPool.length === 0) ||
-      (mode === 'praesens' && praesensPoolEmpty));
+  const isPoolEmpty = !isLoading && verbs.length > 0 && pool.length === 0;
 
   return {
     // data
@@ -311,7 +172,13 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     // SRS
     useSRS, setUseSRS, srsMap, resetSRS,
     // current question
-    currentVerb, currentPronoun, currentPraesensType, currentFormText, expectedPraesens, mcOptions, currentSrsItem,
+    currentVerb,
+    currentPronoun: card?.pronoun ?? '',
+    currentPraesensType: (card?.kind === 'praesens' ? 'praesens' : 'form_to_infinitive') as 'praesens' | 'form_to_infinitive',
+    currentFormText: isReverse ? (card.form ?? '') : '',
+    expectedPraesens: card?.kind === 'praesens' ? (card.form ?? '') : '',
+    mcOptions,
+    currentSrsItem,
     // inputs
     userInput, setUserInput,
     praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput,

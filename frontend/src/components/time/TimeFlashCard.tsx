@@ -25,9 +25,9 @@ export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
   const mainPhrase = formatMode === 'formal' ? timeData.official : timeData.colloquial;
 
   return (
-    <div className="question-card" style={{ minHeight: 380, justifyContent: 'center' }}>
+    <div className="question-card flash-card">
       {displayMode === 'both' ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <div className="flash-clocks">
           <AnalogClock hours={timeData.hours} minutes={timeData.minutes} />
           <DigitalDisplay hours={timeData.hours} minutes={timeData.minutes} />
         </div>
@@ -38,62 +38,32 @@ export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
       )}
 
       {!isRevealed ? (
-        <div style={{ marginTop: 24, width: '100%', maxWidth: 360 }}>
-          <button
-            type="button"
-            className="btn-primary"
-            style={{ width: '100%', padding: '14px 20px', fontSize: 16 }}
-            onClick={onReveal}
-            autoFocus
-          >
+        <div className="flash-action">
+          <button type="button" className="btn-primary btn-lg" onClick={onReveal} autoFocus>
             <Eye size={18} /> Показать ответ (Пробел / Enter)
           </button>
         </div>
       ) : (
-        <div style={{ marginTop: 20, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div
-            style={{
-              padding: '16px 20px',
-              borderRadius: 14,
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-color)',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>
-              {timeData.colloquial}
-            </div>
+        <div className="flash-reveal">
+          <div className="flash-answer">
+            <div className="flash-answer-main">{timeData.colloquial}</div>
 
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span>Время: <strong style={{ color: 'var(--text-primary)' }}>{timeData.timeString24}</strong></span>
+            <div className="flash-answer-meta">
+              <span>Время: <strong>{timeData.timeString24}</strong></span>
               <span>•</span>
-              <span>Официально: <strong style={{ color: 'var(--text-primary)' }}>{timeData.official}</strong></span>
+              <span>Официально: <strong>{timeData.official}</strong></span>
             </div>
 
             {timeData.kurzVariant && (
-              <div style={{ fontSize: 12, color: 'var(--warning)', fontWeight: 600, marginBottom: 8 }}>
-                💡 Разговорное использование: «{timeData.kurzVariant}»
-              </div>
+              <div className="flash-kurz">💡 Разговорное использование: «{timeData.kurzVariant}»</div>
             )}
 
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => speakGerman(mainPhrase)}
-              title="Озвучить"
-              style={{ margin: '0 auto', display: 'flex' }}
-            >
+            <button type="button" className="icon-btn flash-audio" onClick={() => speakGerman(mainPhrase)} title="Озвучить" aria-label="Озвучить">
               <Volume2 size={18} />
             </button>
           </div>
 
-          <button
-            type="button"
-            className="btn-primary"
-            style={{ width: '100%', padding: '14px 20px', fontSize: 16 }}
-            onClick={onNext}
-            autoFocus
-          >
+          <button type="button" className="btn-primary btn-lg" onClick={onNext} autoFocus>
             Следующее время <ArrowRight size={18} />
           </button>
         </div>

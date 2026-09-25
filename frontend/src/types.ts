@@ -9,12 +9,17 @@ export interface Category {
   };
 }
 
+/** Explicit part of speech of a dictionary entry (`null`/missing = not specified). */
+export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
+
 export interface Word {
   id: string;
   de: string;
   ru: string;
   /** Short clarifying note (e.g. meaning/context) to tell apart words that translate the same way. */
   hint?: string | null;
+  /** Which trainers the entry belongs to — the verbs trainer only takes `'verb'`. */
+  partOfSpeech?: PartOfSpeech | null;
   plural?: string | null;
   feminine?: string | null;
   femininePlural?: string | null;
@@ -38,8 +43,6 @@ export interface SRSRecord {
   lastReviewed: string; // ISO
   nextReview: string; // ISO
 }
-
-export type SRSState = SRSRecord;
 
 export interface NumberRangeSettings {
   min: number;

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import apiRouter from './api';
+import { backfillPartOfSpeech } from './services/backfillPartOfSpeech';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -16,4 +17,5 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
 });

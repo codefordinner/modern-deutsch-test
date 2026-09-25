@@ -35,13 +35,13 @@ export const AnalyticsTab: React.FC = () => {
     fetchStats();
   }, []);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Загрузка аналитики...</div>;
+  if (loading) return <div className="centered-message">Загрузка аналитики...</div>;
   if (!stats) {
     return (
-      <div style={{ textAlign: 'center', padding: 40 }}>
-        <div style={{ marginBottom: 12 }}>Не удалось загрузить статистику посетителей.</div>
-        {error && <div style={{ fontSize: 13, color: 'var(--error)', marginBottom: 8 }}>{error}</div>}
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+      <div className="state-card">
+        <div className="state-text--flush">Не удалось загрузить статистику посетителей.</div>
+        {error && <div className="error-note">{error}</div>}
+        <div className="muted-note state-text">
           Убедитесь, что backend пересобран и задеплоен с обновлённым /api/analytics/stats.
         </div>
         <button className="btn-secondary" onClick={fetchStats}><RefreshCw size={14} /> Повторить попытку</button>
@@ -56,64 +56,52 @@ export const AnalyticsTab: React.FC = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}><Users size={20} /> Статистика посетителей</h3>
+      <div className="stats-header">
+        <h3 className="stats-title"><Users size={20} /> Статистика посетителей</h3>
         <button className="btn-secondary" onClick={fetchStats}><RefreshCw size={14} /> Обновить</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <div className="card" style={{ margin: 0, padding: 18, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Всего визитов</div>
-          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>{stats.totalVisits ?? 0}</div>
+      <div className="stat-cards">
+        <div className="card stat-card">
+          <div className="stat-card-label">Всего визитов</div>
+          <div className="stat-card-value">{stats.totalVisits ?? 0}</div>
         </div>
-        <div className="card" style={{ margin: 0, padding: 18, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Уникальных посетителей</div>
-          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4, color: 'var(--accent-primary)' }}>{stats.uniqueVisitors ?? 0}</div>
+        <div className="card stat-card">
+          <div className="stat-card-label">Уникальных посетителей</div>
+          <div className="stat-card-value stat-card-value--accent">{stats.uniqueVisitors ?? 0}</div>
         </div>
-        <div className="card" style={{ margin: 0, padding: 18, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Визитов сегодня</div>
-          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4, color: 'var(--success)' }}>{stats.visitsToday ?? 0}</div>
+        <div className="card stat-card">
+          <div className="stat-card-label">Визитов сегодня</div>
+          <div className="stat-card-value stat-card-value--success">{stats.visitsToday ?? 0}</div>
         </div>
       </div>
 
-      <div className="card" style={{ margin: '0 0 20px' }}>
-        <h4 style={{ marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalendarDays size={16} /> Визиты за 7 дней
-        </h4>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 140 }}>
+      <div className="card panel-card">
+        <h4 className="panel-card-title"><CalendarDays size={16} /> Визиты за 7 дней</h4>
+        <div className="bar-chart">
           {last7Days.map((d) => (
-            <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 700 }}>{d.count}</div>
-              <div
-                style={{
-                  width: '100%',
-                  maxWidth: 36,
-                  height: `${Math.max(4, (d.count / maxDayCount) * 100)}px`,
-                  background: 'var(--accent-primary)',
-                  borderRadius: 4,
-                }}
-              />
-              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{d.date.slice(5)}</div>
+            <div key={d.date} className="bar-col">
+              <div className="bar-value">{d.count}</div>
+              <div className="bar" style={{ height: `${Math.max(4, (d.count / maxDayCount) * 100)}px` }} />
+              <div className="bar-label">{d.date.slice(5)}</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="card" style={{ margin: 0 }}>
-        <h4 style={{ marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Eye size={16} /> Популярные разделы
-        </h4>
+      <div className="card panel-card panel-card--last">
+        <h4 className="panel-card-title"><Eye size={16} /> Популярные разделы</h4>
         {topTabs.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Пока нет данных о переходах</div>
+          <div className="muted-note">Пока нет данных о переходах</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="hbar-list">
             {topTabs.map((t) => (
-              <div key={t.tab} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 140, fontSize: 13, fontWeight: 600 }}>{tabLabels[t.tab] || t.tab}</div>
-                <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: 6, overflow: 'hidden', height: 14 }}>
-                  <div style={{ width: `${(t.count / maxTabCount) * 100}%`, background: 'var(--accent-primary)', height: '100%' }} />
+              <div key={t.tab} className="hbar-row">
+                <div className="hbar-label">{tabLabels[t.tab] || t.tab}</div>
+                <div className="hbar-track">
+                  <div className="hbar-fill" style={{ width: `${(t.count / maxTabCount) * 100}%` }} />
                 </div>
-                <div style={{ width: 40, textAlign: 'right', fontSize: 13, fontWeight: 700 }}>{t.count}</div>
+                <div className="hbar-count">{t.count}</div>
               </div>
             ))}
           </div>

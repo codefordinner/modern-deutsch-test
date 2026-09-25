@@ -5,6 +5,8 @@ interface UmlautBarProps {
   onInsert: (char: string) => void;
 }
 
+const UMLAUTS = ['ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'];
+
 export const UmlautBar: React.FC<UmlautBarProps> = ({ onInsert }) => {
   const [settings] = useUISettings();
 
@@ -13,14 +15,10 @@ export const UmlautBar: React.FC<UmlautBarProps> = ({ onInsert }) => {
   // stole taps for users who don't need it. Can be re-enabled in Настройки.
   if (!settings.showUmlautBar) return null;
 
-  const umlauts = ['ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'];
-
   return (
-    <div className="umlaut-bar" id="umlaut-bar" aria-label="Панель умлаутов">
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 6, fontWeight: 600 }}>
-        Вставка:
-      </span>
-      {umlauts.map((char) => (
+    <div className="umlaut-bar" id="umlaut-bar" role="group" aria-label="Панель умлаутов">
+      <span className="umlaut-bar-label">Вставка:</span>
+      {UMLAUTS.map((char) => (
         <button
           key={char}
           id={`umlaut-btn-${char}`}

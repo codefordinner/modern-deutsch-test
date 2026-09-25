@@ -3,56 +3,59 @@ import { Lock, AlertCircle } from 'lucide-react';
 import { getErrorMessage, login } from '../../api/client';
 
 interface AdminLoginProps {
-  onLogin: (token: string) => void;
+  onLogin: () => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
+    setIsSubmitting(true);
 
     try {
-      const { token } = await login(password);
-      onLogin(token);
+      await login(password);
+      onLogin();
     } catch (e) {
       setLoginError(getErrorMessage(e, 'Ошибка подключения к серверу'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="card" style={{ maxWidth: 440, margin: '40px auto', padding: 32 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
-        <Lock size={26} color="var(--accent-primary)" />
-        <h2 style={{ margin: 0 }}>Вход в панель управления</h2>
+    <div className="card login-card">
+      <div className="login-title">
+        <Lock size={26} color="var(--accent-primary)" aria-hidden="true" />
+        <h2>Вход в панель управления</h2>
       </div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20, textAlign: 'center' }}>
-        Доступ к управлению базой слов, категорий и аналитикой.
-      </p>
+      <p className="login-lead">Доступ к управлению базой слов, категорий и аналитикой.</p>
 
       <form onSubmit={handleLogin}>
-        <div style={{ marginBottom: 16 }}>
+        <div className="login-field">
+          <label className="sr-only" htmlFor="admin-password-input">Пароль администратора</label>
           <input
             id="admin-password-input"
             type="password"
-            className="text-input"
-            style={{ width: '100%' }}
+            className="text-input w-full"
             placeholder="Пароль администратора"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             autoFocus
           />
         </div>
 
         {loginError && (
-          <div style={{ color: 'var(--error)', fontSize: 13, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="form-error" role="alert">
             <AlertCircle size={16} /> {loginError}
           </div>
         )}
 
-        <button id="admin-login-submit-btn" type="submit" className="btn-primary" style={{ width: '100%' }}>
+        <button id="admin-login-submit-btn" type="submit" className="btn-primary btn-block" disabled={isSubmitting}>
           Войти
         </button>
       </form>

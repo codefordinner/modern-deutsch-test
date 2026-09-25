@@ -16,6 +16,11 @@ export interface UISettings {
    * open between questions.
    */
   collapseKeyboardAfterAnswer: boolean;
+  /**
+   * Accept ae/oe/ue/ss where the answer has ä/ö/ü/ß ("Tuer" for "Tür"). Off by
+   * default: learners are supposed to practise the real spelling.
+   */
+  acceptUmlautSubstitutes: boolean;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -24,6 +29,7 @@ const EVENT_NAME = 'app-ui-settings-changed';
 export const DEFAULT_UI_SETTINGS: UISettings = {
   showUmlautBar: false,
   collapseKeyboardAfterAnswer: false,
+  acceptUmlautSubstitutes: false,
 };
 
 export function getUISettings(): UISettings {

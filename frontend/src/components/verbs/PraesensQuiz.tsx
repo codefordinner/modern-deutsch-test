@@ -4,11 +4,11 @@ import { UmlautBar } from '../UmlautBar';
 import { FeedbackBox } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
-import type { Word, SRSState, Feedback } from '../../types';
+import type { Word, SRSRecord, Feedback } from '../../types';
 
 interface PraesensQuizProps {
   verb: Word;
-  srsItem?: SRSState;
+  srsItem?: SRSRecord;
   pronoun: string;
   expected: string;
   userInput: string;
@@ -35,23 +35,21 @@ export const PraesensQuiz: React.FC<PraesensQuizProps> = ({
 
   return (
     <div className="question-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540, marginBottom: 12 }}>
-        <div className="question-prompt-label" style={{ margin: 0 }}>Спряжение (Präsens)</div>
+      <div className="question-header">
+        <div className="question-prompt-label">Спряжение (Präsens)</div>
         <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{verb.de}</h2>
-        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить">
+        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить">
           <Volume2 size={18} />
         </button>
       </div>
 
-      <div style={{ fontSize: 22, fontWeight: 700, margin: '10px 0 20px', color: 'var(--accent-primary)' }}>
-        {pronoun} ... ?
-      </div>
+      <div className="question-pronoun">{pronoun} ... ?</div>
 
-      <form onSubmit={onSubmit} style={{ width: '100%' }}>
+      <form onSubmit={onSubmit} className="question-form">
         <div className="input-group">
           <input
             type="text"

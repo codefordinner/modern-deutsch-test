@@ -4,11 +4,11 @@ import { UmlautBar } from '../UmlautBar';
 import { FeedbackBox } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
-import type { Word, SRSState, Feedback } from '../../types';
+import type { Word, SRSRecord, Feedback } from '../../types';
 
 interface StammformenQuizProps {
   verb: Word;
-  srsItem?: SRSState;
+  srsItem?: SRSRecord;
   praeteritumInput: string;
   partizip2Input: string;
   hilfsverbInput: string;
@@ -49,20 +49,20 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
 
   return (
     <div className="question-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540, marginBottom: 12 }}>
-        <div className="question-prompt-label" style={{ margin: 0 }}>3 Основные формы глагола</div>
+      <div className="question-header">
+        <div className="question-prompt-label">3 Основные формы глагола</div>
         <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{verb.de}</h2>
-        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить">
+        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить">
           <Volume2 size={18} />
         </button>
       </div>
 
-      <form onSubmit={onSubmit} style={{ width: '100%', maxWidth: 540 }}>
-        <div className="quiz-grid-3" style={{ marginBottom: 14 }}>
+      <form onSubmit={onSubmit} className="question-form question-form--wide">
+        <div className="quiz-grid-3 quiz-fields">
           <input
             type="text"
             className="text-input"
@@ -102,15 +102,14 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
           <button
             key="next"
             type="button"
-            className="btn-primary"
-            style={{ width: '100%' }}
+            className="btn-primary btn-block"
             onClick={onNext}
             autoFocus={settings.collapseKeyboardAfterAnswer}
           >
             Дальше (Enter)
           </button>
         ) : (
-          <button key="check" type="submit" className="btn-primary" style={{ width: '100%' }}>
+          <button key="check" type="submit" className="btn-primary btn-block">
             Проверить
           </button>
         )}

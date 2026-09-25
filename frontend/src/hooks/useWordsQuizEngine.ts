@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FormEvent } from 'react';
-import { getCategories, getErrorMessage, getWords } from '../api/client';
+import { getErrorMessage } from '../api/client';
+import { useCategories, useWords } from './useDictionary';
 import { useSRSProgress } from './useSRSProgress';
 import { srsKeys } from '../utils/srs';
 import { pickClosestAnswer } from '../utils/answerDiff';
-import type { Word, Category, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
+import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
+import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
 
 export type DirectionMode = WordDirection | 'mixed';
+
+const ARTICLE_PREFIX = /^(der|die|das)\s+/i;
+
+/** "a, b / c" → ["a", "b", "c"]: any of the listed translations is accepted. */
+const splitTranslations = (ru: string): string[] => ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
 
 interface Card {
   word: Word;
@@ -21,12 +28,11 @@ interface Card {
  * with layout only.
  */
 export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
-  // ---- data ----
-  const [words, setWords] = useState<Word[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  // ---- data (shared with the other trainers and the admin panel, see api/queryCache.ts) ----
+  const wordsQuery = useWords();
+  const categoriesQuery = useCategories();
+  const { words } = wordsQuery;
+  const { categories } = categoriesQuery;
 
   // ---- settings ----
   const [directionMode, setDirectionMode] = useState<DirectionMode>('ru_to_de');
@@ -44,30 +50,14 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const [userInput, setUserInput] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setLoadError(null);
-    Promise.all([getWords({ limit: 1000 }), getCategories()])
-      .then(([wordsPage, cats]) => {
-        if (cancelled) return;
-        setWords(wordsPage.words || []);
-        setCategories(cats || []);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        console.error(e);
-        setLoadError(getErrorMessage(e, 'Не удалось загрузить слова'));
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken]);
+  const failedQuery = [wordsQuery, categoriesQuery].find((q) => !q.hasData && q.error !== undefined);
+  const loadError = failedQuery ? getErrorMessage(failedQuery.error, 'Не удалось загрузить слова') : null;
+  const isLoading = !loadError && (wordsQuery.isLoading || categoriesQuery.isLoading);
 
-  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+  const reload = useCallback(() => {
+    void wordsQuery.refetch();
+    void categoriesQuery.refetch();
+  }, [wordsQuery.refetch, categoriesQuery.refetch]);
 
   const nextWord = useCallback(() => {
     if (selectedCats.length === 0) {
@@ -118,20 +108,18 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     if (feedback) { nextWord(); return; }
     if (!currentWord) return;
 
-    let isCorrect = false;
     let expectedTarget = currentWord.de;
     if (currentFormType === 'plural' && currentWord.plural) expectedTarget = currentWord.plural;
     if (currentFormType === 'feminine' && currentWord.feminine) expectedTarget = currentWord.feminine;
 
-    const cleanIn = userInput.trim().toLowerCase();
-    if (cleanIn.length === 0) {
-      isCorrect = false;
-    } else if (activeDirection === 'ru_to_de') {
-      const cleanDe = expectedTarget.trim().toLowerCase();
-      if (requireArticle) isCorrect = cleanIn === cleanDe;
-      else isCorrect = cleanIn === cleanDe.replace(/^(der|die|das)\s+/, '');
+    // Case, stray/double spaces and Unicode form never matter; ae/oe/ue/ss for ä/ö/ü/ß is a user setting.
+    let isCorrect: boolean;
+    if (activeDirection === 'ru_to_de') {
+      // Without the article requirement both "der Tisch" and "Tisch" are right.
+      const accepted = requireArticle ? [expectedTarget] : [expectedTarget, expectedTarget.replace(ARTICLE_PREFIX, '')];
+      isCorrect = answersMatch(userInput, accepted, currentMatchOptions());
     } else {
-      isCorrect = currentWord.ru.toLowerCase().split(/[,;/]/).map((s) => s.trim()).includes(cleanIn);
+      isCorrect = answersMatch(userInput, splitTranslations(currentWord.ru), { foldYo: true });
     }
 
     recordAnswer(srsKeys.word(currentWord.id, activeDirection, currentFormType), isCorrect);
@@ -141,12 +129,12 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     if (activeDirection === 'ru_to_de') {
       // With the article requirement off, the article is displayed but not
       // part of the comparison (the user wasn't asked to type it).
-      const article = requireArticle ? undefined : expectedTarget.match(/^(der|die|das)\s+/i)?.[0];
+      const article = requireArticle ? undefined : expectedTarget.match(ARTICLE_PREFIX)?.[0];
       check = { user: userInput, expected: expectedTarget, isCorrect, neutralPrefix: article };
     } else {
       // Several translations may be accepted ("a, b / c") — diff against the
       // one the user came closest to and list the rest.
-      const variants = currentWord.ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
+      const variants = splitTranslations(currentWord.ru);
       const closest = pickClosestAnswer(userInput, variants);
       check = {
         user: userInput,

@@ -1,14 +1,17 @@
 import { Router, Request, Response } from 'express';
 import {
-  AUTH_COOKIE_NAME,
-  TOKEN_TTL_SECONDS,
+  clearAuthCookie,
   isAdminRequest,
   isValidAdminPassword,
+  setAuthCookie,
   signAdminToken,
 } from '../middleware/auth.middleware';
 
 const router = Router();
 
+// The session token is set as an HttpOnly cookie and is intentionally NOT part of
+// the response body: the frontend never sees it, so it cannot end up in
+// localStorage where an XSS bug could read it.
 router.post('/login', (req: Request, res: Response) => {
   const { password } = req.body ?? {};
 
@@ -16,20 +19,20 @@ router.post('/login', (req: Request, res: Response) => {
     return res.status(401).json({ success: false, error: 'Неверный пароль' });
   }
 
-  const token = signAdminToken();
-  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_TTL_SECONDS}`);
-  res.json({ success: true, token, message: 'Authenticated successfully' });
+  setAuthCookie(req, res, signAdminToken());
+  res.json({ success: true, message: 'Authenticated successfully' });
 });
 
 // Tokens are stateless JWTs, so there is nothing to revoke server-side: logging
-// out drops the cookie (the client also discards its copy) and the token simply
-// expires on its own after TOKEN_TTL_SECONDS.
-router.post('/logout', (_req: Request, res: Response) => {
-  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+// out drops the cookie and the token simply expires on its own after TOKEN_TTL_SECONDS.
+router.post('/logout', (req: Request, res: Response) => {
+  clearAuthCookie(req, res);
   res.json({ success: true, message: 'Logged out' });
 });
 
+// The client cannot read the HttpOnly cookie, so it asks the server whether it is signed in.
 router.get('/check', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ authenticated: isAdminRequest(req) });
 });
 

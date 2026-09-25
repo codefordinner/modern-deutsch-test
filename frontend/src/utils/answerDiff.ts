@@ -3,7 +3,12 @@
 //
 // The comparison is case-insensitive on purpose: every trainer in the app
 // accepts answers regardless of capitalisation ("tisch" == "Tisch"), so a
-// difference in case must never be highlighted as an error.
+// difference in case must never be highlighted as an error. For the same reason
+// both texts are Unicode-normalised and their whitespace is tidied first
+// (see utils/answerMatch.ts), so a double space or a decomposed "ä" is not
+// shown as a mistake either.
+
+import { cleanText } from './answerMatch';
 
 export interface DiffSegment {
   text: string;
@@ -49,8 +54,8 @@ function toSegments(chars: string[], changed: boolean[]): DiffSegment[] {
  *  - A wrong or superfluous letter shows up as `changed` in `user`.
  */
 export function diffAnswers(userRaw: string, expectedRaw: string, options: DiffOptions = {}): AnswerDiffResult {
-  const user = Array.from(userRaw.trim());
-  const expected = Array.from(expectedRaw.trim());
+  const user = Array.from(cleanText(userRaw));
+  const expected = Array.from(cleanText(expectedRaw));
 
   // Indices of the characters that take part in the comparison.
   const significant = (chars: string[]) =>
@@ -102,13 +107,13 @@ export function diffAnswers(userRaw: string, expectedRaw: string, options: DiffO
  */
 export function pickClosestAnswer(userRaw: string, candidates: string[], options: DiffOptions = {}): string {
   if (candidates.length <= 1) return candidates[0] ?? '';
-  const userLen = Array.from(userRaw.trim()).length;
+  const userLen = Array.from(cleanText(userRaw)).length;
 
   let best = candidates[0];
   let bestScore = -1;
   for (const candidate of candidates) {
     const { matchLength } = diffAnswers(userRaw, candidate, options);
-    const total = userLen + Array.from(candidate.trim()).length;
+    const total = userLen + Array.from(cleanText(candidate)).length;
     const score = total === 0 ? 0 : (2 * matchLength) / total;
     if (score > bestScore) {
       best = candidate;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen, Tag, ArrowLeftRight, BarChart3, LogOut } from 'lucide-react';
 import { AdminLogin } from './admin/AdminLogin';
 import { WordsTab } from './admin/WordsTab';
@@ -8,17 +8,19 @@ import { AnalyticsTab } from './admin/AnalyticsTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
 import {
-  UNAUTHORIZED_EVENT, authToken, createCategory, createWord, deleteCategory, deleteWord,
-  getCategories, getWords, logout, updateCategory, updateWord,
+  UNAUTHORIZED_EVENT, checkSession, createCategory, createWord, deleteCategory, deleteWord,
+  logout, updateCategory, updateWord,
 } from '../api/client';
+import { invalidateQueries } from '../api/queryCache';
+import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';
 import type { Word, Category } from '../types';
 
 export const AdminPanel: React.FC = () => {
-  const [isAuthed, setIsAuthed] = useState<boolean>(() => authToken.get() !== null);
+  // The session cookie is HttpOnly (invisible to JS), so the client asks the
+  // server whether it is currently signed in rather than checking local state.
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
   const [tab, setTab] = useState<'words' | 'categories' | 'import' | 'analytics'>('words');
-  const [words, setWords] = useState<Word[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -26,7 +28,17 @@ export const AdminPanel: React.FC = () => {
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [isCatOpen, setIsCatOpen] = useState(false);
 
-  // The API client drops the token and fires this when the server rejects it (e.g. the session expired).
+  useEffect(() => {
+    let cancelled = false;
+    checkSession()
+      .then((ok) => { if (!cancelled) setIsAuthed(ok); })
+      .catch(() => { if (!cancelled) setIsAuthed(false); });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The API client fires this when the server rejects the session (e.g. it expired).
   useEffect(() => {
     const onUnauthorized = () => {
       setIsAuthed(false);
@@ -36,34 +48,31 @@ export const AdminPanel: React.FC = () => {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, []);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      setCategories(await getCategories());
-    } catch (e) {
-      reportError(e, 'Не удалось загрузить категории');
-    }
-  }, []);
+  // Shared with the trainers (see hooks/useDictionary.ts): editing here refreshes what they show too.
+  const { categories, error: categoriesError } = useCategories();
+  const { words: allWords, error: wordsError } = useWords();
 
-  // Search fires on every keystroke; only the latest request may update the list.
-  const wordsRequestId = useRef(0);
-  const loadWords = useCallback(async () => {
-    const requestId = ++wordsRequestId.current;
-    try {
-      const page = await getWords({ categoryId: category, search, limit: 500 });
-      if (requestId === wordsRequestId.current) setWords(page.words || []);
-    } catch (e) {
-      if (requestId === wordsRequestId.current) reportError(e, 'Не удалось загрузить слова');
-    }
-  }, [category, search]);
+  useEffect(() => {
+    if (isAuthed && categoriesError) reportError(categoriesError, 'Не удалось загрузить категории');
+  }, [isAuthed, categoriesError]);
+  useEffect(() => {
+    if (isAuthed && wordsError) reportError(wordsError, 'Не удалось загрузить слова');
+  }, [isAuthed, wordsError]);
 
-  useEffect(() => { if (isAuthed) loadCategories(); }, [isAuthed, loadCategories]);
-  useEffect(() => { if (isAuthed) loadWords(); }, [isAuthed, loadWords]);
+  const words = allWords.filter((w) => {
+    const matchesCategory = category === 'all' || w.categoryId === category;
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || w.de.toLowerCase().includes(q) || w.ru.toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
-  const handleLogin = (token: string) => { authToken.set(token); setIsAuthed(true); };
+  const refreshDictionary = () => invalidateQueries(WORDS_KEY);
+  const refreshCategories = () => invalidateQueries(CATEGORIES_KEY);
+
+  const handleLogin = () => setIsAuthed(true);
 
   const handleLogout = () => {
-    logout().catch(() => {}); // best effort: also clears the HttpOnly auth cookie
-    authToken.clear();
+    logout().catch(() => {});
     setIsAuthed(false);
   };
 
@@ -71,7 +80,7 @@ export const AdminPanel: React.FC = () => {
     if (!confirm('Удалить слово?')) return;
     try {
       await deleteWord(id);
-      loadWords();
+      refreshDictionary();
     } catch (e) {
       reportError(e, 'Не удалось удалить слово');
     }
@@ -81,8 +90,8 @@ export const AdminPanel: React.FC = () => {
     if (!confirm('Удалить категорию?')) return;
     try {
       await deleteCategory(id);
-      loadCategories();
-      loadWords();
+      refreshCategories();
+      refreshDictionary();
     } catch (e) {
       reportError(e, 'Не удалось удалить категорию');
     }
@@ -94,7 +103,7 @@ export const AdminPanel: React.FC = () => {
       if (editingWord) await updateWord(editingWord.id, word);
       else await createWord(word);
       setIsWordOpen(false);
-      loadWords();
+      refreshDictionary();
     } catch (e) {
       reportError(e, 'Не удалось сохранить слово');
     }
@@ -105,18 +114,19 @@ export const AdminPanel: React.FC = () => {
       if (editingCat) await updateCategory(editingCat.id, cat);
       else await createCategory(cat);
       setIsCatOpen(false);
-      loadCategories();
+      refreshCategories();
     } catch (e) {
       reportError(e, 'Не удалось сохранить категорию');
     }
   };
 
+  if (isAuthed === null) return <div className="centered-message">Проверка сессии...</div>;
   if (!isAuthed) return <AdminLogin onLogin={handleLogin} />;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 10, flexWrap: 'wrap' }}>
-        <div className="trainer-modes" style={{ margin: 0 }}>
+      <div className="admin-toolbar">
+        <div className="trainer-modes trainer-modes--flush">
           <button className={`mode-pill ${tab === 'words' ? 'active' : ''}`} onClick={() => setTab('words')}><BookOpen size={14} /> Слова</button>
           <button className={`mode-pill ${tab === 'categories' ? 'active' : ''}`} onClick={() => setTab('categories')}><Tag size={14} /> Категории</button>
           <button className={`mode-pill ${tab === 'import' ? 'active' : ''}`} onClick={() => setTab('import')}><ArrowLeftRight size={14} /> Импорт / Экспорт</button>
@@ -142,7 +152,7 @@ export const AdminPanel: React.FC = () => {
           onDeleteCategory={handleDeleteCategory}
         />
       )}
-      {tab === 'import' && <ImportExportTab categories={categories} onRefresh={() => { loadCategories(); loadWords(); }} />}
+      {tab === 'import' && <ImportExportTab categories={categories} onRefresh={() => { refreshCategories(); refreshDictionary(); }} />}
       {tab === 'analytics' && <AnalyticsTab />}
 
       {isWordOpen && <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={handleSaveWord} />}

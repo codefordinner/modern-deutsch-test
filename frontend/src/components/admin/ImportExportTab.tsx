@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 import { Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { exportWords, getErrorMessage, importWords } from '../../api/client';
+import { invalidateQueries } from '../../api/queryCache';
+import { WORDS_KEY } from '../../hooks/useDictionary';
 import { reportError } from '../../utils/toast';
-import type { Category } from '../../types';
+import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
+import type { Category, PartOfSpeech } from '../../types';
 
 interface ImportExportTabProps {
   categories: Category[];
   onRefresh: () => void;
 }
 
+const AUTO = '';
+
 export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, onRefresh }) => {
   const [importText, setImportText] = useState('');
   const [targetCategory, setTargetCategory] = useState(categories[0]?.id || '');
+  const [importPartOfSpeech, setImportPartOfSpeech] = useState<PartOfSpeech | typeof AUTO>(AUTO);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleImport = async () => {
@@ -19,9 +25,10 @@ export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, on
     setStatusMsg(null);
 
     try {
-      const { importedCount } = await importWords(importText, targetCategory);
+      const { importedCount } = await importWords(importText, targetCategory, importPartOfSpeech || undefined);
       setStatusMsg({ type: 'success', text: `Успешно импортировано: ${importedCount} слов` });
       setImportText('');
+      invalidateQueries(WORDS_KEY);
       onRefresh();
     } catch (e) {
       setStatusMsg({ type: 'error', text: getErrorMessage(e, 'Ошибка импорта') });
@@ -44,36 +51,55 @@ export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, on
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-      <div className="card" style={{ margin: 0 }}>
-        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}><Upload size={20} /> Импорт слов</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+    <div className="import-grid">
+      <div className="card card--flush">
+        <h3 className="card-title"><Upload size={20} /> Импорт слов</h3>
+        <p className="card-note">
           Формат: <code>Немецкое слово [таб или запятая] Перевод [таб] Множественное число</code>
         </p>
 
-        <select className="text-input" style={{ width: '100%', marginBottom: 12 }} value={targetCategory} onChange={(e) => setTargetCategory(e.target.value)}>
-          {categories.map((c) => (<option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>))}
-        </select>
+        <div className="form-grid-2 select-spaced">
+          <select className="text-input" value={targetCategory} onChange={(e) => setTargetCategory(e.target.value)}>
+            {categories.map((c) => (<option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>))}
+          </select>
+          <select
+            className="text-input"
+            value={importPartOfSpeech}
+            onChange={(e) => setImportPartOfSpeech(e.target.value as PartOfSpeech | typeof AUTO)}
+            title="Часть речи для всех импортируемых строк"
+          >
+            <option value={AUTO}>Часть речи: автоматически</option>
+            {PART_OF_SPEECH_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
 
-        <textarea className="text-input" rows={6} style={{ width: '100%', marginBottom: 12, fontFamily: 'var(--mono)', fontSize: 13 }} placeholder="der Hund&#9;собака&#9;die Hunde&#10;die Katze&#9;кошка&#9;die Katzen" value={importText} onChange={(e) => setImportText(e.target.value)} />
+        <textarea
+          className="text-input w-full textarea-mono"
+          rows={6}
+          placeholder="der Hund&#9;собака&#9;die Hunde&#10;die Katze&#9;кошка&#9;die Katzen"
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+        />
 
         {statusMsg && (
-          <div style={{ fontSize: 13, color: statusMsg.type === 'success' ? 'var(--success)' : 'var(--error)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className={`status-msg status-msg--${statusMsg.type}`}>
             {statusMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />} {statusMsg.text}
           </div>
         )}
 
-        <button className="btn-primary" style={{ width: '100%' }} onClick={handleImport}><Upload size={16} /> Запустить импорт</button>
+        <button className="btn-primary btn-block" onClick={handleImport}><Upload size={16} /> Запустить импорт</button>
       </div>
 
-      <div className="card" style={{ margin: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div className="card card--flush card--split">
         <div>
-          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}><Download size={20} /> Экспорт базы слов</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          <h3 className="card-title"><Download size={20} /> Экспорт базы слов</h3>
+          <p className="card-note">
             Выгрузить все слова и категории в структурированный JSON формат для резервного копирования или переноса на другой сервер.
           </p>
         </div>
-        <button className="btn-secondary" style={{ width: '100%', padding: '14px' }} onClick={handleExport}><Download size={18} /> Скачать JSON базу</button>
+        <button className="btn-secondary btn-block btn-export" onClick={handleExport}><Download size={18} /> Скачать JSON базу</button>
       </div>
     </div>
   );

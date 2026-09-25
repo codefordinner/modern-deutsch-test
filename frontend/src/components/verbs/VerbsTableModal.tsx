@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Search, Volume2 } from 'lucide-react';
+import { Search, Volume2 } from 'lucide-react';
+import { Modal } from '../Modal';
 import type { Word } from '../../types';
 import { speakGerman } from '../../utils/audio';
 
@@ -22,60 +23,58 @@ export const VerbsTableModal: React.FC<VerbsTableModalProps> = ({ verbs, onClose
   });
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: 740, maxHeight: '80vh' }}>
-        <div className="modal-header">
-          <h3 style={{ margin: 0 }}>Таблица 3-х форм глаголов ({verbs.length})</h3>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
-        </div>
-
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: 10, top: 12, color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              className="text-input"
-              style={{ width: '100%', paddingLeft: 34, fontSize: 13 }}
-              placeholder="Поиск глагола..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="modal-body" style={{ padding: 0 }}>
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Infinitiv</th>
-                  <th>Präteritum</th>
-                  <th>Partizip II</th>
-                  <th>Hilfsverb</th>
-                  <th>Перевод</th>
-                  <th>Аудио</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((v) => (
-                  <tr key={v.id}>
-                    <td style={{ fontWeight: 700 }}>{v.de}</td>
-                    <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{v.praeteritum || '—'}</td>
-                    <td style={{ color: 'var(--success)', fontWeight: 600 }}>{v.partizip2 || '—'}</td>
-                    <td style={{ fontStyle: 'italic' }}>{v.hilfsverb || 'haben'}</td>
-                    <td>{v.ru}</td>
-                    <td>
-                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => speakGerman(`${v.de}, ${v.praeteritum || ''}, ${v.partizip2 || ''}`)}>
-                        <Volume2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+    <Modal title={`Таблица 3-х форм глаголов (${verbs.length})`} size="xl" onClose={onClose}>
+      <div className="modal-toolbar">
+        <div className="search-field search-field--lg">
+          <Search size={16} className="search-field-icon" aria-hidden="true" />
+          <input
+            type="text"
+            className="text-input"
+            placeholder="Поиск глагола..."
+            aria-label="Поиск глагола"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
-    </div>
+
+      <div className="modal-body modal-body--flush">
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Infinitiv</th>
+                <th>Präteritum</th>
+                <th>Partizip II</th>
+                <th>Hilfsverb</th>
+                <th>Перевод</th>
+                <th>Аудио</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((v) => (
+                <tr key={v.id}>
+                  <td className="cell-bold">{v.de}</td>
+                  <td className="cell-accent">{v.praeteritum || '—'}</td>
+                  <td className="cell-success">{v.partizip2 || '—'}</td>
+                  <td className="cell-italic">{v.hilfsverb || 'haben'}</td>
+                  <td>{v.ru}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn--xs"
+                      onClick={() => speakGerman(`${v.de}, ${v.praeteritum || ''}, ${v.partizip2 || ''}`)}
+                      aria-label={`Озвучить: ${v.de}`}
+                    >
+                      <Volume2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Modal>
   );
 };

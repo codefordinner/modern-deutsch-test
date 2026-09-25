@@ -15,41 +15,37 @@ export const Scorebar: React.FC<ScorebarProps> = ({ score, onReset, trainerName 
     <div className="score-bar" id="scorebar">
       <div className="score-stats">
         {trainerName && (
-          <div className="stat-item" style={{ marginRight: 6 }}>
+          <div className="stat-item stat-item--module">
             <span className="stat-label">Модуль</span>
-            <span className="stat-value" style={{ fontSize: 16, color: 'var(--accent-primary)' }}>
-              {trainerName}
-            </span>
+            <span className="stat-value stat-value--module">{trainerName}</span>
           </div>
         )}
 
         <div className="stat-item">
-          <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="stat-label">
             <CheckCircle size={12} color="var(--success)" /> Верно / Всего
           </span>
           <span className="stat-value">
-            {score.correct} <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>/ {score.total}</span>
+            {score.correct} <span className="stat-value-total">/ {score.total}</span>
           </span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="stat-label">
             <Target size={12} color="var(--accent-primary)" /> Точность
           </span>
           <span className="stat-value">{accuracy}%</span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="stat-label">
             <Flame size={12} color="#f97316" /> Серия
           </span>
-          <span className="stat-value" style={{ color: score.streak > 2 ? '#f97316' : 'inherit' }}>
-            {score.streak} 🔥
-          </span>
+          <span className={`stat-value ${score.streak > 2 ? 'stat-value--hot' : ''}`}>{score.streak} 🔥</span>
         </div>
 
         <div className="stat-item">
-          <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="stat-label">
             <Trophy size={12} color="#eab308" /> Лучшая
           </span>
           <span className="stat-value">{score.bestStreak}</span>
@@ -58,11 +54,10 @@ export const Scorebar: React.FC<ScorebarProps> = ({ score, onReset, trainerName 
 
       <button
         id="reset-score-btn"
-        className="btn-secondary"
+        className="btn-secondary score-reset-btn"
         onClick={onReset}
-        title="Сбросить счётчик сессии"
+        title="Сбросить счётчик"
         type="button"
-        style={{ padding: '6px 12px', fontSize: 12 }}
       >
         <RotateCcw size={14} />
         <span>Сброс</span>

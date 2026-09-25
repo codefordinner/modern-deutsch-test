@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
@@ -6,12 +6,16 @@ import { NumbersTrainer } from './components/NumbersTrainer';
 import { WordsTrainer } from './components/WordsTrainer';
 import { VerbsTrainer } from './components/VerbsTrainer';
 import { TimeTrainer } from './components/TimeTrainer';
-import { AdminPanel } from './components/AdminPanel';
-import type { TrainerTab, ScoreState } from './types';
-import { trackEvent } from './api/client';
 import { ToastHost } from './components/ToastHost';
+import { trackEvent } from './api/client';
+import { useHashRoute } from './hooks/useHashRoute';
+import { useScores } from './hooks/useScores';
+import type { ScoredTab } from './hooks/useScores';
+import type { TrainerTab } from './types';
 
-const initialScore: ScoreState = { correct: 0, total: 0, streak: 0, bestStreak: 0 };
+// The admin panel (tables, forms, analytics) is only for the site owner, so it
+// is split into its own chunk that ordinary learners never download.
+const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
 
 const titles: Record<TrainerTab, string> = {
   numbers: '🔢 Числительные',
@@ -21,8 +25,16 @@ const titles: Record<TrainerTab, string> = {
   admin: '⚙️ Панель управления',
 };
 
+const pageTitles: Record<TrainerTab, string> = {
+  numbers: 'Числительные',
+  words: 'Словарь',
+  verbs: 'Глаголы',
+  time: 'Время',
+  admin: 'Админка',
+};
+
 export function App() {
-  const [activeTab, setActiveTab] = useState<TrainerTab>('numbers');
+  const activeTab = useHashRoute();
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('theme');
@@ -31,9 +43,8 @@ export function App() {
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const [scores, setScores] = useState<Record<string, ScoreState>>({
-    numbers: { ...initialScore }, words: { ...initialScore }, verbs: { ...initialScore }, time: { ...initialScore },
-  });
+  const { scores, recordAnswer, resetScore } = useScores();
+  const scoredTab: ScoredTab | null = activeTab === 'admin' ? null : activeTab;
 
   // NOTE: the light theme in index.css is scoped to `html.light` (dark is
   // the default `:root`), so toggling a `dark` class here (as before) never
@@ -55,50 +66,55 @@ export function App() {
     trackEvent('visit');
   }, []);
 
+  // One event per tab change — however it happened (a tab link, Back/Forward, a pasted link).
+  const previousTab = useRef(activeTab);
+  useEffect(() => {
+    if (previousTab.current === activeTab) return;
+    previousTab.current = activeTab;
+    trackEvent('tab_switch', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    document.title = `${pageTitles[activeTab]} — Deutsch Trainer`;
+  }, [activeTab]);
+
   const handleAnswer = (isCorrect: boolean) => {
-    trackEvent('quiz_answer', activeTab, isCorrect);
-    setScores((prev) => {
-      const cur = prev[activeTab] || { ...initialScore };
-      const nextStreak = isCorrect ? cur.streak + 1 : 0;
-      return {
-        ...prev,
-        [activeTab]: {
-          correct: isCorrect ? cur.correct + 1 : cur.correct,
-          total: cur.total + 1,
-          streak: nextStreak,
-          bestStreak: Math.max(cur.bestStreak, nextStreak),
-        },
-      };
-    });
+    if (!scoredTab) return;
+    trackEvent('quiz_answer', scoredTab, isCorrect);
+    recordAnswer(scoredTab, isCorrect);
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-shell">
       <Navbar
         activeTab={activeTab}
-        onSelectTab={(tab) => { setActiveTab(tab); trackEvent('tab_switch', tab); }}
         isDark={isDark}
         onToggleTheme={() => setIsDark((p) => !p)}
         onOpenStats={() => setIsStatsOpen(true)}
-        showStats={activeTab !== 'admin'}
+        showStats={scoredTab !== null}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      <main className="app-container">
-        {activeTab === 'numbers' && <NumbersTrainer score={scores.numbers || initialScore} onAnswer={handleAnswer} />}
-        {activeTab === 'words' && <WordsTrainer score={scores.words || initialScore} onAnswer={handleAnswer} />}
-        {activeTab === 'verbs' && <VerbsTrainer score={scores.verbs || initialScore} onAnswer={handleAnswer} />}
-        {activeTab === 'time' && <TimeTrainer score={scores.time || initialScore} onAnswer={handleAnswer} />}
-        {activeTab === 'admin' && <AdminPanel />}
+      <main className="app-container" id="main">
+        {activeTab === 'numbers' && <NumbersTrainer onAnswer={handleAnswer} />}
+        {activeTab === 'words' && <WordsTrainer onAnswer={handleAnswer} />}
+        {activeTab === 'verbs' && <VerbsTrainer onAnswer={handleAnswer} />}
+        {activeTab === 'time' && <TimeTrainer />}
+        {activeTab === 'admin' && (
+          <Suspense fallback={<div className="centered-message">Загрузка панели управления…</div>}>
+            <AdminPanel />
+          </Suspense>
+        )}
       </main>
 
-      <StatsPanel
-        score={scores[activeTab] || initialScore}
-        onReset={() => setScores((p) => ({ ...p, [activeTab]: { ...initialScore } }))}
-        trainerName={titles[activeTab]}
-        isOpen={isStatsOpen}
-        onClose={() => setIsStatsOpen(false)}
-      />
+      {isStatsOpen && scoredTab && (
+        <StatsPanel
+          score={scores[scoredTab]}
+          onReset={() => resetScore(scoredTab)}
+          trainerName={titles[activeTab]}
+          onClose={() => setIsStatsOpen(false)}
+        />
+      )}
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
 

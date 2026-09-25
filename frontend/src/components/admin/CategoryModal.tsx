@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Modal } from '../Modal';
 import type { Category } from '../../types';
 
 interface CategoryModalProps {
@@ -28,35 +28,29 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: 460 }}>
-        <div className="modal-header">
-          <h3 style={{ margin: 0 }}>{category ? 'Редактировать категорию' : 'Новая категория'}</h3>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <Modal title={category ? 'Редактировать категорию' : 'Новая категория'} size="sm" onClose={onClose} closeOnBackdrop={false}>
+      <form onSubmit={handleSubmit} className="modal-form">
+        <div className="modal-body modal-body--form">
+          <div>
+            <label className="field-label" htmlFor="category-name">Название категории *</label>
+            <input id="category-name" type="text" className="text-input w-full" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="form-grid-2">
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Название категории *</label>
-              <input type="text" className="text-input" style={{ width: '100%' }} value={name} onChange={(e) => setName(e.target.value)} required />
+              <label className="field-label" htmlFor="category-icon">Иконка (Emoji)</label>
+              <input id="category-icon" type="text" className="text-input w-full" value={icon} onChange={(e) => setIcon(e.target.value)} />
             </div>
-            <div className="form-grid-2">
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Иконка (Emoji)</label>
-                <input type="text" className="text-input" style={{ width: '100%' }} value={icon} onChange={(e) => setIcon(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Цвет</label>
-                <input type="color" className="text-input" style={{ width: '100%', height: 46, padding: 4 }} value={color} onChange={(e) => setColor(e.target.value)} />
-              </div>
+            <div>
+              <label className="field-label" htmlFor="category-color">Цвет</label>
+              <input id="category-color" type="color" className="text-input w-full color-input" value={color} onChange={(e) => setColor(e.target.value)} />
             </div>
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>Отмена</button>
-            <button type="submit" className="btn-primary">Сохранить</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose}>Отмена</button>
+          <button type="submit" className="btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </Modal>
   );
 };

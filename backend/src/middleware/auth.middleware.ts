@@ -58,11 +58,29 @@ const verifyAdminToken = (token: string): boolean => {
   }
 };
 
-/** Reads the token from `Authorization: Bearer …`, falling back to the auth cookie. */
-export const extractToken = (req: Request): string | null => {
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
+const isSecureRequest = (req: Request): boolean =>
+  req.secure || String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https';
 
+const cookieAttributes = (req: Request, maxAgeSeconds: number): string =>
+  [
+    'Path=/',
+    'HttpOnly', // not readable from JS, so an XSS bug cannot steal the session
+    'SameSite=Strict', // never sent on cross-site requests (first line of defence against CSRF)
+    `Max-Age=${maxAgeSeconds}`,
+    ...(isSecureRequest(req) ? ['Secure'] : []),
+  ].join('; ');
+
+/** Starts an admin session. The token only ever travels in this HttpOnly cookie. */
+export const setAuthCookie = (req: Request, res: Response, token: string): void => {
+  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; ${cookieAttributes(req, TOKEN_TTL_SECONDS)}`);
+};
+
+export const clearAuthCookie = (req: Request, res: Response): void => {
+  res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=; ${cookieAttributes(req, 0)}`);
+};
+
+/** Reads the session token from the auth cookie (the `Authorization` header is deliberately not accepted). */
+export const extractToken = (req: Request): string | null => {
   const cookie = req.headers.cookie
     ?.split(';')
     .map((part) => part.trim())

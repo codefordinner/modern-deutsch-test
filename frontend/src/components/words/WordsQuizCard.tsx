@@ -4,13 +4,13 @@ import { UmlautBar } from '../UmlautBar';
 import { FeedbackBox } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
-import type { Word, SRSState, Feedback } from '../../types';
+import type { Word, SRSRecord, Feedback } from '../../types';
 
 interface WordsQuizCardProps {
   currentWord: Word;
   direction: 'de_to_ru' | 'ru_to_de';
   formType: 'base' | 'plural' | 'feminine';
-  srsItem?: SRSState;
+  srsItem?: SRSRecord;
   useSRS?: boolean;
   userInput: string;
   feedback: Feedback | null;
@@ -60,21 +60,19 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
 
   return (
     <div className="question-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540, marginBottom: 12 }}>
-        <span className="question-prompt-label" style={{ margin: 0 }}>{promptLabel}</span>
+      <div className="question-header">
+        <span className="question-prompt-label">{promptLabel}</span>
         {useSRS ? (
           <span className={`leitner-badge box-${boxNum}`}>Ящик {boxNum}</span>
         ) : (
-          <span className="leitner-badge" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', borderColor: 'var(--border-color)' }}>
-            🎲 Рандом
-          </span>
+          <span className="leitner-badge leitner-badge--random">🎲 Рандом</span>
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{mainText}</h2>
         {direction === 'de_to_ru' && (
-          <button type="button" className="icon-btn" onClick={() => speakGerman(audioTarget)} title="Озвучить">
+          <button type="button" className="icon-btn" onClick={() => speakGerman(audioTarget)} title="Озвучить" aria-label="Озвучить">
             <Volume2 size={18} />
           </button>
         )}
@@ -82,12 +80,12 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
 
       {subText && <div className="question-subtext">{subText}</div>}
       {currentWord.hint && (
-        <div className="question-subtext" style={{ fontStyle: 'italic', opacity: 0.85 }}>
+        <div className="question-subtext question-subtext--hint">
           💡 {currentWord.hint}
         </div>
       )}
 
-      <form onSubmit={onSubmit} style={{ width: '100%' }}>
+      <form onSubmit={onSubmit} className="question-form">
         <div className="input-group">
           <input
             type="text"

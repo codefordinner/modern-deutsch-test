@@ -24,6 +24,9 @@ model Word {
   de              String
   ru              String
   hint            String?
+  /// noun | verb | adjective | adverb | other. Validated in the API (SQLite has no enums in Prisma 5).
+  /// null = not specified; the API infers it on save, see src/services/partOfSpeech.ts.
+  partOfSpeech    String?
   plural          String?
   feminine        String?
   femininePlural  String?

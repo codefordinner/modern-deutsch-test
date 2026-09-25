@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import type { Word, Category } from '../../types';
+import { Modal } from '../Modal';
+import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
+import type { PartOfSpeech, Word, Category } from '../../types';
 
 interface WordModalProps {
   word: Word | null;
@@ -9,10 +10,14 @@ interface WordModalProps {
   onSave: (wordData: Partial<Word>) => Promise<void>;
 }
 
+/** '' in the <select> means "let the server infer it from the rest of the entry". */
+const AUTO = '';
+
 export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose, onSave }) => {
   const [de, setDe] = useState('');
   const [ru, setRu] = useState('');
   const [hint, setHint] = useState('');
+  const [partOfSpeech, setPartOfSpeech] = useState<PartOfSpeech | typeof AUTO>(AUTO);
   const [plural, setPlural] = useState('');
   const [feminine, setFeminine] = useState('');
   const [praeteritum, setPraeteritum] = useState('');
@@ -33,6 +38,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       setDe(word.de);
       setRu(word.ru);
       setHint(word.hint || '');
+      setPartOfSpeech(word.partOfSpeech ?? AUTO);
       setPlural(word.plural || '');
       setFeminine(word.feminine || '');
       setPraeteritum(word.praeteritum || '');
@@ -63,6 +69,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       de,
       ru,
       hint: hint || null,
+      partOfSpeech: partOfSpeech || null,
       plural: plural || null,
       feminine: feminine || null,
       praeteritum: praeteritum || null,
@@ -79,120 +86,127 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: 620, maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="modal-header">
-          <h3 style={{ margin: 0 }}>{word ? 'Редактировать слово' : 'Новое слово'}</h3>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="form-grid-2">
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Немецкий (с артиклем) *</label>
-                <input type="text" className="text-input" style={{ width: '100%' }} placeholder="der Tisch / sein" value={de} onChange={(e) => setDe(e.target.value)} required />
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Русский перевод *</label>
-                <input type="text" className="text-input" style={{ width: '100%' }} placeholder="стол / быть" value={ru} onChange={(e) => setRu(e.target.value)} required />
-              </div>
-            </div>
-
+    <Modal title={word ? 'Редактировать слово' : 'Новое слово'} size="lg" onClose={onClose} closeOnBackdrop={false}>
+      <form onSubmit={handleSubmit} className="modal-form">
+        <div className="modal-body modal-body--form">
+          <div className="form-grid-2">
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Подсказка (чтобы отличать похожие переводы)</label>
-              <input type="text" className="text-input" style={{ width: '100%' }} placeholder="напр. «коса (причёска)» или «замок (здание)»" value={hint} onChange={(e) => setHint(e.target.value)} />
+              <label className="field-label" htmlFor="word-de">Немецкий (с артиклем) *</label>
+              <input id="word-de" type="text" className="text-input w-full" placeholder="der Tisch / sein" value={de} onChange={(e) => setDe(e.target.value)} required />
             </div>
-
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Категория *</label>
-              <select className="text-input" style={{ width: '100%' }} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+              <label className="field-label" htmlFor="word-ru">Русский перевод *</label>
+              <input id="word-ru" type="text" className="text-input w-full" placeholder="стол / быть" value={ru} onChange={(e) => setRu(e.target.value)} required />
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="word-hint">Подсказка (чтобы отличать похожие переводы)</label>
+            <input id="word-hint" type="text" className="text-input w-full" placeholder="напр. «коса (причёска)» или «замок (здание)»" value={hint} onChange={(e) => setHint(e.target.value)} />
+          </div>
+
+          <div className="form-grid-2">
+            <div>
+              <label className="field-label" htmlFor="word-category">Категория *</label>
+              <select id="word-category" className="text-input w-full" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>
                 ))}
               </select>
             </div>
+            <div>
+              <label className="field-label" htmlFor="word-pos">
+                Часть речи{' '}
+                <span className="field-label--xs">(определяет, попадёт ли слово в тренажёр глаголов)</span>
+              </label>
+              <select id="word-pos" className="text-input w-full" value={partOfSpeech} onChange={(e) => setPartOfSpeech(e.target.value as PartOfSpeech | typeof AUTO)}>
+                <option value={AUTO}>Определить автоматически</option>
+                {PART_OF_SPEECH_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-            <div className="form-grid-2">
+          <div className="form-grid-2">
+            <div>
+              <label className="field-label" htmlFor="word-plural">Множественное число (Plural)</label>
+              <input id="word-plural" type="text" className="text-input w-full" placeholder="die Tische" value={plural} onChange={(e) => setPlural(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="word-feminine">Женский род (профессии)</label>
+              <input id="word-feminine" type="text" className="text-input w-full" placeholder="die Ärztin" value={feminine} onChange={(e) => setFeminine(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <div className="form-section-title">Основные формы глагола (для глаголов)</div>
+            <div className="form-grid-3 form-row">
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Множественное число (Plural)</label>
-                <input type="text" className="text-input" style={{ width: '100%' }} placeholder="die Tische" value={plural} onChange={(e) => setPlural(e.target.value)} />
+                <label className="field-label field-label--sm" htmlFor="word-praeteritum">Präteritum</label>
+                <input id="word-praeteritum" type="text" className="text-input w-full" placeholder="war / ging" value={praeteritum} onChange={(e) => setPraeteritum(e.target.value)} />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>Женский род (профессии)</label>
-                <input type="text" className="text-input" style={{ width: '100%' }} placeholder="die Ärztin" value={feminine} onChange={(e) => setFeminine(e.target.value)} />
+                <label className="field-label field-label--sm" htmlFor="word-partizip2">Partizip II</label>
+                <input id="word-partizip2" type="text" className="text-input w-full" placeholder="gewesen / gegangen" value={partizip2} onChange={(e) => setPartizip2(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label field-label--sm" htmlFor="word-hilfsverb">Вспомогательный</label>
+                <select id="word-hilfsverb" className="text-input w-full" value={hilfsverb} onChange={(e) => setHilfsverb(e.target.value)}>
+                  <option value="haben">haben</option>
+                  <option value="sein">sein</option>
+                </select>
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Основные формы глагола (для глаголов)</div>
-              <div className="form-grid-3" style={{ marginBottom: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>Präteritum</label>
-                  <input type="text" className="text-input" style={{ width: '100%' }} placeholder="war / ging" value={praeteritum} onChange={(e) => setPraeteritum(e.target.value)} />
+            <button
+              type="button"
+              className="btn-secondary conjugation-toggle"
+              onClick={() => setShowConjugation((prev) => !prev)}
+            >
+              {showConjugation ? '▲ Скрыть спряжение в Präsens' : '▼ Настроить спряжение в Präsens (ich, du, er, wir, ihr, sie)'}
+            </button>
+
+            {showConjugation && (
+              <div className="conjugation-panel">
+                <div className="conjugation-hint">
+                  Формы настоящего времени (Präsens) — например, для <em>sein</em> (bin, bist, ist...):
                 </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>Partizip II</label>
-                  <input type="text" className="text-input" style={{ width: '100%' }} placeholder="gewesen / gegangen" value={partizip2} onChange={(e) => setPartizip2(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>Вспомогательный</label>
-                  <select className="text-input" style={{ width: '100%' }} value={hilfsverb} onChange={(e) => setHilfsverb(e.target.value)}>
-                    <option value="haben">haben</option>
-                    <option value="sein">sein</option>
-                  </select>
+                <div className="form-grid-3">
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-ich">ich</label>
+                    <input id="word-praesens-ich" type="text" className="text-input w-full" placeholder="bin" value={praesensIch} onChange={(e) => setPraesensIch(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-du">du</label>
+                    <input id="word-praesens-du" type="text" className="text-input w-full" placeholder="bist" value={praesensDu} onChange={(e) => setPraesensDu(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-er">er / sie / es</label>
+                    <input id="word-praesens-er" type="text" className="text-input w-full" placeholder="ist" value={praesensErSieEs} onChange={(e) => setPraesensErSieEs(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-wir">wir</label>
+                    <input id="word-praesens-wir" type="text" className="text-input w-full" placeholder="sind" value={praesensWir} onChange={(e) => setPraesensWir(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-ihr">ihr</label>
+                    <input id="word-praesens-ihr" type="text" className="text-input w-full" placeholder="seid" value={praesensIhr} onChange={(e) => setPraesensIhr(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label--xs" htmlFor="word-praesens-sie">sie / Sie</label>
+                    <input id="word-praesens-sie" type="text" className="text-input w-full" placeholder="sind" value={praesensSie} onChange={(e) => setPraesensSie(e.target.value)} />
+                  </div>
                 </div>
               </div>
-
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ fontSize: 13, padding: '6px 12px', marginTop: 4, width: '100%' }}
-                onClick={() => setShowConjugation((prev) => !prev)}
-              >
-                {showConjugation ? '▲ Скрыть спряжение в Präsens' : '▼ Настроить спряжение в Präsens (ich, du, er, wir, ihr, sie)'}
-              </button>
-
-              {showConjugation && (
-                <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    Формы настоящего времени (Präsens) — например, для <em>sein</em> (bin, bist, ist...):
-                  </div>
-                  <div className="form-grid-3">
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>ich</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="bin" value={praesensIch} onChange={(e) => setPraesensIch(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>du</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="bist" value={praesensDu} onChange={(e) => setPraesensDu(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>er / sie / es</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="ist" value={praesensErSieEs} onChange={(e) => setPraesensErSieEs(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>wir</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="sind" value={praesensWir} onChange={(e) => setPraesensWir(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>ihr</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="seid" value={praesensIhr} onChange={(e) => setPraesensIhr(e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>sie / Sie</label>
-                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="sind" value={praesensSie} onChange={(e) => setPraesensSie(e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>Отмена</button>
-            <button type="submit" className="btn-primary">Сохранить</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose}>Отмена</button>
+          <button type="submit" className="btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </Modal>
   );
 };

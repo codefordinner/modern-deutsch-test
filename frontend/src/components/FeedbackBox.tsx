@@ -62,10 +62,11 @@ export const FeedbackBox: React.FC<FeedbackBoxProps> = ({ feedback, action }) =>
   return (
     <div
       className={`feedback-box ${feedback.isCorrect ? 'feedback-success' : 'feedback-error'} ${showChecks ? 'feedback-box-compare' : ''}`}
+      role={feedback.isCorrect ? 'status' : 'alert'}
     >
       {feedback.isCorrect ? <Check size={20} className="feedback-icon" /> : <X size={20} className="feedback-icon" />}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700 }}>{feedback.isCorrect ? 'Верно!' : 'Ошибка!'}</div>
+      <div className="feedback-content">
+        <div className="feedback-title">{feedback.isCorrect ? 'Верно!' : 'Ошибка!'}</div>
 
         {showChecks ? (
           <div className="answer-compare-list">
@@ -84,7 +85,7 @@ export const FeedbackBox: React.FC<FeedbackBoxProps> = ({ feedback, action }) =>
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 14 }}>{feedback.message}</div>
+          <div className="feedback-message">{feedback.message}</div>
         )}
       </div>
       {action}

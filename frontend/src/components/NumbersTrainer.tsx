@@ -3,12 +3,15 @@ import { Sliders } from 'lucide-react';
 import { NumbersQuizCard } from './numbers/NumbersQuizCard';
 import { NumbersRangeModal } from './numbers/NumbersRangeModal';
 import { numberToGermanWords } from '../utils/numbers-generator';
-import type { ScoreState, NumberRangeSettings, Feedback } from '../types';
+import { answersMatch, cleanText, currentMatchOptions, parseTypedInteger } from '../utils/answerMatch';
+import type { NumberRangeSettings, Feedback } from '../types';
 
 interface NumbersTrainerProps {
-  score: ScoreState;
   onAnswer: (isCorrect: boolean) => void;
 }
+
+// Spaces never matter in a German number word: "zwei und vierzig" is as good as "zweiundvierzig".
+const withoutSpaces = (text: string) => cleanText(text).replace(/ /g, '');
 
 export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
   const [directionMode, setDirectionMode] = useState<'de_to_num' | 'num_to_de' | 'mixed'>('num_to_de');
@@ -42,32 +45,25 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
 
-    let isCorrect = false;
-    const cleanIn = userInput.trim();
-    if (cleanIn.length === 0) {
-      isCorrect = false;
-    } else if (activeDirection === 'num_to_de') {
-      const cleanInput = cleanIn.toLowerCase().replace(/\s+/g, '');
-      const cleanTarget = german.toLowerCase().replace(/\s+/g, '');
-      isCorrect = cleanInput === cleanTarget;
-    } else {
-      isCorrect = parseInt(cleanIn.replace(/\s+/g, ''), 10) === currentNum;
-    }
+    const isCorrect =
+      activeDirection === 'num_to_de'
+        ? answersMatch(withoutSpaces(userInput), withoutSpaces(german), currentMatchOptions())
+        : parseTypedInteger(userInput) === currentNum;
 
     const expectedAnswer = activeDirection === 'num_to_de' ? german : String(currentNum);
     setFeedback({
       isCorrect,
       message: `Правильно: ${german}`,
       // Spaces are never an error here ("zwei und vierzig" is accepted), so they're ignored in the diff too.
-      checks: [{ user: cleanIn, expected: expectedAnswer, isCorrect, ignoreSpaces: true }],
+      checks: [{ user: cleanText(userInput), expected: expectedAnswer, isCorrect, ignoreSpaces: true }],
     });
     onAnswer(isCorrect);
   };
 
   return (
     <div>
-      <div className="trainer-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-        <div className="trainer-modes" style={{ margin: 0 }}>
+      <div className="trainer-toolbar">
+        <div className="trainer-modes trainer-modes--flush">
           <button className={`mode-pill ${directionMode === 'num_to_de' ? 'active' : ''}`} onClick={() => setDirectionMode('num_to_de')}>Цифры → Немецкий</button>
           <button className={`mode-pill ${directionMode === 'de_to_num' ? 'active' : ''}`} onClick={() => setDirectionMode('de_to_num')}>Немецкий → Цифры</button>
           <button className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>

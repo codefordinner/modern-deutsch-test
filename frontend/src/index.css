@@ -878,11 +878,6 @@ body {
   white-space: normal;
 }
 @media (max-width: 640px) {
-  .trainer-toolbar {
-    align-items: stretch !important;
-    flex-direction: column;
-    gap: 8px !important;
-  }
   .trainer-toolbar > .trainer-modes {
     width: 100%;
     margin-bottom: 0;

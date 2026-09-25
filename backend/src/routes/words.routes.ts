@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { inferPartOfSpeech, isPartOfSpeech, readPartOfSpeech } from '../services/partOfSpeech';
 
 const router = Router();
 
@@ -64,11 +65,15 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     } = req.body;
     if (!de || !ru || !categoryId) return res.status(400).json({ error: 'Missing required fields' });
 
+    const pos = readPartOfSpeech(req.body, { keepIfMissing: false });
+    if (!pos.ok) return res.status(400).json({ error: pos.error });
+
     const word = await prisma.word.create({
       data: {
         de,
         ru,
         hint,
+        partOfSpeech: pos.value,
         plural,
         feminine,
         praeteritum,
@@ -109,12 +114,17 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       praesensSie,
       categoryId,
     } = req.body;
+
+    const pos = readPartOfSpeech(req.body, { keepIfMissing: true });
+    if (!pos.ok) return res.status(400).json({ error: pos.error });
+
     const word = await prisma.word.update({
       where: { id: req.params.id },
       data: {
         de,
         ru,
         hint,
+        partOfSpeech: pos.value,
         plural,
         feminine,
         praeteritum,
@@ -147,8 +157,11 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
 
 router.post('/import', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { data, defaultCategoryId } = req.body;
+    const { data, defaultCategoryId, partOfSpeech } = req.body;
     if (!data || !defaultCategoryId) return res.status(400).json({ error: 'Data and categoryId required' });
+
+    // Optional: applies to every imported line; without it each line is inferred on its own (articles → noun).
+    if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Invalid partOfSpeech' });
 
     const lines = String(data).split('\n');
     let importedCount = 0;
@@ -162,7 +175,16 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
         const ru = parts[1];
         const plural = parts[2] || null;
         const hint = parts[3] || null;
-        await prisma.word.create({ data: { de, ru, plural, hint, categoryId: defaultCategoryId } });
+        await prisma.word.create({
+          data: {
+            de,
+            ru,
+            plural,
+            hint,
+            partOfSpeech: partOfSpeech || inferPartOfSpeech({ de }),
+            categoryId: defaultCategoryId,
+          },
+        });
         importedCount++;
       }
     }

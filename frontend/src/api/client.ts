@@ -1,35 +1,16 @@
-import type { AnalyticsStats, Category, Word, WordsPage } from '../types';
+import type { AnalyticsStats, Category, PartOfSpeech, Word, WordsPage } from '../types';
 
-const TOKEN_KEY = 'admin_token';
-
-/** Dispatched on `window` when the server rejects our admin token (expired / invalid). */
+/** Dispatched on `window` when the server rejects our admin session (expired / invalid). */
 export const UNAUTHORIZED_EVENT = 'api:unauthorized';
 
-// ---- Admin token storage ----
-
-export const authToken = {
-  get(): string | null {
-    try {
-      return localStorage.getItem(TOKEN_KEY);
-    } catch {
-      return null;
-    }
-  },
-  set(token: string): void {
-    try {
-      localStorage.setItem(TOKEN_KEY, token);
-    } catch {
-      // Storage unavailable (private mode…): the session just won't survive a reload.
-    }
-  },
-  clear(): void {
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-    } catch {
-      // ignore
-    }
-  },
-};
+// The admin session lives in an HttpOnly cookie that the browser attaches by
+// itself; JavaScript never sees the token. (Older builds also kept a copy in
+// localStorage, readable by any injected script — drop it if it is still around.)
+try {
+  localStorage.removeItem('admin_token');
+} catch {
+  // Storage unavailable: nothing to clean up.
+}
 
 // ---- Errors ----
 
@@ -54,7 +35,7 @@ export function getErrorMessage(error: unknown, fallback = 'Что-то пошл
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
-  /** Send the admin token; a 401 then means the session is gone and logs the admin out. */
+  /** An admin call: a 401 then means the session is gone and logs the admin out. */
   auth?: boolean;
 }
 
@@ -62,16 +43,12 @@ async function request<T>(path: string, { method = 'GET', body, auth = false }: 
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  if (auth) {
-    const token = authToken.get();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
-
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
       headers,
+      credentials: 'same-origin', // sends the session cookie
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -87,10 +64,7 @@ async function request<T>(path: string, { method = 'GET', body, auth = false }: 
   }
 
   if (!res.ok) {
-    if (res.status === 401 && auth) {
-      authToken.clear();
-      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
-    }
+    if (res.status === 401 && auth) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     const serverMessage = (data as { error?: unknown } | null)?.error;
     throw new ApiError(
       typeof serverMessage === 'string' && serverMessage ? serverMessage : `Ошибка сервера (${res.status})`,
@@ -133,12 +107,19 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
 
 // ---- Admin endpoints ----
 
-export function login(password: string): Promise<{ token: string }> {
-  return request<{ token: string }>('/admin/login', { method: 'POST', body: { password } });
+/** Signs in; on success the server sets the session cookie. */
+export function login(password: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/admin/login', { method: 'POST', body: { password } });
 }
 
-/** Asks the server to drop the auth cookie (sent automatically); the token itself is discarded by the caller. */
+/** Asks the server to drop the session cookie. */
 export const logout = () => request<unknown>('/admin/logout', { method: 'POST' });
+
+/** Whether the browser currently holds a valid admin session (the cookie itself is invisible to scripts). */
+export async function checkSession(): Promise<boolean> {
+  const data = await request<{ authenticated?: boolean }>('/admin/check');
+  return data.authenticated === true;
+}
 
 export type WordInput = Partial<Word>;
 export type CategoryInput = Partial<Category>;
@@ -154,8 +135,12 @@ export const updateCategory = (id: string, category: CategoryInput) =>
   request<Category>(`/categories/${id}`, { method: 'PUT', body: category, auth: true });
 export const deleteCategory = (id: string) => request<unknown>(`/categories/${id}`, { method: 'DELETE', auth: true });
 
-export const importWords = (data: string, defaultCategoryId: string) =>
-  request<{ importedCount: number }>('/words/import', { method: 'POST', body: { data, defaultCategoryId }, auth: true });
+export const importWords = (data: string, defaultCategoryId: string, partOfSpeech?: PartOfSpeech) =>
+  request<{ importedCount: number }>('/words/import', {
+    method: 'POST',
+    body: { data, defaultCategoryId, partOfSpeech },
+    auth: true,
+  });
 
 export const exportWords = () => request<Word[]>('/words/export', { auth: true });
 

@@ -4,10 +4,10 @@ import { UmlautBar } from '../UmlautBar';
 import { FeedbackBox } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
-import type { SRSState, Feedback } from '../../types';
+import type { SRSRecord, Feedback } from '../../types';
 
 interface FormToInfinitiveQuizProps {
-  srsItem?: SRSState;
+  srsItem?: SRSRecord;
   formText: string;
   userInput: string;
   feedback: Feedback | null;
@@ -32,21 +32,21 @@ export const FormToInfinitiveQuiz: React.FC<FormToInfinitiveQuizProps> = ({
 
   return (
     <div className="question-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 540, marginBottom: 12 }}>
-        <div className="question-prompt-label" style={{ margin: 0 }}>Форма → Инфинитив</div>
+      <div className="question-header">
+        <div className="question-prompt-label">Форма → Инфинитив</div>
         <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{formText}</h2>
-        <button type="button" className="icon-btn" onClick={() => speakGerman(formText)} title="Озвучить">
+        <button type="button" className="icon-btn" onClick={() => speakGerman(formText)} title="Озвучить" aria-label="Озвучить">
           <Volume2 size={18} />
         </button>
       </div>
 
       <div className="question-subtext">Напишите глагол в инфинитиве (начальной форме)</div>
 
-      <form onSubmit={onSubmit} style={{ width: '100%' }}>
+      <form onSubmit={onSubmit} className="question-form">
         <div className="input-group">
           <input
             type="text"

@@ -49,7 +49,7 @@ export const TimeQuizCard: React.FC<TimeQuizCardProps> = ({
         <DigitalDisplay hours={hours} minutes={minutes} />
       )}
 
-      <form onSubmit={onSubmit} style={{ width: '100%', marginTop: 14 }}>
+      <form onSubmit={onSubmit} className="question-form question-form--top-spaced">
         <div className="input-group">
           <input
             type="text"
@@ -87,7 +87,7 @@ export const TimeQuizCard: React.FC<TimeQuizCardProps> = ({
           // If the caller didn't supply its own comparison, compare the typed text with the target phrase.
           feedback={{ ...feedback, checks: feedback.checks ?? [{ user: userInput, expected: targetGerman, isCorrect: feedback.isCorrect }] }}
           action={
-            <button type="button" className="icon-btn" onClick={() => speakGerman(targetGerman)} title="Озвучить">
+            <button type="button" className="icon-btn" onClick={() => speakGerman(targetGerman)} title="Озвучить" aria-label="Озвучить">
               <Volume2 size={16} />
             </button>
           }

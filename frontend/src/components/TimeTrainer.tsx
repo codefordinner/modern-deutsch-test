@@ -3,9 +3,8 @@ import { HelpCircle, Clock, Sparkles } from 'lucide-react';
 import { TimeFlashCard } from './time/TimeFlashCard';
 import { TimeRulesModal } from './time/TimeRulesModal';
 import { getGermanTime, generateRandomTime } from '../utils/time-generator';
-import type { ScoreState } from '../types';
 
-export const TimeTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean) => void }> = () => {
+export const TimeTrainer: React.FC = () => {
   const [displayMode, setDisplayMode] = useState<'analog' | 'digital' | 'both'>('analog');
   const [stepMode, setStepMode] = useState<'any' | '5min'>('any');
   const [time, setTime] = useState({ hours: 14, minutes: 28 });
@@ -40,8 +39,8 @@ export const TimeTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean) 
 
   return (
     <div>
-      <div className="trainer-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-        <div className="trainer-modes" style={{ margin: 0 }}>
+      <div className="trainer-toolbar">
+        <div className="trainer-modes trainer-modes--flush">
           <button className={`mode-pill ${stepMode === 'any' ? 'active' : ''}`} onClick={() => setStepMode('any')}>
             <Sparkles size={13} /> Любая минута (kurz vor / nach)
           </button>
@@ -49,7 +48,7 @@ export const TimeTrainer: React.FC<{ score: ScoreState; onAnswer: (ok: boolean) 
             Шаг 5 минут
           </button>
 
-          <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 4px' }} />
+          <div className="mode-divider" aria-hidden="true" />
 
           <button className={`mode-pill ${displayMode === 'analog' ? 'active' : ''}`} onClick={() => setDisplayMode('analog')}>
             <Clock size={13} /> Стрелки

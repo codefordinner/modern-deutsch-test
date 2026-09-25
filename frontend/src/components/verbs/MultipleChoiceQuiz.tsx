@@ -1,11 +1,11 @@
 import React from 'react';
 import { Volume2, Check, X } from 'lucide-react';
 import { speakGerman } from '../../utils/audio';
-import type { Word, SRSState } from '../../types';
+import type { Word, SRSRecord } from '../../types';
 
 interface MultipleChoiceQuizProps {
   verb: Word;
-  srsItem?: SRSState;
+  srsItem?: SRSRecord;
   options: string[];
   feedback: { isCorrect: boolean; message: string } | null;
   onSelectOption: (opt: string) => void;
@@ -24,25 +24,24 @@ export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
 
   return (
     <div className="question-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 500, marginBottom: 12 }}>
-        <div className="question-prompt-label" style={{ margin: 0 }}>Partizip II тест</div>
+      <div className="question-header">
+        <div className="question-prompt-label">Partizip II тест</div>
         <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div className="question-title-row">
         <h2 className="question-text">{verb.de}</h2>
-        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить">
+        <button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить">
           <Volume2 size={18} />
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', maxWidth: 500, margin: '20px 0' }}>
-        {options.map((opt, idx) => (
+      <div className="mc-grid">
+        {options.map((opt) => (
           <button
-            key={idx}
+            key={opt}
             type="button"
-            className="btn-secondary"
-            style={{ padding: '14px', fontSize: 16, fontWeight: 700 }}
+            className="btn-secondary mc-option"
             disabled={feedback !== null}
             onClick={() => onSelectOption(opt)}
           >
@@ -52,12 +51,15 @@ export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
       </div>
 
       {feedback && (
-        <div style={{ width: '100%', maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className={`feedback-box ${feedback.isCorrect ? 'feedback-success' : 'feedback-error'}`} style={{ width: '100%', margin: 0 }}>
+        <div className="mc-result">
+          <div
+            className={`feedback-box ${feedback.isCorrect ? 'feedback-success' : 'feedback-error'}`}
+            role={feedback.isCorrect ? 'status' : 'alert'}
+          >
             {feedback.isCorrect ? <Check size={20} /> : <X size={20} />}
             <div>
-              <div style={{ fontWeight: 700 }}>{feedback.isCorrect ? 'Верно!' : 'Ошибка!'}</div>
-              <div style={{ fontSize: 14 }}>{feedback.message}</div>
+              <div className="feedback-title">{feedback.isCorrect ? 'Верно!' : 'Ошибка!'}</div>
+              <div className="feedback-message">{feedback.message}</div>
             </div>
           </div>
           <button type="button" className="btn-primary" onClick={onNext} autoFocus>
