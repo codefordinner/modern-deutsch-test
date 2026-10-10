@@ -154,14 +154,53 @@ export const updateCategory = (id: string, category: CategoryInput) =>
   request<Category>(`/categories/${id}`, { method: 'PUT', body: category, auth: true });
 export const deleteCategory = (id: string) => request<unknown>(`/categories/${id}`, { method: 'DELETE', auth: true });
 
-export const importWords = (data: string, defaultCategoryId: string, partOfSpeech?: PartOfSpeech) =>
-  request<{ importedCount: number }>('/words/import', {
-    method: 'POST',
-    body: { data, defaultCategoryId, partOfSpeech },
-    auth: true,
-  });
+// ---- Bulk import / export ----
 
-export const exportWords = () => request<Word[]>('/words/export', { auth: true });
+export interface ImportOptions {
+  /** JSON (e.g. from an AI assistant) or plain text lines. */
+  data: string;
+  /** Used for rows that don't name a category themselves. */
+  defaultCategoryId?: string;
+  /** Applied to rows without their own `partOfSpeech`. */
+  partOfSpeech?: PartOfSpeech;
+  /** Skip words whose German form is already in the dictionary (default on the server: true). */
+  skipDuplicates?: boolean;
+  /** Only report what would happen; write nothing. */
+  dryRun?: boolean;
+}
+
+export interface ImportRowError {
+  /** 1-based position of the word in the pasted data. */
+  row: number;
+  de?: string;
+  message: string;
+}
+
+export interface ImportResult {
+  success: boolean;
+  dryRun: boolean;
+  /** Words found in the pasted data. */
+  total: number;
+  /** Words added (or, for a dry run, that would be added). */
+  importedCount: number;
+  /** German forms skipped because they already exist. */
+  duplicates: string[];
+  errors: ImportRowError[];
+  /** Categories that were (or would be) created. */
+  newCategories: string[];
+}
+
+export const importWords = (options: ImportOptions) =>
+  request<ImportResult>('/words/import', { method: 'POST', body: options, auth: true });
+
+export interface WordsExport {
+  version: number;
+  exportedAt: string;
+  categories: { name: string; icon?: string | null; color?: string | null }[];
+  words: Record<string, string>[];
+}
+
+export const exportWords = () => request<WordsExport>('/words/export', { auth: true });
 
 export async function getStats(): Promise<AnalyticsStats> {
   const data = await request<Partial<AnalyticsStats>>('/analytics/stats', { auth: true });

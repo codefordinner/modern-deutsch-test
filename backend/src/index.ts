@@ -7,7 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+// Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
+app.use(express.json({ limit: '5mb' }));
 
 app.use('/api', apiRouter);
 

@@ -1,7 +1,19 @@
 import { Router, Request, Response } from 'express';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
-import { inferPartOfSpeech, isPartOfSpeech, readPartOfSpeech } from '../services/partOfSpeech';
+import { isPartOfSpeech, readPartOfSpeech } from '../services/partOfSpeech';
+import type { PartOfSpeech } from '../services/partOfSpeech';
+import {
+  ImportFormatError,
+  MAX_IMPORT_ROWS,
+  TEXT_FIELDS,
+  duplicateKey,
+  extractRawImport,
+  normalizeRows,
+  resolvePartOfSpeech,
+} from '../services/wordImport';
+import type { ParsedRow, RowError } from '../services/wordImport';
 
 const router = Router();
 
@@ -155,50 +167,161 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// ---- Bulk import / export ---------------------------------------------------
+
+const CREATE_CHUNK = 200;
+const DEFAULT_CATEGORY_ICON = '📌';
+const DEFAULT_CATEGORY_COLOR = '#2563eb';
+
+interface PlannedWord {
+  row: ParsedRow;
+  categoryName: string;
+}
+
+/**
+ * Bulk import. `data` is JSON (as produced by an AI assistant, see the prompt in
+ * the admin panel) or plain text lines. With `dryRun` nothing is written — the
+ * response only says what would happen, so the admin can check before importing.
+ *
+ * Rows with problems are reported and skipped; the valid rows are still imported.
+ */
 router.post('/import', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { data, defaultCategoryId, partOfSpeech } = req.body;
-    if (!data || !defaultCategoryId) return res.status(400).json({ error: 'Data and categoryId required' });
+    const { data, defaultCategoryId, partOfSpeech, skipDuplicates = true, dryRun = false } = req.body ?? {};
 
-    // Optional: applies to every imported line; without it each line is inferred on its own (articles → noun).
+    if (typeof data !== 'string' || !data.trim()) return res.status(400).json({ error: 'Нет данных для импорта' });
     if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Invalid partOfSpeech' });
 
-    const lines = String(data).split('\n');
-    let importedCount = 0;
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) continue;
-      const parts = line.split(/[\t,;]/).map((p) => p.trim());
-      if (parts.length >= 2) {
-        const de = parts[0];
-        const ru = parts[1];
-        const plural = parts[2] || null;
-        const hint = parts[3] || null;
-        await prisma.word.create({
-          data: {
-            de,
-            ru,
-            plural,
-            hint,
-            partOfSpeech: partOfSpeech || inferPartOfSpeech({ de }),
-            categoryId: defaultCategoryId,
-          },
-        });
-        importedCount++;
-      }
+    let raw;
+    try {
+      raw = extractRawImport(data);
+    } catch (e) {
+      if (e instanceof ImportFormatError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+    if (raw.rows.length === 0) return res.status(400).json({ error: 'В данных не найдено ни одного слова' });
+    if (raw.rows.length > MAX_IMPORT_ROWS) {
+      return res.status(400).json({ error: `Слишком много слов за раз (максимум ${MAX_IMPORT_ROWS})` });
     }
 
-    res.json({ success: true, importedCount });
+    const { rows, errors } = normalizeRows(raw.rows);
+    const rowErrors: RowError[] = [...errors];
+
+    const categories = await prisma.category.findMany();
+    const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
+
+    let defaultCategoryName: string | null = null;
+    if (defaultCategoryId) {
+      const found = categories.find((c) => c.id === String(defaultCategoryId));
+      if (!found) return res.status(400).json({ error: 'Категория по умолчанию не найдена' });
+      defaultCategoryName = found.name;
+    }
+
+    const existing = await prisma.word.findMany({ select: { de: true } });
+    const seen = new Set(existing.map((w) => duplicateKey(w.de)));
+
+    const planned: PlannedWord[] = [];
+    const duplicates: string[] = [];
+    const newCategoryNames = new Map<string, string>(); // lower-case key → display name
+
+    for (const row of rows) {
+      const categoryName = row.category ?? defaultCategoryName;
+      if (!categoryName) {
+        rowErrors.push({ row: row.index, de: row.de, message: 'Не указана категория (поле category или категория по умолчанию)' });
+        continue;
+      }
+
+      const key = duplicateKey(row.de);
+      if (skipDuplicates && seen.has(key)) {
+        duplicates.push(row.de);
+        continue;
+      }
+      seen.add(key);
+
+      const categoryKey = categoryName.trim().toLowerCase();
+      if (!categoryByName.has(categoryKey) && !newCategoryNames.has(categoryKey)) {
+        newCategoryNames.set(categoryKey, categoryName.trim());
+      }
+      planned.push({ row, categoryName: categoryName.trim() });
+    }
+
+    rowErrors.sort((a, b) => a.row - b.row);
+    const summary = {
+      success: true,
+      dryRun: Boolean(dryRun),
+      total: raw.rows.length,
+      importedCount: planned.length,
+      duplicates,
+      errors: rowErrors,
+      newCategories: [...newCategoryNames.values()],
+    };
+
+    if (dryRun || planned.length === 0) return res.json(summary);
+
+    // Create the categories that don't exist yet (icon/colour from the "categories" list if given).
+    const metaByName = new Map(raw.categories.map((c) => [c.name.trim().toLowerCase(), c]));
+    for (const [key, name] of newCategoryNames) {
+      const meta = metaByName.get(key);
+      const created = await prisma.category.create({
+        data: {
+          name,
+          icon: meta?.icon || DEFAULT_CATEGORY_ICON,
+          color: meta?.color || DEFAULT_CATEGORY_COLOR,
+          isBuiltin: false,
+        },
+      });
+      categoryByName.set(key, created);
+    }
+
+    const fallbackPos: PartOfSpeech | null = partOfSpeech ?? null;
+    const records: Prisma.WordCreateManyInput[] = planned.map(({ row, categoryName }) => {
+      const category = categoryByName.get(categoryName.toLowerCase());
+      if (!category) throw new Error(`Category "${categoryName}" is missing`);
+      return {
+        de: row.de,
+        ru: row.ru,
+        partOfSpeech: resolvePartOfSpeech(row, category.name, fallbackPos),
+        ...row.fields,
+        categoryId: category.id,
+      };
+    });
+
+    const operations: Prisma.PrismaPromise<Prisma.BatchPayload>[] = [];
+    for (let i = 0; i < records.length; i += CREATE_CHUNK) {
+      operations.push(prisma.word.createMany({ data: records.slice(i, i + CREATE_CHUNK) }));
+    }
+    // All chunks succeed or none does.
+    await prisma.$transaction(operations);
+
+    res.json(summary);
   } catch (error) {
+    console.error('[import] failed:', error);
     res.status(500).json({ error: 'Import failed' });
   }
 });
 
+/** Export in the very same format the import reads, so a backup can be restored (or edited by an AI) as is. */
 router.get('/export', requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const words = await prisma.word.findMany({ include: { category: true } });
-    res.json(words);
+    const [categories, words] = await Promise.all([
+      prisma.category.findMany({ orderBy: { name: 'asc' } }),
+      prisma.word.findMany({ include: { category: true }, orderBy: [{ category: { name: 'asc' } }, { de: 'asc' }] }),
+    ]);
+
+    res.json({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      categories: categories.map((c) => ({ name: c.name, icon: c.icon, color: c.color })),
+      words: words.map((w) => {
+        const entry: Record<string, string> = { de: w.de, ru: w.ru, category: w.category.name };
+        if (w.partOfSpeech) entry.partOfSpeech = w.partOfSpeech;
+        for (const field of TEXT_FIELDS) {
+          const value = w[field];
+          if (value) entry[field] = value;
+        }
+        return entry;
+      }),
+    });
   } catch (error) {
     res.status(500).json({ error: 'Export failed' });
   }

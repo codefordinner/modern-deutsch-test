@@ -1,0 +1,108 @@
+/* Admin → Import / Export */
+
+.import-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .import-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.import-step {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.import-step:first-of-type {
+  margin-top: 8px;
+}
+
+.import-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.import-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.import-prompt {
+  margin-bottom: 8px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.import-copy-btn {
+  margin-bottom: 4px;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.import-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.import-result {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.import-result--ok {
+  background: var(--success-light);
+  border: 1px solid var(--success-border);
+}
+
+.import-result--warn {
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
+}
+
+.import-result-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.import-result-block {
+  margin-top: 10px;
+}
+
+.import-result-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.import-result-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}

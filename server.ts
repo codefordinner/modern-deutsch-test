@@ -46,7 +46,8 @@ async function startServer() {
     const PORT = 3000;
 
     app.use(cors());
-    app.use(express.json());
+    // Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
+    app.use(express.json({ limit: '5mb' }));
 
     // Mount API router
     app.use('/api', apiRouter);
@@ -60,7 +61,7 @@ async function startServer() {
     app.use('/api', (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
       console.error('[api error]:', err);
       if (res.headersSent) return next(err);
-      res.status(500).json({ error: err.message || 'Internal server error' });
+      res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
     });
 
     // Serve Vite Dev Server or Production Static Build
