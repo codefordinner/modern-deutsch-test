@@ -42,6 +42,7 @@ export interface SRSRecord {
   mistakes: number;
   lastReviewed: string; // ISO
   nextReview: string; // ISO
+  promotedOn?: string; // local day YYYY-MM-DD of the last promotion (max one box up per day)
 }
 
 export interface NumberRangeSettings {

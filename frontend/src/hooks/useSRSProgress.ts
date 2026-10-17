@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { pickCardBySRS, updateSRS } from '../utils/srs';
 import type { SRSMap } from '../utils/srs';
+import { pickRandom } from '../utils/random';
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -25,8 +26,9 @@ function writeJSON(key: string, value: unknown): void {
  * per-card progress map, both persisted in localStorage under
  * `${storagePrefix}_use_srs` / `${storagePrefix}_srs_state`.
  *
- * - `pickCard` chooses the next card (SRS-weighted when enabled, uniformly
- *   random otherwise) and always reads the latest progress, so it is safe
+ * - `pickCard` chooses the next card (box-weighted when SRS is on, uniformly
+ *   random otherwise), never repeats the previous card straight away when
+ *   there is a choice, and always reads the latest progress, so it is safe
  *   to call from memoised callbacks.
  * - `recordAnswer` updates and persists progress; it does nothing while SRS is off.
  */
@@ -39,6 +41,8 @@ export function useSRSProgress(storagePrefix: string) {
 
   const srsMapRef = useRef(srsMap);
   srsMapRef.current = srsMap;
+
+  const lastKeyRef = useRef<string | undefined>(undefined);
 
   const setUseSRS = useCallback(
     (value: boolean) => {
@@ -72,8 +76,18 @@ export function useSRSProgress(storagePrefix: string) {
   const pickCard = useCallback(
     <T>(items: T[], keyFn: (item: T) => string): T | undefined => {
       if (items.length === 0) return undefined;
-      if (!useSRS) return items[Math.floor(Math.random() * items.length)];
-      return pickCardBySRS(items, srsMapRef.current, keyFn);
+
+      const excludeKey = lastKeyRef.current;
+      let picked: T | undefined;
+      if (useSRS) {
+        picked = pickCardBySRS(items, srsMapRef.current, keyFn, { excludeKey });
+      } else {
+        const others = excludeKey !== undefined ? items.filter((item) => keyFn(item) !== excludeKey) : items;
+        picked = pickRandom(others.length > 0 ? others : items);
+      }
+
+      if (picked !== undefined) lastKeyRef.current = keyFn(picked);
+      return picked;
     },
     [useSRS]
   );
