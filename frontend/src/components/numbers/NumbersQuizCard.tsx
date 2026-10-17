@@ -54,6 +54,8 @@ export const NumbersQuizCard: React.FC<NumbersQuizCardProps> = ({
         <div className="input-group">
           <input
             type="text"
+            inputMode={isGermanToDigits ? 'numeric' : 'text'}
+            enterKeyHint={feedback ? 'next' : 'done'}
             className="text-input"
             placeholder={isGermanToDigits ? 'Например: 42' : 'Например: zweiundvierzig'}
             value={userInput}

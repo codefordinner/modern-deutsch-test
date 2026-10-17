@@ -1,0 +1,101 @@
+/* ==========================================================================
+   Mobile / iOS Safari fixes. Imported LAST in main.tsx so it overrides the
+   earlier files.
+   ========================================================================== */
+
+/* 1. Scroll "runs away" while typing with the keyboard open.
+   `overflow: hidden` containers are still programmatically scrollable: when
+   iOS scrolls the caret into view it scrolls the card/modal itself, shifting
+   the content up a bit more on every keystroke. `overflow: clip` clips the
+   same way but can never be scrolled. */
+.question-card,
+.modal-content {
+  overflow: hidden; /* fallback for old browsers */
+  overflow: clip;
+}
+
+/* `overflow-x: hidden` on BOTH html and body makes body a scroll container on
+   iOS (jumpy scroll, broken sticky). Only clip on body, leave html alone. */
+html {
+  overflow-x: visible;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/* 2. 100vh is taller than the visible area on iOS (URL bar / keyboard). */
+body,
+#root,
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.modal-content {
+  max-height: 88vh;
+  max-height: 88dvh;
+}
+
+/* 3. iOS zooms the page when an input with font-size < 16px gets focus
+   (search fields, selects and textareas were 13–14px). */
+@media (hover: none) and (pointer: coarse) {
+  .text-input,
+  .search-field .text-input,
+  .search-field--lg .text-input,
+  select.text-input,
+  textarea.text-input,
+  .textarea-mono {
+    font-size: 16px !important;
+  }
+
+  /* Comfortable tap targets */
+  .icon-btn { width: 40px; height: 40px; }
+  .icon-btn--sm, .icon-btn--xs { width: 36px; height: 36px; }
+  .mode-pill { padding: 9px 14px; }
+  .btn-secondary { min-height: 40px; }
+  .umlaut-btn { min-height: 42px; }
+}
+
+/* No 300ms double-tap-zoom delay on controls; no grey tap flash. */
+button, a, select, label, input, .mode-pill {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 4. Notch / home indicator (needs viewport-fit=cover in index.html). */
+.app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.app-container {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app-footer {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.toast-host {
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* 5. Modals on small screens: leave room, keep scroll inside the modal. */
+.modal-body {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 480px) {
+  .modal-backdrop { padding: 8px; align-items: flex-end; }
+  .modal-content { border-radius: 16px 16px 12px 12px; }
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer > button { flex: 1 1 auto; }
+  .stat-cards { grid-template-columns: 1fr 1fr; }
+  .hbar-count { width: 32px; }
+  .digital-display { font-size: 30px; padding: 10px 20px; }
+}
+
+/* Wide tables scroll inside their own frame */
+.table-frame, .table-scroll { -webkit-overflow-scrolling: touch; }
+.data-table th, .data-table td { padding: 10px 10px; }
