@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { pickCardBySRS, updateSRS } from '../utils/srs';
 import type { SRSMap } from '../utils/srs';
+import { isDue } from '../utils/srsDue';
+import { useStudyPrefs } from '../utils/studyPrefs';
 import { pickRandom } from '../utils/random';
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -30,6 +32,11 @@ function writeJSON(key: string, value: unknown): void {
  *   random otherwise), never repeats the previous card straight away when
  *   there is a choice, and always reads the latest progress, so it is safe
  *   to call from memoised callbacks.
+ *   With SRS on and the global "only cards to review" preference set, only due
+ *   cards (see utils/srsDue.ts) are considered; when none is due it returns
+ *   `undefined` — the trainer then shows its "all done for today" state.
+ *   `pickCard` changes identity when that preference changes, which makes the
+ *   trainers deal a fresh card.
  * - `recordAnswer` updates and persists progress; it does nothing while SRS is off.
  */
 export function useSRSProgress(storagePrefix: string) {
@@ -38,6 +45,7 @@ export function useSRSProgress(storagePrefix: string) {
 
   const [useSRS, setUseSRSState] = useState<boolean>(() => readJSON(useSrsKey, true));
   const [srsMap, setSrsMap] = useState<SRSMap>(() => readJSON<SRSMap>(stateKey, {}));
+  const [{ dueOnly }] = useStudyPrefs();
 
   const srsMapRef = useRef(srsMap);
   srsMapRef.current = srsMap;
@@ -75,21 +83,26 @@ export function useSRSProgress(storagePrefix: string) {
 
   const pickCard = useCallback(
     <T>(items: T[], keyFn: (item: T) => string): T | undefined => {
-      if (items.length === 0) return undefined;
+      let pool = items;
+      if (useSRS && dueOnly) {
+        const now = Date.now();
+        pool = items.filter((item) => isDue(srsMapRef.current[keyFn(item)], now));
+      }
+      if (pool.length === 0) return undefined;
 
       const excludeKey = lastKeyRef.current;
       let picked: T | undefined;
       if (useSRS) {
-        picked = pickCardBySRS(items, srsMapRef.current, keyFn, { excludeKey });
+        picked = pickCardBySRS(pool, srsMapRef.current, keyFn, { excludeKey });
       } else {
-        const others = excludeKey !== undefined ? items.filter((item) => keyFn(item) !== excludeKey) : items;
-        picked = pickRandom(others.length > 0 ? others : items);
+        const others = excludeKey !== undefined ? pool.filter((item) => keyFn(item) !== excludeKey) : pool;
+        picked = pickRandom(others.length > 0 ? others : pool);
       }
 
       if (picked !== undefined) lastKeyRef.current = keyFn(picked);
       return picked;
     },
-    [useSRS]
+    [useSRS, dueOnly]
   );
 
   return { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard };

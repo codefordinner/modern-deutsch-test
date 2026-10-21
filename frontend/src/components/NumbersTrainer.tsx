@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sliders } from 'lucide-react';
 import { NumbersQuizCard } from './numbers/NumbersQuizCard';
 import { NumbersRangeModal } from './numbers/NumbersRangeModal';
-import { numberToGermanWords } from '../utils/numbers-generator';
+import { germanNumberVariants } from '../utils/numbers-generator';
+import { pickClosestAnswer } from '../utils/answerDiff';
 import { answersMatch, cleanText, currentMatchOptions, parseTypedInteger } from '../utils/answerMatch';
 import type { NumberRangeSettings, Feedback } from '../types';
 
@@ -16,15 +17,14 @@ const withoutSpaces = (text: string) => cleanText(text).replace(/ /g, '');
 export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
   const [directionMode, setDirectionMode] = useState<'de_to_num' | 'num_to_de' | 'mixed'>('num_to_de');
   const [activeDirection, setActiveDirection] = useState<'de_to_num' | 'num_to_de'>('num_to_de');
-  const [settings, setSettings] = useState<NumberRangeSettings>({ min: 0, max: 100, allowLarge: false });
+  const [settings, setSettings] = useState<NumberRangeSettings>({ min: 0, max: 100 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentNum, setCurrentNum] = useState<number>(0);
   const [userInput, setUserInput] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const nextQuestion = () => {
-    const min = settings.min;
-    const max = settings.max;
+  const nextQuestion = useCallback(() => {
+    const { min, max } = settings;
     const num = Math.floor(Math.random() * (max - min + 1)) + min;
     setCurrentNum(num);
     setUserInput('');
@@ -35,11 +35,13 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
     } else {
       setActiveDirection(directionMode);
     }
-  };
+  }, [settings, directionMode]);
 
-  useEffect(() => { nextQuestion(); }, [settings, directionMode]);
+  useEffect(() => { nextQuestion(); }, [nextQuestion]);
 
-  const german = numberToGermanWords(currentNum);
+  // All accepted spellings; the first is the canonical one (shown as the question and as "Правильно").
+  const variants = germanNumberVariants(currentNum);
+  const german = variants[0];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +49,12 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
 
     const isCorrect =
       activeDirection === 'num_to_de'
-        ? answersMatch(withoutSpaces(userInput), withoutSpaces(german), currentMatchOptions())
+        ? answersMatch(withoutSpaces(userInput), variants.map(withoutSpaces), currentMatchOptions())
         : parseTypedInteger(userInput) === currentNum;
 
-    const expectedAnswer = activeDirection === 'num_to_de' ? german : String(currentNum);
+    // For a wrong answer, diff against the accepted spelling the input is closest to ("hundert" vs "einhundert").
+    const expectedAnswer =
+      activeDirection === 'num_to_de' ? pickClosestAnswer(userInput, variants, { ignoreSpaces: true }) : String(currentNum);
     setFeedback({
       isCorrect,
       message: `Правильно: ${german}`,

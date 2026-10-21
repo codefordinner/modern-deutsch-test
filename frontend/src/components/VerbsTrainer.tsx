@@ -6,6 +6,7 @@ import { PraesensQuiz } from './verbs/PraesensQuiz';
 import { StammformenQuiz } from './verbs/StammformenQuiz';
 import { MultipleChoiceQuiz } from './verbs/MultipleChoiceQuiz';
 import { FormToInfinitiveQuiz } from './verbs/FormToInfinitiveQuiz';
+import { SRSIdleCard } from './srs/SRSIdleCard';
 import { useVerbsQuizEngine } from '../hooks/useVerbsQuizEngine';
 import type { VerbQuizMode } from '../hooks/useVerbsQuizEngine';
 
@@ -125,7 +126,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
           onNext={nextQuestion}
         />
       ) : (
-        <div className="card state-card state-card--compact">Загрузка...</div>
+        <SRSIdleCard />
       )}
 
       {isTableOpen && <VerbsTableModal verbs={verbs} onClose={() => setIsTableOpen(false)} />}

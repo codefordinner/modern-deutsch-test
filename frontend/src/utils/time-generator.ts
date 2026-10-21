@@ -189,11 +189,6 @@ export function isTimeAnswerMatch(userInput: string, timeData: GermanTimeOutput)
   });
 }
 
-export function timeToGermanWords(hours: number, minutes: number, isFormal: boolean): string {
-  const data = getGermanTime(hours, minutes);
-  return isFormal ? data.official : data.colloquial;
-}
-
 export function isTimeAnswerCorrect(userInput: string, hours: number, minutes: number, isFormal: boolean): boolean {
   const data = getGermanTime(hours, minutes);
   const clean = userInput.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -202,4 +197,3 @@ export function isTimeAnswerCorrect(userInput: string, hours: number, minutes: n
   }
   return isTimeAnswerMatch(userInput, data);
 }
-

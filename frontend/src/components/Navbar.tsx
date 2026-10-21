@@ -1,7 +1,8 @@
 import React from 'react';
 import type { TrainerTab } from '../types';
 import { tabHref } from '../hooks/useHashRoute';
-import { Hash, BookOpen, Zap, Clock, ShieldCheck, Sun, Moon, BarChart3, Settings } from 'lucide-react';
+import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
+import { Hash, BookOpen, Type, Zap, Clock, ShieldCheck, Sun, Moon, BarChart3, Settings } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: TrainerTab;
@@ -15,6 +16,7 @@ interface NavbarProps {
 const tabs = [
   { id: 'numbers' as TrainerTab, label: 'Числа', icon: Hash },
   { id: 'words' as TrainerTab, label: 'Слова', icon: BookOpen },
+  { id: 'articles' as TrainerTab, label: 'Артикли', icon: Type },
   { id: 'verbs' as TrainerTab, label: 'Глаголы', icon: Zap },
   { id: 'time' as TrainerTab, label: 'Время', icon: Clock },
   { id: 'admin' as TrainerTab, label: 'Админка', icon: ShieldCheck },
@@ -29,6 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
 }) => {
   const themeLabel = isDark ? 'Включить светлую тему' : 'Включить тёмную тему';
+  const [{ dailyGoal }] = useStudyPrefs();
+  const answeredToday = useDailyCount();
 
   return (
     <header className="app-header">
@@ -67,6 +71,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         <div className="header-actions">
+          {showStats && dailyGoal > 0 && (
+            <span
+              className={`daily-chip ${answeredToday >= dailyGoal ? 'is-done' : ''}`}
+              title={`Цель на сегодня: ${answeredToday} из ${dailyGoal} ответов`}
+            >
+              🎯 {answeredToday}/{dailyGoal}
+            </span>
+          )}
           {showStats && (
             <button
               id="open-stats-btn"

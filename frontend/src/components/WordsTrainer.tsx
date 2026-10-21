@@ -4,6 +4,7 @@ import { WordsQuizCard } from './words/WordsQuizCard';
 import { WordsDictionaryModal } from './words/WordsDictionaryModal';
 import { WordsSRSModal } from './words/WordsSRSModal';
 import { WordsSettingsModal } from './words/WordsSettingsModal';
+import { SRSIdleCard } from './srs/SRSIdleCard';
 import { useWordsQuizEngine } from '../hooks/useWordsQuizEngine';
 
 export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
@@ -77,7 +78,7 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
           onSubmit={handleSubmit} onNext={nextWord} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : (
-        <div className="card state-card state-card--compact">Загрузка...</div>
+        <SRSIdleCard />
       )}
 
       {isDictOpen && <WordsDictionaryModal words={words} categories={categories} onClose={() => setIsDictOpen(false)} />}

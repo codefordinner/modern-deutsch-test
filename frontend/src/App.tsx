@@ -4,6 +4,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
 import { NumbersTrainer } from './components/NumbersTrainer';
 import { WordsTrainer } from './components/WordsTrainer';
+import { ArticlesTrainer } from './components/ArticlesTrainer';
 import { VerbsTrainer } from './components/VerbsTrainer';
 import { TimeTrainer } from './components/TimeTrainer';
 import { ToastHost } from './components/ToastHost';
@@ -20,6 +21,7 @@ const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ d
 const titles: Record<TrainerTab, string> = {
   numbers: '🔢 Числительные',
   words: '📚 Словарь',
+  articles: '🔤 Артикли (der / die / das)',
   verbs: '⚡ Глаголы (Präsens, Präteritum, Partizip II)',
   time: '⏰ Немецкое время (Uhrzeit)',
   admin: '⚙️ Панель управления',
@@ -28,6 +30,7 @@ const titles: Record<TrainerTab, string> = {
 const pageTitles: Record<TrainerTab, string> = {
   numbers: 'Числительные',
   words: 'Словарь',
+  articles: 'Артикли',
   verbs: 'Глаголы',
   time: 'Время',
   admin: 'Админка',
@@ -98,6 +101,7 @@ export function App() {
       <main className="app-container" id="main">
         {activeTab === 'numbers' && <NumbersTrainer onAnswer={handleAnswer} />}
         {activeTab === 'words' && <WordsTrainer onAnswer={handleAnswer} />}
+        {activeTab === 'articles' && <ArticlesTrainer onAnswer={handleAnswer} />}
         {activeTab === 'verbs' && <VerbsTrainer onAnswer={handleAnswer} />}
         {activeTab === 'time' && <TimeTrainer />}
         {activeTab === 'admin' && (

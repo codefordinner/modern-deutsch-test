@@ -1,0 +1,129 @@
+/* Styles for: articles trainer, daily goal, backup, bulk admin tools, duplicates, import review. */
+
+/* ---- Articles trainer ---- */
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 540px;
+  margin: 20px 0 8px;
+}
+
+.article-btn {
+  --article-color: var(--accent-primary);
+  position: relative;
+  padding: 18px 8px;
+  font-size: 22px;
+  font-weight: 800;
+  font-family: inherit;
+  border-radius: 12px;
+  border: 2px solid var(--article-color);
+  background: transparent;
+  color: var(--article-color);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
+}
+
+.article-btn--der { --article-color: #3b82f6; }
+.article-btn--die { --article-color: #ef4444; }
+.article-btn--das { --article-color: #10b981; }
+
+.article-btn:hover:not(:disabled) { background: var(--bg-tertiary); transform: translateY(-1px); }
+.article-btn:disabled { cursor: default; }
+.article-btn.is-correct { background: var(--article-color); color: #fff; }
+.article-btn.is-wrong { opacity: 0.55; text-decoration: line-through; }
+.article-btn.is-dim { opacity: 0.35; }
+
+.article-btn-key {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+@media (hover: none) { .article-btn-key { display: none; } }
+
+/* ---- Daily goal ---- */
+.daily-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono);
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+.daily-chip.is-done { color: var(--success); background: var(--success-light); border-color: var(--success-border); }
+
+.daily-goal {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  font-size: 13px;
+}
+.daily-goal-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.daily-goal-track { height: 10px; overflow: hidden; border-radius: 6px; background: var(--bg-primary); }
+.daily-goal-fill { height: 100%; background: var(--accent-primary); transition: width 0.3s ease; }
+.daily-goal-fill.is-done { background: var(--success); }
+.daily-goal-done { margin-top: 8px; font-weight: 600; color: var(--success); }
+
+/* ---- Settings: backup ---- */
+.backup-section { display: flex; flex-direction: column; gap: 8px; }
+.backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- Admin: bulk bar ---- */
+.th-check { width: 36px; text-align: center; }
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-primary);
+  background: var(--accent-light);
+}
+.bulk-count { font-size: 13px; }
+.bulk-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bulk-bar .select-compact { flex: 0 1 190px; }
+.bulk-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Admin: duplicates ---- */
+.dup-group { margin: 0 0 14px; padding: 14px 16px; }
+.dup-group-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+.dup-row + .dup-row { margin-top: 4px; }
+.dup-row.is-keep { border-color: var(--success-border); background: var(--success-light); }
+.dup-row input { accent-color: var(--accent-primary); }
+.dup-row-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dup-row-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+.dup-row.is-keep .dup-row-tag { color: var(--success); }
+
+/* ---- Admin: import review ---- */
+.import-stack { display: flex; flex-direction: column; gap: 20px; }
+.review-card { overflow: hidden; }
+.review-table .text-input { padding: 6px 10px; font-size: 14px; min-width: 110px; width: 100%; }
+.review-table tr.is-excluded { opacity: 0.45; }
+.review-table tr.has-issue td { background: var(--warning-light); }
+.review-note { margin-top: 2px; font-size: 11px; color: var(--text-muted); }
+.review-note--error { color: var(--error); font-weight: 600; }
+.review-summary { margin-right: auto; align-self: center; }

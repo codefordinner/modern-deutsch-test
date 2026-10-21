@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import authRoutes from './routes/auth.routes';
 import wordsRoutes from './routes/words.routes';
+import wordsAdminRoutes from './routes/words-admin.routes';
 import categoriesRoutes from './routes/categories.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import { requireSameOrigin } from './middleware/csrf.middleware';
+import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
 
 const router = Router();
 
@@ -12,6 +14,9 @@ router.use(requireSameOrigin);
 
 router.use('/auth', authRoutes);
 router.use('/admin', authRoutes); // alias for admin login
+router.use('/words', normalizeWordBody);
+// Admin-only bulk tools; mounted before the CRUD router (their paths never clash with it).
+router.use('/words', wordsAdminRoutes);
 router.use('/words', wordsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/analytics', analyticsRoutes);

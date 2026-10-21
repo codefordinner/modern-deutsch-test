@@ -25,6 +25,7 @@ export interface Word {
   femininePlural?: string | null;
   praeteritum?: string | null;
   partizip2?: string | null;
+  /** Always 'haben' | 'sein' (the server normalises legacy 'hat' / 'ist'). */
   hilfsverb?: string | null;
   praesensIch?: string | null;
   praesensDu?: string | null;
@@ -41,17 +42,16 @@ export interface SRSRecord {
   streak: number;
   mistakes: number;
   lastReviewed: string; // ISO
-  nextReview: string; // ISO
+  nextReview: string; // ISO — a card is "due" once this has passed (see utils/srsDue.ts)
   promotedOn?: string; // local day YYYY-MM-DD of the last promotion (max one box up per day)
 }
 
 export interface NumberRangeSettings {
   min: number;
   max: number;
-  allowLarge?: boolean;
 }
 
-export type TrainerTab = 'numbers' | 'words' | 'verbs' | 'time' | 'admin';
+export type TrainerTab = 'numbers' | 'words' | 'articles' | 'verbs' | 'time' | 'admin';
 
 export interface ScoreState {
   correct: number;

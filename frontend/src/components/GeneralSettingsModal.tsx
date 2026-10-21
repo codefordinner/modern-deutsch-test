@@ -1,7 +1,9 @@
-import React from 'react';
-import { Keyboard, Languages, Type } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Download, Keyboard, Languages, Target, Type, Upload } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
+import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
+import { applyBackup, downloadBackup, parseBackup } from '../utils/progressBackup';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
@@ -9,10 +11,45 @@ interface GeneralSettingsModalProps {
 
 export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onClose }) => {
   const [settings, updateSettings] = useUISettings();
+  const [prefs, setPrefs] = useStudyPrefs();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    setImportError(null);
+    try {
+      const backup = parseBackup(await file.text());
+      const when = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ru-RU') : 'неизвестно';
+      if (!confirm(`Заменить весь текущий прогресс и настройки данными из файла (сохранён: ${when})?`)) return;
+      applyBackup(backup);
+      window.location.reload();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Не удалось прочитать файл');
+    } finally {
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
 
   return (
     <Modal title="Общие настройки" size="sm" onClose={onClose}>
       <div className="modal-body modal-body--stack">
+        <div>
+          <label className="setting-toggle-title" htmlFor="daily-goal-input">
+            <Target size={14} /> Цель на день (ответов)
+          </label>
+          <input
+            id="daily-goal-input"
+            type="number"
+            className="text-input w-full"
+            min={0}
+            max={MAX_DAILY_GOAL}
+            value={prefs.dailyGoal}
+            onChange={(e) => setPrefs({ dailyGoal: Number(e.target.value) })}
+          />
+          <span className="setting-toggle-desc">Считаются ответы во всех тренажёрах. 0 — без цели.</span>
+        </div>
+
         <label className="setting-toggle">
           <input
             type="checkbox"
@@ -61,6 +98,30 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
             </span>
           </div>
         </label>
+
+        <div className="settings-divider backup-section">
+          <span className="settings-group-title">Перенос прогресса между устройствами</span>
+          <span className="setting-toggle-desc">
+            Файл содержит ящики SRS, счёт и настройки. Загрузка заменяет текущий прогресс на этом устройстве.
+          </span>
+          <div className="backup-actions">
+            <button type="button" className="btn-secondary" onClick={downloadBackup}>
+              <Download size={14} /> Скачать
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => fileInput.current?.click()}>
+              <Upload size={14} /> Загрузить
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              aria-label="Файл прогресса"
+              onChange={(e) => void handleFile(e.target.files?.[0])}
+            />
+          </div>
+          {importError && <div className="status-msg status-msg--error" role="alert">{importError}</div>}
+        </div>
       </div>
 
       <div className="modal-footer">

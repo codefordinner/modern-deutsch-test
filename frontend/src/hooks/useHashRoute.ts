@@ -5,7 +5,7 @@ import type { TrainerTab } from '../types';
 // new browser tab, the Back/Forward buttons move between tabs, and a reload keeps
 // you where you were. Nothing to install and it works behind any static host.
 
-export const TABS: readonly TrainerTab[] = ['numbers', 'words', 'verbs', 'time', 'admin'];
+export const TABS: readonly TrainerTab[] = ['numbers', 'words', 'articles', 'verbs', 'time', 'admin'];
 export const DEFAULT_TAB: TrainerTab = 'numbers';
 
 export const tabHref = (tab: TrainerTab): string => `#/${tab}`;

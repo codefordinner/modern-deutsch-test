@@ -154,6 +154,41 @@ export const updateCategory = (id: string, category: CategoryInput) =>
   request<Category>(`/categories/${id}`, { method: 'PUT', body: category, auth: true });
 export const deleteCategory = (id: string) => request<unknown>(`/categories/${id}`, { method: 'DELETE', auth: true });
 
+// ---- Bulk operations ----
+
+export interface BulkResult {
+  success: boolean;
+  count: number;
+}
+
+export const bulkSetCategory = (ids: string[], categoryId: string) =>
+  request<BulkResult>('/words/bulk/category', { method: 'POST', body: { ids, categoryId }, auth: true });
+
+export const bulkSetPartOfSpeech = (ids: string[], partOfSpeech: PartOfSpeech | null) =>
+  request<BulkResult>('/words/bulk/part-of-speech', { method: 'POST', body: { ids, partOfSpeech }, auth: true });
+
+export const bulkDeleteWords = (ids: string[]) =>
+  request<BulkResult>('/words/bulk/delete', { method: 'POST', body: { ids }, auth: true });
+
+// ---- Duplicates ----
+
+export interface DuplicateGroup {
+  /** Normalised German form shared by the words. */
+  key: string;
+  /** Oldest first. */
+  words: Word[];
+}
+
+export const getDuplicates = () =>
+  request<{ groups: DuplicateGroup[]; total: number }>('/words/duplicates', { auth: true });
+
+export const mergeDuplicates = (keepId: string, removeIds: string[]) =>
+  request<{ success: boolean; removed: number; filledFields: string[] }>('/words/duplicates/merge', {
+    method: 'POST',
+    body: { keepId, removeIds },
+    auth: true,
+  });
+
 // ---- Bulk import / export ----
 
 export interface ImportOptions {
@@ -192,6 +227,32 @@ export interface ImportResult {
 
 export const importWords = (options: ImportOptions) =>
   request<ImportResult>('/words/import', { method: 'POST', body: options, auth: true });
+
+export interface ImportPreviewRow {
+  /** 1-based position in the pasted data. */
+  index: number;
+  de: string;
+  ru: string;
+  /** '' = no category given (and no default): the admin must pick one before importing. */
+  category: string;
+  partOfSpeech: PartOfSpeech | null;
+  /** Remaining text fields (plural, hint, praeteritum, …). */
+  fields: Record<string, string>;
+  /** 'duplicate' = this German form is already in the dictionary or earlier in the pasted data. */
+  status: 'ok' | 'duplicate';
+}
+
+export interface ImportPreview {
+  rows: ImportPreviewRow[];
+  /** Rows the server could not read at all. */
+  errors: ImportRowError[];
+  categories: { name: string; icon?: string; color?: string }[];
+  total: number;
+}
+
+/** Parses and validates pasted data without writing anything. */
+export const previewImport = (options: { data: string; defaultCategoryId?: string; partOfSpeech?: PartOfSpeech }) =>
+  request<ImportPreview>('/words/import/preview', { method: 'POST', body: options, auth: true });
 
 export interface WordsExport {
   version: number;

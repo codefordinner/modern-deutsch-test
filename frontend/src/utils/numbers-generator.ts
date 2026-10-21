@@ -34,7 +34,8 @@ const TENS: Record<number, string> = {
   9: 'neunzig',
 };
 
-// Converts numbers under 100 to German
+// Converts numbers under 100 to German.
+// `isPartOfLarger`: the number is followed by a multiplier ("…tausend"), so a final 1 is "ein", not "eins".
 export function twoDigitToGerman(n: number, isPartOfLarger = false): string {
   if (n < 0 || n > 99) return '';
   if (n === 0) return isPartOfLarger ? '' : 'null';
@@ -59,7 +60,7 @@ export function threeDigitToGerman(n: number, isPartOfLarger = false): string {
   const hundredStr = (hundred === 1 ? 'ein' : ONES[hundred]) + 'hundert';
 
   if (remainder === 0) return hundredStr;
-  return hundredStr + twoDigitToGerman(remainder, false);
+  return hundredStr + twoDigitToGerman(remainder, isPartOfLarger);
 }
 
 // Full converter for 0 to 999 999 999
@@ -84,7 +85,7 @@ export function numberToGerman(n: number): string {
     }
   }
 
-  // Thousands
+  // Thousands: a final 1 of the group is "ein" ("einhunderteintausend"), only "eintausend" itself is special-cased.
   const thousands = Math.floor(remainderAfterMillions / 1000);
   const remainderAfterThousands = remainderAfterMillions % 1000;
 
@@ -92,13 +93,13 @@ export function numberToGerman(n: number): string {
     if (thousands === 1) {
       result += 'eintausend';
     } else {
-      result += `${threeDigitToGerman(thousands, false)}tausend`;
+      result += `${threeDigitToGerman(thousands, true)}tausend`;
     }
   }
 
-  // Hundreds & units
+  // Hundreds & units: nothing follows, so a final 1 is "eins" ("eintausendeins").
   if (remainderAfterThousands > 0) {
-    result += threeDigitToGerman(remainderAfterThousands, n >= 1000);
+    result += threeDigitToGerman(remainderAfterThousands, false);
   }
 
   return result;
@@ -106,25 +107,33 @@ export function numberToGerman(n: number): string {
 
 export const numberToGermanWords = numberToGerman;
 
-export type NumberRangeKey = 'units' | 'teens' | 'tens' | 'hundreds' | 'thousands' | 'millions';
+/**
+ * Every accepted spelling of `n`: the canonical one from `numberToGerman` plus
+ * the common ones where the leading "ein" of "einhundert" / "eintausend" is
+ * dropped ("hundert", "tausend", "tausendhundert", "eine Million hunderttausend").
+ *
+ * The "ein" is only optional when the word starts the number, starts a group
+ * after a space ("Million eintausend"), or sits right after "tausend" — NOT
+ * after "hundert": "hunderteintausend" is 101 000, but "einhunderttausend" is 100 000.
+ */
+export function germanNumberVariants(n: number): string[] {
+  const canonical = numberToGerman(n);
+  const optionalEin = /(?<=^|\s)ein(?=hundert|tausend)|(?<=tausend)ein(?=hundert)/g;
+  const positions = Array.from(canonical.matchAll(optionalEin), (m) => m.index as number);
 
-export const NUMBER_RANGES: { key: NumberRangeKey; label: string; min: number; max: number }[] = [
-  { key: 'units', label: 'Единицы (0–12)', min: 0, max: 12 },
-  { key: 'teens', label: '13–19 (dreizehn...)', min: 13, max: 19 },
-  { key: 'tens', label: 'Десятки 20–99 (und-правило)', min: 20, max: 99 },
-  { key: 'hundreds', label: 'Сотни (100–999)', min: 100, max: 999 },
-  { key: 'thousands', label: 'Тысячи (1 000–999 999)', min: 1000, max: 999999 },
-  { key: 'millions', label: 'Миллионы (1 000 000+)', min: 1000000, max: 20000000 },
-];
-
-export function getRandomNumberByRanges(selectedRanges: NumberRangeKey[]): number {
-  if (!selectedRanges || selectedRanges.length === 0) {
-    selectedRanges = ['units', 'teens', 'tens'];
+  const variants = new Set<string>([canonical]);
+  for (let mask = 1; mask < 1 << positions.length; mask++) {
+    let text = '';
+    let last = 0;
+    positions.forEach((position, i) => {
+      if (mask & (1 << i)) {
+        text += canonical.slice(last, position);
+        last = position + 'ein'.length;
+      }
+    });
+    variants.add(text + canonical.slice(last));
   }
-  const chosenKey = selectedRanges[Math.floor(Math.random() * selectedRanges.length)];
-  const range = NUMBER_RANGES.find((r) => r.key === chosenKey) || NUMBER_RANGES[0];
-
-  return Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+  return Array.from(variants);
 }
 
 export function normalizeGermanAnswer(str: string): string {

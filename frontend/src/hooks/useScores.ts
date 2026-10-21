@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ScoreState } from '../types';
+import { incrementDailyCount } from '../utils/studyPrefs';
 
 /** Trainers that keep a score (the admin panel has none). */
-export type ScoredTab = 'numbers' | 'words' | 'verbs' | 'time';
+export type ScoredTab = 'numbers' | 'words' | 'articles' | 'verbs' | 'time';
 
 export type Scores = Record<ScoredTab, ScoreState>;
 
 const STORAGE_KEY = 'app_scores';
-const SCORED_TABS: readonly ScoredTab[] = ['numbers', 'words', 'verbs', 'time'];
+const SCORED_TABS: readonly ScoredTab[] = ['numbers', 'words', 'articles', 'verbs', 'time'];
 
 export const emptyScore = (): ScoreState => ({ correct: 0, total: 0, streak: 0, bestStreak: 0 });
 
@@ -41,6 +42,7 @@ function loadScores(): Scores {
 /**
  * Per-trainer score (correct / total / streak / best streak), kept in
  * localStorage so a page reload doesn't wipe it. "Reset" clears one trainer.
+ * Every recorded answer also counts towards the daily goal (utils/studyPrefs.ts).
  */
 export function useScores() {
   const [scores, setScores] = useState<Scores>(loadScores);
@@ -54,6 +56,7 @@ export function useScores() {
   }, [scores]);
 
   const recordAnswer = useCallback((tab: ScoredTab, isCorrect: boolean) => {
+    incrementDailyCount();
     setScores((prev) => {
       const current = prev[tab];
       const streak = isCorrect ? current.streak + 1 : 0;

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Modal } from '../Modal';
 import { SRSBoxStats } from '../srs/SRSBoxStats';
-import { SRSResetButton, SRSToggle } from '../srs/SRSControls';
+import { SRSDueControls, SRSResetButton, SRSToggle } from '../srs/SRSControls';
 import { buildVerbCards } from '../../utils/verbCards';
 import type { Word, SRSRecord } from '../../types';
 
@@ -49,6 +49,8 @@ export const VerbsSRSModal: React.FC<VerbsSRSModalProps> = ({
           onLabel="Включено: глаголы повторяются по ящикам"
           offLabel="Отключено: чистый случайный выбор (рандом)"
         />
+
+        <SRSDueControls keys={keys} srsState={srsState} useSRS={useSRS} />
 
         <SRSBoxStats keys={keys} srsState={srsState} />
 
