@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { diffAnswers } from '../utils/answerDiff';
 import type { DiffSegment } from '../utils/answerDiff';
@@ -94,10 +94,26 @@ export const FeedbackBox: React.FC<FeedbackBoxProps> = ({ feedback, action }) =>
 };
 
 /**
- * Wraps the feedback under a typed-answer card and keeps a minimum height, so showing and hiding the
- * result doesn't change the page height. On phones with the keyboard open, that height change made
- * the page jump when answering several questions in a row with Enter.
+ * Wraps the feedback under a typed-answer card and keeps the page height constant, so showing and
+ * hiding the result doesn't move the layout. On phones with the keyboard open, every height change
+ * made the browser re-scroll the page, and answering several questions in a row with Enter made the
+ * screen drift further and further up.
+ *
+ * The slot starts at a CSS minimum and only ever GROWS to the tallest feedback seen so far (a wrong
+ * answer is taller than a right one), so after the first tall result the height never changes again.
  */
-export const FeedbackSlot: React.FC<{ feedback: Feedback | null }> = ({ feedback }) => (
-  <div className="feedback-slot">{feedback && <FeedbackBox feedback={feedback} />}</div>
-);
+export const FeedbackSlot: React.FC<{ feedback: Feedback | null }> = ({ feedback }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [minHeight, setMinHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const height = ref.current?.offsetHeight ?? 0;
+    if (height > minHeight) setMinHeight(height);
+  }, [feedback, minHeight]);
+
+  return (
+    <div ref={ref} className="feedback-slot" style={minHeight > 0 ? { minHeight } : undefined}>
+      {feedback && <FeedbackBox feedback={feedback} />}
+    </div>
+  );
+};

@@ -6,6 +6,9 @@ import './styles/import-export.css'
 import './styles/features.css'
 import './styles/mobile.css'
 import App from './App.tsx'
+import { installEnterScrollGuard } from './utils/scrollGuard'
+
+installEnterScrollGuard()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

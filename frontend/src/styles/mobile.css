@@ -100,3 +100,15 @@ button, a, select, label, input, .mode-pill {
 /* Wide tables scroll inside their own frame */
 .table-frame, .table-scroll { -webkit-overflow-scrolling: touch; }
 .data-table th, .data-table td { padding: 10px 10px; }
+
+/* 6. Pressing Enter repeatedly with the keyboard open made the page drift upwards.
+   - the feedback slot contains its children's margins, so its height (kept constant by
+     FeedbackSlot) really is the height the page reserves;
+   - scroll anchoring must not shift the page when the feedback appears/disappears. */
+.feedback-slot {
+  display: flow-root;
+}
+html,
+body {
+  overflow-anchor: none;
+}

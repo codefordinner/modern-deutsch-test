@@ -55,7 +55,8 @@ export const NumbersQuizCard: React.FC<NumbersQuizCardProps> = ({
           <input
             type="text"
             inputMode={isGermanToDigits ? 'numeric' : 'text'}
-            enterKeyHint={feedback ? 'next' : 'done'}
+            // Constant on purpose: changing the hint on a focused field makes iOS rebuild the keyboard and re-scroll the page.
+            enterKeyHint="done"
             className="text-input"
             placeholder={isGermanToDigits ? 'Например: 42' : 'Например: zweiundvierzig'}
             value={userInput}
