@@ -1,7 +1,7 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
 import { UmlautBar } from '../UmlautBar';
-import { FeedbackBox } from '../FeedbackBox';
+import { FeedbackSlot } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
 import type { SRSRecord, Feedback } from '../../types';
@@ -78,7 +78,7 @@ export const FormToInfinitiveQuiz: React.FC<FormToInfinitiveQuizProps> = ({
 
       <UmlautBar onInsert={onInsertChar} />
 
-      {feedback && <FeedbackBox feedback={feedback} />}
+      <FeedbackSlot feedback={feedback} />
     </div>
   );
 };

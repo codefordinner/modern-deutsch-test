@@ -380,6 +380,10 @@
   margin: 0;
 }
 
+.feedback-slot {
+  min-height: 112px; /* roughly one short feedback box incl. its top margin */
+}
+
 .feedback-content {
   flex: 1;
   min-width: 0;

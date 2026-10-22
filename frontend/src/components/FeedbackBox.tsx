@@ -92,3 +92,12 @@ export const FeedbackBox: React.FC<FeedbackBoxProps> = ({ feedback, action }) =>
     </div>
   );
 };
+
+/**
+ * Wraps the feedback under a typed-answer card and keeps a minimum height, so showing and hiding the
+ * result doesn't change the page height. On phones with the keyboard open, that height change made
+ * the page jump when answering several questions in a row with Enter.
+ */
+export const FeedbackSlot: React.FC<{ feedback: Feedback | null }> = ({ feedback }) => (
+  <div className="feedback-slot">{feedback && <FeedbackBox feedback={feedback} />}</div>
+);

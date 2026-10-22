@@ -1,7 +1,7 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
 import { UmlautBar } from '../UmlautBar';
-import { FeedbackBox } from '../FeedbackBox';
+import { FeedbackSlot } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
 import type { Word, SRSRecord, Feedback } from '../../types';
@@ -117,7 +117,7 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
 
       <UmlautBar onInsert={onInsertChar} />
 
-      {feedback && <FeedbackBox feedback={feedback} />}
+      <FeedbackSlot feedback={feedback} />
     </div>
   );
 };
