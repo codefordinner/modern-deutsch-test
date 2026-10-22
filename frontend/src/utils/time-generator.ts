@@ -1,4 +1,4 @@
-// German Time Generator & Validator with 'kurz' and any minute support
+// German time generator (flash cards): colloquial / official phrases, 'kurz' variants, any minute
 import { twoDigitToGerman } from './numbers-generator';
 
 const HOUR_WORDS_12: Record<number, string> = {
@@ -24,7 +24,6 @@ export interface GermanTimeOutput {
   official: string;
   colloquial: string;
   kurzVariant?: string;
-  acceptedVariants: string[];
 }
 
 export function formatTime24(h: number, m: number): string {
@@ -55,98 +54,67 @@ export function getGermanTime(hours: number, minutes: number): GermanTimeOutput 
 
   let colloquial = '';
   let kurzVariant: string | undefined;
-  const variants: string[] = [];
 
   // Exact milestones
   if (minutes === 0) {
     colloquial = `${curHourPrefix} Uhr`;
-    variants.push(curWord, `${curHourPrefix} Uhr`, `Punkt ${curHourPrefix} Uhr`);
   } else if (minutes >= 1 && minutes <= 4) {
     colloquial = `kurz nach ${curWord}`;
     kurzVariant = `kurz nach ${curWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(minutes)} nach ${curWord}`);
   } else if (minutes === 5) {
     colloquial = `fünf nach ${curWord}`;
-    variants.push(colloquial);
   } else if (minutes >= 6 && minutes <= 9) {
     colloquial = `${twoDigitToGerman(minutes)} nach ${curWord}`;
-    variants.push(colloquial, `kurz vor zehn nach ${curWord}`);
   } else if (minutes === 10) {
     colloquial = `zehn nach ${curWord}`;
-    variants.push(colloquial);
   } else if (minutes >= 11 && minutes <= 14) {
     colloquial = `kurz vor Viertel nach ${curWord}`;
     kurzVariant = `kurz vor Viertel nach ${curWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(minutes)} nach ${curWord}`, `kurz vor Viertel ${nextWord}`);
   } else if (minutes === 15) {
     colloquial = `Viertel nach ${curWord}`;
-    variants.push(colloquial, `viertel nach ${curWord}`, `Viertel ${nextWord}`, `viertel ${nextWord}`);
   } else if (minutes >= 16 && minutes <= 19) {
     colloquial = `kurz nach Viertel nach ${curWord}`;
     kurzVariant = `kurz nach Viertel nach ${curWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(minutes)} nach ${curWord}`, `kurz nach Viertel ${nextWord}`);
   } else if (minutes === 20) {
     colloquial = `zwanzig nach ${curWord}`;
-    variants.push(colloquial, `zehn vor halb ${nextWord}`);
   } else if (minutes >= 21 && minutes <= 24) {
-    const diff = 30 - minutes;
-    colloquial = `${twoDigitToGerman(diff)} vor halb ${nextWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(minutes)} nach ${curWord}`);
+    // Same pattern as 20 ("zwanzig nach") and 6–9: a plain "N nach"; "N vor halb" only starts at 25.
+    colloquial = `${twoDigitToGerman(minutes)} nach ${curWord}`;
   } else if (minutes === 25) {
     colloquial = `fünf vor halb ${nextWord}`;
-    variants.push(colloquial, `fünfundzwanzig nach ${curWord}`);
   } else if (minutes >= 26 && minutes <= 29) {
     colloquial = `kurz vor halb ${nextWord}`;
     kurzVariant = `kurz vor halb ${nextWord}`;
-    const diff = 30 - minutes;
-    variants.push(colloquial, `${twoDigitToGerman(diff)} vor halb ${nextWord}`, `${twoDigitToGerman(minutes)} nach ${curWord}`);
   } else if (minutes === 30) {
     colloquial = `halb ${nextWord}`;
-    variants.push(colloquial);
   } else if (minutes >= 31 && minutes <= 34) {
     colloquial = `kurz nach halb ${nextWord}`;
     kurzVariant = `kurz nach halb ${nextWord}`;
-    const diff = minutes - 30;
-    variants.push(`kurz nach halb ${nextWord}`, `${twoDigitToGerman(diff)} nach halb ${nextWord}`, `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`);
   } else if (minutes === 35) {
     colloquial = `fünf nach halb ${nextWord}`;
-    variants.push(colloquial, `fünfundzwanzig vor ${nextWord}`);
   } else if (minutes >= 36 && minutes <= 39) {
     const diff = minutes - 30;
     colloquial = `${twoDigitToGerman(diff)} nach halb ${nextWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`);
   } else if (minutes === 40) {
     colloquial = `zwanzig vor ${nextWord}`;
-    variants.push(colloquial, `zehn nach halb ${nextWord}`);
   } else if (minutes >= 41 && minutes <= 44) {
     colloquial = `kurz vor Viertel vor ${nextWord}`;
     kurzVariant = `kurz vor Viertel vor ${nextWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`, `kurz vor Dreiviertel ${nextWord}`);
   } else if (minutes === 45) {
     colloquial = `Viertel vor ${nextWord}`;
-    variants.push(colloquial, `viertel vor ${nextWord}`, `Dreiviertel ${nextWord}`, `dreiviertel ${nextWord}`);
   } else if (minutes >= 46 && minutes <= 49) {
     colloquial = `kurz nach Viertel vor ${nextWord}`;
     kurzVariant = `kurz nach Viertel vor ${nextWord}`;
-    variants.push(colloquial, `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`, `kurz nach Dreiviertel ${nextWord}`);
   } else if (minutes === 50) {
     colloquial = `zehn vor ${nextWord}`;
-    variants.push(colloquial);
   } else if (minutes >= 51 && minutes <= 54) {
     colloquial = `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`;
-    variants.push(colloquial);
   } else if (minutes === 55) {
     colloquial = `fünf vor ${nextWord}`;
-    variants.push(colloquial);
   } else if (minutes >= 56 && minutes <= 59) {
     colloquial = `kurz vor ${nextWord}`;
     kurzVariant = `kurz vor ${nextWord}`;
-    const diff = 60 - minutes;
-    variants.push(colloquial, `${twoDigitToGerman(diff)} vor ${nextWord}`);
   }
-
-  // Also allow official format in variants
-  variants.push(official);
 
   return {
     hours,
@@ -156,7 +124,6 @@ export function getGermanTime(hours: number, minutes: number): GermanTimeOutput 
     official,
     colloquial,
     kurzVariant,
-    acceptedVariants: Array.from(new Set(variants.map((v) => v.toLowerCase().trim()))),
   };
 }
 
@@ -177,23 +144,4 @@ export function generateRandomTime(stepMode: 'any' | '5min' = 'any'): { hours: n
   }
 
   return { hours, minutes };
-}
-
-export function isTimeAnswerMatch(userInput: string, timeData: GermanTimeOutput): boolean {
-  const normUser = userInput.toLowerCase().trim().replace(/\s+/g, ' ');
-  if (!normUser) return false;
-
-  return timeData.acceptedVariants.some((v) => {
-    const normV = v.toLowerCase().trim().replace(/\s+/g, ' ');
-    return normUser === normV;
-  });
-}
-
-export function isTimeAnswerCorrect(userInput: string, hours: number, minutes: number, isFormal: boolean): boolean {
-  const data = getGermanTime(hours, minutes);
-  const clean = userInput.toLowerCase().trim().replace(/\s+/g, ' ');
-  if (isFormal) {
-    return clean === data.official.toLowerCase().trim();
-  }
-  return isTimeAnswerMatch(userInput, data);
 }

@@ -171,11 +171,11 @@ export const AdminPanel: React.FC = () => {
     <div>
       <div className="admin-toolbar">
         <div className="trainer-modes trainer-modes--flush">
-          <button className={`mode-pill ${tab === 'words' ? 'active' : ''}`} onClick={() => setTab('words')}><BookOpen size={14} /> Слова</button>
-          <button className={`mode-pill ${tab === 'categories' ? 'active' : ''}`} onClick={() => setTab('categories')}><Tag size={14} /> Категории</button>
-          <button className={`mode-pill ${tab === 'import' ? 'active' : ''}`} onClick={() => setTab('import')}><ArrowLeftRight size={14} /> Импорт / Экспорт</button>
-          <button className={`mode-pill ${tab === 'duplicates' ? 'active' : ''}`} onClick={() => setTab('duplicates')}><Copy size={14} /> Дубликаты</button>
-          <button className={`mode-pill ${tab === 'analytics' ? 'active' : ''}`} onClick={() => setTab('analytics')}><BarChart3 size={14} /> Аналитика</button>
+          <button type="button" className={`mode-pill ${tab === 'words' ? 'active' : ''}`} aria-pressed={tab === 'words'} onClick={() => setTab('words')}><BookOpen size={14} /> Слова</button>
+          <button type="button" className={`mode-pill ${tab === 'categories' ? 'active' : ''}`} aria-pressed={tab === 'categories'} onClick={() => setTab('categories')}><Tag size={14} /> Категории</button>
+          <button type="button" className={`mode-pill ${tab === 'import' ? 'active' : ''}`} aria-pressed={tab === 'import'} onClick={() => setTab('import')}><ArrowLeftRight size={14} /> Импорт / Экспорт</button>
+          <button type="button" className={`mode-pill ${tab === 'duplicates' ? 'active' : ''}`} aria-pressed={tab === 'duplicates'} onClick={() => setTab('duplicates')}><Copy size={14} /> Дубликаты</button>
+          <button type="button" className={`mode-pill ${tab === 'analytics' ? 'active' : ''}`} aria-pressed={tab === 'analytics'} onClick={() => setTab('analytics')}><BarChart3 size={14} /> Аналитика</button>
         </div>
         <button className="btn-secondary" onClick={handleLogout}><LogOut size={14} /> Выйти</button>
       </div>

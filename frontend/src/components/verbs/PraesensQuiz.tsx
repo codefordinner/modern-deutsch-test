@@ -61,7 +61,7 @@ export const PraesensQuiz: React.FC<PraesensQuizProps> = ({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            autoFocus
+            autoFocus={settings.autoFocus}
           />
           {feedback ? (
             <button
@@ -69,7 +69,7 @@ export const PraesensQuiz: React.FC<PraesensQuizProps> = ({
               type="button"
               className="btn-primary"
               onClick={onNext}
-              autoFocus={settings.collapseKeyboardAfterAnswer}
+              autoFocus={settings.autoFocus && settings.collapseKeyboardAfterAnswer}
             >
               Дальше (Enter)
             </button>

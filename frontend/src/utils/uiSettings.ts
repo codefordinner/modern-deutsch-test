@@ -21,6 +21,12 @@ export interface UISettings {
    * default: learners are supposed to practise the real spelling.
    */
   acceptUmlautSubstitutes: boolean;
+  /**
+   * Move keyboard focus automatically to the answer field / "Дальше" button
+   * when a new card appears. On by default (fast keyboard flow); screen-reader
+   * users can turn it off so focus doesn't jump away from what is being read.
+   */
+  autoFocus: boolean;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -30,6 +36,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   showUmlautBar: false,
   collapseKeyboardAfterAnswer: false,
   acceptUmlautSubstitutes: false,
+  autoFocus: true,
 };
 
 export function getUISettings(): UISettings {

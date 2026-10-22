@@ -26,9 +26,9 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
     <div>
       <div className="trainer-toolbar">
         <div className="trainer-modes trainer-modes--flush">
-          <button className={`mode-pill ${directionMode === 'ru_to_de' ? 'active' : ''}`} onClick={() => setDirectionMode('ru_to_de')}>Русский → Немецкий</button>
-          <button className={`mode-pill ${directionMode === 'de_to_ru' ? 'active' : ''}`} onClick={() => setDirectionMode('de_to_ru')}>Немецкий → Русский</button>
-          <button className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
+          <button type="button" className={`mode-pill ${directionMode === 'ru_to_de' ? 'active' : ''}`} aria-pressed={directionMode === 'ru_to_de'} onClick={() => setDirectionMode('ru_to_de')}>Русский → Немецкий</button>
+          <button type="button" className={`mode-pill ${directionMode === 'de_to_ru' ? 'active' : ''}`} aria-pressed={directionMode === 'de_to_ru'} onClick={() => setDirectionMode('de_to_ru')}>Немецкий → Русский</button>
+          <button type="button" className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} aria-pressed={directionMode === 'mixed'} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
         </div>
         <div className="toolbar-actions">
           <button className="btn-secondary" onClick={() => setIsSrsOpen(true)}><Layers size={15} /> SRS</button>

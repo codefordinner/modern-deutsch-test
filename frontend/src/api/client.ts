@@ -107,6 +107,34 @@ export function getWords({ categoryId, search, limit }: WordsQuery = {}): Promis
   return request<WordsPage>(`/words${query ? `?${query}` : ''}`);
 }
 
+/** The server caps one page at this many words (see words.routes.ts). */
+export const WORDS_PAGE_SIZE = 1000;
+/** Safety net against a runaway loop: 50 pages = 50 000 words. */
+const MAX_WORD_PAGES = 50;
+
+/**
+ * Loads EVERY word matching the query by following the server's pages, so the
+ * dictionary never gets silently cut off at the page limit as it grows.
+ * `total` is the server's count; `words.length < total` only if the safety cap was hit.
+ */
+export async function getAllWords({ categoryId, search }: Omit<WordsQuery, 'limit'> = {}): Promise<WordsPage> {
+  const params = new URLSearchParams();
+  if (categoryId) params.set('categoryId', categoryId);
+  if (search) params.set('search', search);
+  params.set('limit', String(WORDS_PAGE_SIZE));
+
+  const words: Word[] = [];
+  let total = 0;
+  for (let page = 1; page <= MAX_WORD_PAGES; page++) {
+    params.set('page', String(page));
+    const result = await request<WordsPage>(`/words?${params.toString()}`);
+    total = result.total;
+    words.push(...result.words);
+    if (result.words.length === 0 || words.length >= total) break;
+  }
+  return { words, total, page: 1, limit: words.length };
+}
+
 export function getCategories(): Promise<Category[]> {
   return request<Category[]>('/categories');
 }

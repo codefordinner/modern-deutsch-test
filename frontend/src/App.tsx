@@ -8,6 +8,7 @@ import { ArticlesTrainer } from './components/ArticlesTrainer';
 import { VerbsTrainer } from './components/VerbsTrainer';
 import { TimeTrainer } from './components/TimeTrainer';
 import { ToastHost } from './components/ToastHost';
+import { UpdateBanner } from './components/UpdateBanner';
 import { trackEvent } from './api/client';
 import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
@@ -122,6 +123,7 @@ export function App() {
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
 
+      <UpdateBanner />
       <ToastHost />
     </div>
   );

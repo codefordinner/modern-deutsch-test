@@ -41,22 +41,22 @@ export const TimeTrainer: React.FC = () => {
     <div>
       <div className="trainer-toolbar">
         <div className="trainer-modes trainer-modes--flush">
-          <button className={`mode-pill ${stepMode === 'any' ? 'active' : ''}`} onClick={() => setStepMode('any')}>
+          <button type="button" className={`mode-pill ${stepMode === 'any' ? 'active' : ''}`} aria-pressed={stepMode === 'any'} onClick={() => setStepMode('any')}>
             <Sparkles size={13} /> Любая минута (kurz vor / nach)
           </button>
-          <button className={`mode-pill ${stepMode === '5min' ? 'active' : ''}`} onClick={() => setStepMode('5min')}>
+          <button type="button" className={`mode-pill ${stepMode === '5min' ? 'active' : ''}`} aria-pressed={stepMode === '5min'} onClick={() => setStepMode('5min')}>
             Шаг 5 минут
           </button>
 
           <div className="mode-divider" aria-hidden="true" />
 
-          <button className={`mode-pill ${displayMode === 'analog' ? 'active' : ''}`} onClick={() => setDisplayMode('analog')}>
+          <button type="button" className={`mode-pill ${displayMode === 'analog' ? 'active' : ''}`} aria-pressed={displayMode === 'analog'} onClick={() => setDisplayMode('analog')}>
             <Clock size={13} /> Стрелки
           </button>
-          <button className={`mode-pill ${displayMode === 'digital' ? 'active' : ''}`} onClick={() => setDisplayMode('digital')}>
+          <button type="button" className={`mode-pill ${displayMode === 'digital' ? 'active' : ''}`} aria-pressed={displayMode === 'digital'} onClick={() => setDisplayMode('digital')}>
             Цифры
           </button>
-          <button className={`mode-pill ${displayMode === 'both' ? 'active' : ''}`} onClick={() => setDisplayMode('both')}>
+          <button type="button" className={`mode-pill ${displayMode === 'both' ? 'active' : ''}`} aria-pressed={displayMode === 'both'} onClick={() => setDisplayMode('both')}>
             Оба (Стрелки + Цифры)
           </button>
         </div>

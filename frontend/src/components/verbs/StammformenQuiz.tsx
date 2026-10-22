@@ -74,7 +74,7 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            autoFocus
+            autoFocus={settings.autoFocus}
           />
           <input
             type="text"
@@ -104,7 +104,7 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
             type="button"
             className="btn-primary btn-block"
             onClick={onNext}
-            autoFocus={settings.collapseKeyboardAfterAnswer}
+            autoFocus={settings.autoFocus && settings.collapseKeyboardAfterAnswer}
           >
             Дальше (Enter)
           </button>

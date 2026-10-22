@@ -45,6 +45,10 @@ async function startServer() {
     const app = express();
     const PORT = 3000;
 
+    // Set TRUST_PROXY=1 when running behind a reverse proxy, so per-IP limits (login) see the real client IP.
+    const trustProxy = Number(process.env.TRUST_PROXY ?? 0);
+    if (trustProxy > 0) app.set('trust proxy', trustProxy);
+
     app.use(cors());
     // Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
     app.use(express.json({ limit: '5mb' }));

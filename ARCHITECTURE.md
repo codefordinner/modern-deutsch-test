@@ -61,7 +61,7 @@
 | Слова | `WordsTrainer` | `useWordsQuizEngine`, SRS-карточка = слово×направление×форма |
 | Артикли | `ArticlesTrainer` | `utils/articles.ts`; карточка = существительное с артиклем; клавиши 1/2/3 |
 | Глаголы | `VerbsTrainer` | `useVerbsQuizEngine`, `verbCards.ts` (единый список карточек) |
-| Время | `TimeTrainer` | `time-generator.ts`, флэш-карточки без счёта |
+| Время | `TimeTrainer` | `time-generator.ts`, флэш-карточки без счёта (режима ввода нет; проверка ответа не реализована) |
 | Админка | `AdminPanel` (lazy) | слова (массовые действия), категории, импорт/экспорт + проверка, дубликаты, аналитика |
 
 ### SRS (Лейтнер)

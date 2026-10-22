@@ -68,9 +68,9 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
     <div>
       <div className="trainer-toolbar">
         <div className="trainer-modes trainer-modes--flush">
-          <button className={`mode-pill ${directionMode === 'num_to_de' ? 'active' : ''}`} onClick={() => setDirectionMode('num_to_de')}>Цифры → Немецкий</button>
-          <button className={`mode-pill ${directionMode === 'de_to_num' ? 'active' : ''}`} onClick={() => setDirectionMode('de_to_num')}>Немецкий → Цифры</button>
-          <button className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
+          <button type="button" className={`mode-pill ${directionMode === 'num_to_de' ? 'active' : ''}`} aria-pressed={directionMode === 'num_to_de'} onClick={() => setDirectionMode('num_to_de')}>Цифры → Немецкий</button>
+          <button type="button" className={`mode-pill ${directionMode === 'de_to_num' ? 'active' : ''}`} aria-pressed={directionMode === 'de_to_num'} onClick={() => setDirectionMode('de_to_num')}>Немецкий → Цифры</button>
+          <button type="button" className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} aria-pressed={directionMode === 'mixed'} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
         </div>
         <button className="btn-secondary" onClick={() => setIsModalOpen(true)}>
           <Sliders size={15} /> Диапазон: {settings.min} – {settings.max}

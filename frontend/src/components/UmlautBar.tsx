@@ -16,16 +16,19 @@ export const UmlautBar: React.FC<UmlautBarProps> = ({ onInsert }) => {
   if (!settings.showUmlautBar) return null;
 
   return (
-    <div className="umlaut-bar" id="umlaut-bar" role="group" aria-label="Панель умлаутов">
-      <span className="umlaut-bar-label">Вставка:</span>
+    <div className="umlaut-bar" id="umlaut-bar" role="group" aria-label="Вставка умлаутов">
+      <span className="umlaut-bar-label" aria-hidden="true">Вставка:</span>
       {UMLAUTS.map((char) => (
         <button
           key={char}
           id={`umlaut-btn-${char}`}
           type="button"
           className="umlaut-btn"
+          // Keep focus (and the on-screen keyboard) in the answer field when a button is tapped with a pointer.
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsert(char)}
           title={`Вставить символ ${char}`}
+          aria-label={`Вставить ${char}`}
         >
           {char}
         </button>

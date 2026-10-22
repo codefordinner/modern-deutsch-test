@@ -64,7 +64,7 @@ export const NumbersQuizCard: React.FC<NumbersQuizCardProps> = ({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            autoFocus
+            autoFocus={settings.autoFocus}
           />
           {feedback ? (
             <button
@@ -72,7 +72,7 @@ export const NumbersQuizCard: React.FC<NumbersQuizCardProps> = ({
               type="button"
               className="btn-primary"
               onClick={onNext}
-              autoFocus={settings.collapseKeyboardAfterAnswer}
+              autoFocus={settings.autoFocus && settings.collapseKeyboardAfterAnswer}
             >
               Дальше (Enter)
             </button>

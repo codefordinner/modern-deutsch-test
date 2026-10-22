@@ -6,6 +6,7 @@ import { SRSIdleCard } from './srs/SRSIdleCard';
 import { getErrorMessage } from '../api/client';
 import { useCategories, useWords } from '../hooks/useDictionary';
 import { useSRSProgress } from '../hooks/useSRSProgress';
+import { useUISettings } from '../hooks/useUISettings';
 import { ARTICLES, articleSrsKey, isArticleNoun, splitArticle } from '../utils/articles';
 import type { Article } from '../utils/articles';
 import { speakGerman } from '../utils/audio';
@@ -19,6 +20,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
   const { words, hasData, error, isLoading, refetch } = useWords();
   const { categories } = useCategories();
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('articles');
+  const [uiSettings] = useUISettings();
 
   const [categoryId, setCategoryId] = useState('all');
   const [current, setCurrent] = useState<Word | null>(null);
@@ -159,7 +161,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
                 message: `${parts.article} ${parts.noun} — ${current.ru}${current.plural ? ` (${current.plural})` : ''}`,
               }}
             />
-            <button type="button" className="btn-primary" onClick={nextWord} autoFocus>
+            <button type="button" className="btn-primary" onClick={nextWord} autoFocus={uiSettings.autoFocus}>
               Дальше (Enter)
             </button>
           </div>

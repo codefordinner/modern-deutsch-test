@@ -1,13 +1,15 @@
 import React from 'react';
-import { Volume2, Check, X } from 'lucide-react';
+import { Volume2 } from 'lucide-react';
+import { FeedbackBox } from '../FeedbackBox';
+import { useUISettings } from '../../hooks/useUISettings';
 import { speakGerman } from '../../utils/audio';
-import type { Word, SRSRecord } from '../../types';
+import type { Feedback, Word, SRSRecord } from '../../types';
 
 interface MultipleChoiceQuizProps {
   verb: Word;
   srsItem?: SRSRecord;
   options: string[];
-  feedback: { isCorrect: boolean; message: string } | null;
+  feedback: Feedback | null;
   onSelectOption: (opt: string) => void;
   onNext: () => void;
 }
@@ -20,6 +22,7 @@ export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
   onSelectOption,
   onNext,
 }) => {
+  const [settings] = useUISettings();
   const currentBox = srsItem ? srsItem.box : 1;
 
   return (
@@ -52,17 +55,8 @@ export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
 
       {feedback && (
         <div className="mc-result">
-          <div
-            className={`feedback-box ${feedback.isCorrect ? 'feedback-success' : 'feedback-error'}`}
-            role={feedback.isCorrect ? 'status' : 'alert'}
-          >
-            {feedback.isCorrect ? <Check size={20} /> : <X size={20} />}
-            <div>
-              <div className="feedback-title">{feedback.isCorrect ? 'Верно!' : 'Ошибка!'}</div>
-              <div className="feedback-message">{feedback.message}</div>
-            </div>
-          </div>
-          <button type="button" className="btn-primary" onClick={onNext} autoFocus>
+          <FeedbackBox feedback={feedback} />
+          <button type="button" className="btn-primary" onClick={onNext} autoFocus={settings.autoFocus}>
             Дальше (Enter)
           </button>
         </div>

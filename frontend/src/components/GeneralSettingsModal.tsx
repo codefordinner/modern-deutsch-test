@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Keyboard, Languages, Target, Type, Upload } from 'lucide-react';
+import { Download, Focus, Keyboard, Languages, Target, Type, Upload } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
@@ -78,6 +78,23 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
             </span>
             <span className="setting-toggle-desc">
               По умолчанию выключено: нужно писать по-настоящему, «Tür», а не «Tuer». Включите, если на клавиатуре нет умлаутов.
+            </span>
+          </div>
+        </label>
+
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={settings.autoFocus}
+            onChange={(e) => updateSettings({ autoFocus: e.target.checked })}
+          />
+          <div>
+            <span className="setting-toggle-title">
+              <Focus size={14} /> Автоматически переводить фокус на новую карточку
+            </span>
+            <span className="setting-toggle-desc">
+              Поле ответа и кнопка «Дальше» получают фокус сами. Отключите, если пользуетесь скринридером:
+              фокус перестанет «прыгать» и прерывать озвучку.
             </span>
           </div>
         </label>

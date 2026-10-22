@@ -77,7 +77,8 @@ button, a, select, label, input, .mode-pill {
 .app-footer {
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
-.toast-host {
+.toast-host,
+.update-banner {
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 

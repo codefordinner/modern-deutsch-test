@@ -2,6 +2,7 @@ import React from 'react';
 import { Volume2, Eye, ArrowRight } from 'lucide-react';
 import { AnalogClock } from './AnalogClock';
 import { DigitalDisplay } from './DigitalDisplay';
+import { useUISettings } from '../../hooks/useUISettings';
 import { speakGerman } from '../../utils/audio';
 import type { GermanTimeOutput } from '../../utils/time-generator';
 
@@ -22,6 +23,7 @@ export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
   onReveal,
   onNext,
 }) => {
+  const [settings] = useUISettings();
   const mainPhrase = formatMode === 'formal' ? timeData.official : timeData.colloquial;
 
   return (
@@ -39,7 +41,7 @@ export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
 
       {!isRevealed ? (
         <div className="flash-action">
-          <button type="button" className="btn-primary btn-lg" onClick={onReveal} autoFocus>
+          <button type="button" className="btn-primary btn-lg" onClick={onReveal} autoFocus={settings.autoFocus}>
             <Eye size={18} /> Показать ответ (Пробел / Enter)
           </button>
         </div>
@@ -63,7 +65,7 @@ export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
             </button>
           </div>
 
-          <button type="button" className="btn-primary btn-lg" onClick={onNext} autoFocus>
+          <button type="button" className="btn-primary btn-lg" onClick={onNext} autoFocus={settings.autoFocus}>
             Следующее время <ArrowRight size={18} />
           </button>
         </div>

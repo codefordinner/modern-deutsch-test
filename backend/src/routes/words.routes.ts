@@ -38,11 +38,11 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (!query) {
       [words, total] = await Promise.all([
-        prisma.word.findMany({ where, include: { category: true }, take, skip, orderBy: { de: 'asc' } }),
+        prisma.word.findMany({ where, include: { category: true }, take, skip, orderBy: [{ de: 'asc' }, { id: 'asc' }] }),
         prisma.word.count({ where }),
       ]);
     } else {
-      const candidates = await prisma.word.findMany({ where, include: { category: true }, orderBy: { de: 'asc' } });
+      const candidates = await prisma.word.findMany({ where, include: { category: true }, orderBy: [{ de: 'asc' }, { id: 'asc' }] });
       const matched = candidates.filter((w) =>
         [w.de, w.ru, w.hint].some((field) => normalizeForSearch(field).includes(query))
       );
