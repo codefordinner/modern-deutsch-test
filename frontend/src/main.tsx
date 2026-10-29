@@ -10,6 +10,14 @@ import { installEnterScrollGuard } from './utils/scrollGuard'
 
 installEnterScrollGuard()
 
+// Ask the browser not to evict our localStorage (settings, SRS progress) under storage pressure or after
+// a long absence. Some browsers grant it silently, some ask or refuse; either way it is best effort.
+try {
+  void navigator.storage?.persist?.().catch(() => {})
+} catch {
+  // ignore
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

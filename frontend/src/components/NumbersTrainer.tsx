@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Sliders } from 'lucide-react';
 import { NumbersQuizCard } from './numbers/NumbersQuizCard';
 import { NumbersRangeModal } from './numbers/NumbersRangeModal';
+import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import { germanNumberVariants } from '../utils/numbers-generator';
 import { pickClosestAnswer } from '../utils/answerDiff';
 import { answersMatch, cleanText, currentMatchOptions, parseTypedInteger } from '../utils/answerMatch';
@@ -11,13 +12,30 @@ interface NumbersTrainerProps {
   onAnswer: (isCorrect: boolean) => void;
 }
 
+type DirectionMode = 'de_to_num' | 'num_to_de' | 'mixed';
+
+const DEFAULT_RANGE: NumberRangeSettings = { min: 0, max: 100 };
+
+function sanitizeRange(raw: unknown): NumberRangeSettings {
+  const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const min = Number(r.min);
+  const max = Number(r.max);
+  // numberToGerman handles 0 … 999 999 999; anything else in storage is junk.
+  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max <= min || max > 999999999) return DEFAULT_RANGE;
+  return { min, max };
+}
+
 // Spaces never matter in a German number word: "zwei und vierzig" is as good as "zweiundvierzig".
 const withoutSpaces = (text: string) => cleanText(text).replace(/ /g, '');
 
 export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
-  const [directionMode, setDirectionMode] = useState<'de_to_num' | 'num_to_de' | 'mixed'>('num_to_de');
+  const [directionMode, setDirectionMode] = usePersistentState<DirectionMode>(
+    'numbers_direction',
+    'num_to_de',
+    oneOf<DirectionMode>(['de_to_num', 'num_to_de', 'mixed'], 'num_to_de')
+  );
   const [activeDirection, setActiveDirection] = useState<'de_to_num' | 'num_to_de'>('num_to_de');
-  const [settings, setSettings] = useState<NumberRangeSettings>({ min: 0, max: 100 });
+  const [settings, setSettings] = usePersistentState<NumberRangeSettings>('numbers_range', DEFAULT_RANGE, sanitizeRange);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentNum, setCurrentNum] = useState<number>(0);
   const [userInput, setUserInput] = useState('');

@@ -14,6 +14,14 @@ export const BACKUP_KEYS = [
   'articles_use_srs',
   'articles_srs_state',
   'verbs_praesens_submode',
+  // Trainer settings (usePersistentState)
+  'words_settings',
+  'numbers_direction',
+  'numbers_range',
+  'time_display_mode',
+  'time_step_mode',
+  'verbs_mode',
+  'articles_category',
 ] as const;
 
 // The daily counter (app_daily_progress) is deliberately not exported: it's meaningless on another day/device.

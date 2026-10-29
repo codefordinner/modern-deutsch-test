@@ -2,11 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { HelpCircle, Clock, Sparkles } from 'lucide-react';
 import { TimeFlashCard } from './time/TimeFlashCard';
 import { TimeRulesModal } from './time/TimeRulesModal';
+import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import { getGermanTime, generateRandomTime } from '../utils/time-generator';
 
+type DisplayMode = 'analog' | 'digital' | 'both';
+type StepMode = 'any' | '5min';
+
 export const TimeTrainer: React.FC = () => {
-  const [displayMode, setDisplayMode] = useState<'analog' | 'digital' | 'both'>('analog');
-  const [stepMode, setStepMode] = useState<'any' | '5min'>('any');
+  const [displayMode, setDisplayMode] = usePersistentState<DisplayMode>(
+    'time_display_mode',
+    'analog',
+    oneOf<DisplayMode>(['analog', 'digital', 'both'], 'analog')
+  );
+  const [stepMode, setStepMode] = usePersistentState<StepMode>('time_step_mode', 'any', oneOf<StepMode>(['any', '5min'], 'any'));
   const [time, setTime] = useState({ hours: 14, minutes: 28 });
   const [isRevealed, setIsRevealed] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);

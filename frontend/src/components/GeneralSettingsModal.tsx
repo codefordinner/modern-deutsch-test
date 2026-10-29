@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Focus, Keyboard, Languages, Target, Type, Upload } from 'lucide-react';
+import { Download, Focus, Keyboard, Languages, Tag, Target, Type, Upload } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
@@ -49,6 +49,22 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
           />
           <span className="setting-toggle-desc">Считаются ответы во всех тренажёрах. 0 — без цели.</span>
         </div>
+
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={settings.showCategoryHint}
+            onChange={(e) => updateSettings({ showCategoryHint: e.target.checked })}
+          />
+          <div>
+            <span className="setting-toggle-title">
+              <Tag size={14} /> Показывать категорию слова под вопросом
+            </span>
+            <span className="setting-toggle-desc">
+              В тренажёрах «Слова» и «Артикли». Отключите, если категория подсказывает ответ.
+            </span>
+          </div>
+        </label>
 
         <label className="setting-toggle">
           <input

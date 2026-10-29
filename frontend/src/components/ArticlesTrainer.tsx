@@ -5,6 +5,7 @@ import { FeedbackBox } from './FeedbackBox';
 import { SRSIdleCard } from './srs/SRSIdleCard';
 import { getErrorMessage } from '../api/client';
 import { useCategories, useWords } from '../hooks/useDictionary';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { useSRSProgress } from '../hooks/useSRSProgress';
 import { useUISettings } from '../hooks/useUISettings';
 import { ARTICLES, articleSrsKey, isArticleNoun, splitArticle } from '../utils/articles';
@@ -22,7 +23,14 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('articles');
   const [uiSettings] = useUISettings();
 
-  const [categoryId, setCategoryId] = useState('all');
+  const [savedCategoryId, setCategoryId] = usePersistentState<string>('articles_category', 'all', (raw) =>
+    typeof raw === 'string' && raw ? raw : 'all'
+  );
+  // A saved category may have been deleted since: fall back to "all" instead of an empty pool.
+  const categoryId =
+    savedCategoryId === 'all' || categories.length === 0 || categories.some((c) => c.id === savedCategoryId)
+      ? savedCategoryId
+      : 'all';
   const [current, setCurrent] = useState<Word | null>(null);
   const [picked, setPicked] = useState<Article | null>(null);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
@@ -32,6 +40,8 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
     () => (categoryId === 'all' ? nouns : nouns.filter((w) => w.categoryId === categoryId)),
     [nouns, categoryId]
   );
+  const poolKeys = useMemo(() => pool.map((w) => articleSrsKey(w.id)), [pool]);
+  const scope = categoryId === 'all' ? 'все категории' : (categories.find((c) => c.id === categoryId)?.name ?? 'категория');
 
   const nextWord = useCallback(() => {
     setCurrent(pickCard(pool, (w) => articleSrsKey(w.id)) ?? null);
@@ -131,7 +141,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
 
         <div className="question-subtext">
           {current.ru}
-          {current.category ? ` · ${current.category.icon || '📁'} ${current.category.name}` : ''}
+          {uiSettings.showCategoryHint && current.category ? ` · ${current.category.icon || '📁'} ${current.category.name}` : ''}
         </div>
         {current.hint && <div className="question-subtext question-subtext--hint">💡 {current.hint}</div>}
 
@@ -198,6 +208,8 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
           nouns={nouns}
           srsState={srsMap}
           useSRS={useSRS}
+          poolKeys={poolKeys}
+          scope={scope}
           onClose={() => setIsSrsOpen(false)}
           onResetSRS={resetSRS}
           onToggleUseSRS={setUseSRS}

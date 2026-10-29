@@ -38,7 +38,11 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
 
   let promptLabel = direction === 'de_to_ru' ? 'Переведите на русский' : 'Напишите по-немецки';
   let mainText = direction === 'de_to_ru' ? currentWord.de : currentWord.ru;
-  let subText = currentWord.category ? `${currentWord.category.icon || '📁'} ${currentWord.category.name}` : '';
+  // The category hint can be switched off in the settings (it may give the answer away).
+  const subText =
+    settings.showCategoryHint && currentWord.category
+      ? `${currentWord.category.icon || '📁'} ${currentWord.category.name}`
+      : '';
 
   if (formType === 'plural') {
     promptLabel = direction === 'de_to_ru' ? 'Переведите форму Plural' : 'Напишите форму множественного числа (Plural)';

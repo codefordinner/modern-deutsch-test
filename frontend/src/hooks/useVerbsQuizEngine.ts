@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { getErrorMessage } from '../api/client';
 import { useVerbs } from './useDictionary';
+import { oneOf, usePersistentState } from './usePersistentState';
 import { useSRSProgress } from './useSRSProgress';
 import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
 import { buildVerbCards, isCardInSelection, selectVerbCards } from '../utils/verbCards';
@@ -25,7 +26,12 @@ const SUBMODE_STORAGE_KEY = 'verbs_praesens_submode';
  * the others.
  */
 export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
-  const [mode, setMode] = useState<VerbQuizMode>('stammformen');
+  // The chosen quiz mode survives reloads and later visits.
+  const [mode, setMode] = usePersistentState<VerbQuizMode>(
+    'verbs_mode',
+    'stammformen',
+    oneOf<VerbQuizMode>(['praesens', 'stammformen', 'multiple_choice'], 'stammformen')
+  );
   const { verbs, error, hasData, isLoading: isFetchingVerbs, refetch } = useVerbs();
   const loadError = !hasData && error !== undefined ? getErrorMessage(error, 'Не удалось загрузить глаголы') : null;
   const isLoading = !loadError && isFetchingVerbs;

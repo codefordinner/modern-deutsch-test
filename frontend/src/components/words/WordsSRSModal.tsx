@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Modal } from '../Modal';
 import { SRSBoxStats } from '../srs/SRSBoxStats';
-import { SRSDueControls, SRSResetButton, SRSToggle } from '../srs/SRSControls';
+import { SRSDueControls, SRSPoolProgress, SRSResetButton, SRSToggle } from '../srs/SRSControls';
 import { srsKeys } from '../../utils/srs';
 import type { Word, SRSRecord, WordDirection, WordFormType } from '../../types';
 
@@ -9,6 +9,10 @@ interface WordsSRSModalProps {
   words: Word[];
   srsState: Record<string, SRSRecord>;
   useSRS: boolean;
+  /** Keys of the cards of the currently selected categories (see buildWordCards). */
+  poolKeys: readonly string[];
+  /** Human-readable description of the selection. */
+  scope: string;
   onClose: () => void;
   onResetSRS: () => void;
   onToggleUseSRS: (val: boolean) => void;
@@ -20,6 +24,8 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   words,
   srsState,
   useSRS,
+  poolKeys,
+  scope,
   onClose,
   onResetSRS,
   onToggleUseSRS,
@@ -52,6 +58,8 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
           onLabel="Включено: сложные слова повторяются чаще"
           offLabel="Отключено: чистый случайный выбор (рандом без ящиков)"
         />
+
+        <SRSPoolProgress keys={poolKeys} srsState={srsState} scope={scope} />
 
         <SRSDueControls keys={keys} srsState={srsState} useSRS={useSRS} />
 

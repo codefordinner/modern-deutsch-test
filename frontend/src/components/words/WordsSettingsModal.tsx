@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 import { Modal } from '../Modal';
+import { useUISettings } from '../../hooks/useUISettings';
 import type { Category } from '../../types';
 
 interface WordsSettingsModalProps {
@@ -36,6 +37,7 @@ export const WordsSettingsModal: React.FC<WordsSettingsModalProps> = ({
   onEnableFeminineChange,
   onUseSRSChange,
 }) => {
+  const [uiSettings, updateUiSettings] = useUISettings();
   const isAllSelected = selectedCategories.includes('all');
 
   const toggleCategory = (id: string) => {
@@ -116,6 +118,16 @@ export const WordsSettingsModal: React.FC<WordsSettingsModalProps> = ({
         <label className="setting-toggle setting-toggle--center">
           <input type="checkbox" checked={requireArticle} onChange={(e) => onRequireArticleChange(e.target.checked)} />
           <span>Строго требовать артикль (der / die / das)</span>
+        </label>
+
+        {/* Category hint under the question */}
+        <label className="setting-toggle setting-toggle--center">
+          <input
+            type="checkbox"
+            checked={uiSettings.showCategoryHint}
+            onChange={(e) => updateUiSettings({ showCategoryHint: e.target.checked })}
+          />
+          <span>Показывать категорию слова под вопросом (подсказка)</span>
         </label>
 
         {/* SRS Mode Toggle */}

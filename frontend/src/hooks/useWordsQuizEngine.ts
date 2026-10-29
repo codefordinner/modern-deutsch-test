@@ -1,31 +1,60 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { getErrorMessage } from '../api/client';
 import { useCategories, useWords } from './useDictionary';
 import { useSRSProgress } from './useSRSProgress';
+import { asBool, oneOf, usePersistentState } from './usePersistentState';
 import { srsKeys } from '../utils/srs';
 import { pickClosestAnswer } from '../utils/answerDiff';
 import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
+import { buildWordCards } from '../utils/wordCards';
+import type { DirectionMode } from '../utils/wordCards';
 import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
 
-export type DirectionMode = WordDirection | 'mixed';
+export type { DirectionMode } from '../utils/wordCards';
 
 const ARTICLE_PREFIX = /^(der|die|das)\s+/i;
 
 /** "a, b / c" → ["a", "b", "c"]: any of the listed translations is accepted. */
 const splitTranslations = (ru: string): string[] => ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
 
-interface Card {
-  word: Word;
-  direction: WordDirection;
-  formType: WordFormType;
+/** Quiz settings kept in localStorage (`words_settings`). */
+interface WordsSettings {
+  directionMode: DirectionMode;
+  selectedCats: string[];
+  requireArticle: boolean;
+  enableBase: boolean;
+  enablePlural: boolean;
+  enableFeminine: boolean;
+}
+
+const DEFAULT_SETTINGS: WordsSettings = {
+  directionMode: 'ru_to_de',
+  selectedCats: ['all'],
+  requireArticle: true,
+  enableBase: true,
+  enablePlural: true,
+  enableFeminine: true,
+};
+
+function sanitizeSettings(raw: unknown): WordsSettings {
+  const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const cats = Array.isArray(r.selectedCats) ? r.selectedCats.filter((c): c is string => typeof c === 'string') : null;
+  return {
+    directionMode: oneOf<DirectionMode>(['ru_to_de', 'de_to_ru', 'mixed'], DEFAULT_SETTINGS.directionMode)(r.directionMode),
+    selectedCats: cats ?? DEFAULT_SETTINGS.selectedCats,
+    requireArticle: asBool(r.requireArticle, DEFAULT_SETTINGS.requireArticle),
+    enableBase: asBool(r.enableBase, DEFAULT_SETTINGS.enableBase),
+    enablePlural: asBool(r.enablePlural, DEFAULT_SETTINGS.enablePlural),
+    enableFeminine: asBool(r.enableFeminine, DEFAULT_SETTINGS.enableFeminine),
+  };
 }
 
 /**
  * State and rules of the words trainer: loading the dictionary, the
- * quiz settings, building the pool of (word, direction, form) cards, picking
- * the next one (SRS-weighted) and checking an answer. `WordsTrainer` is left
- * with layout only.
+ * quiz settings (persisted), building the pool of (word, direction, form) cards,
+ * picking the next one (SRS-weighted) and checking an answer. `WordsTrainer` is
+ * left with layout only.
  */
 export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   // ---- data (shared with the other trainers and the admin panel, see api/queryCache.ts) ----
@@ -34,13 +63,27 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const { words } = wordsQuery;
   const { categories } = categoriesQuery;
 
-  // ---- settings ----
-  const [directionMode, setDirectionMode] = useState<DirectionMode>('ru_to_de');
-  const [selectedCats, setSelectedCats] = useState<string[]>(['all']);
-  const [requireArticle, setRequireArticle] = useState(true);
-  const [enableBase, setEnableBase] = useState(true);
-  const [enablePlural, setEnablePlural] = useState(true);
-  const [enableFeminine, setEnableFeminine] = useState(true);
+  // ---- settings (survive reloads and later visits) ----
+  const [settings, setSettings] = usePersistentState<WordsSettings>('words_settings', DEFAULT_SETTINGS, sanitizeSettings);
+  const { directionMode, requireArticle, enableBase, enablePlural, enableFeminine } = settings;
+
+  const patch = useCallback((p: Partial<WordsSettings>) => setSettings((prev) => ({ ...prev, ...p })), [setSettings]);
+  const setDirectionMode = useCallback((v: DirectionMode) => patch({ directionMode: v }), [patch]);
+  const setSelectedCats = useCallback((v: string[]) => patch({ selectedCats: v }), [patch]);
+  const setRequireArticle = useCallback((v: boolean) => patch({ requireArticle: v }), [patch]);
+  const setEnableBase = useCallback((v: boolean) => patch({ enableBase: v }), [patch]);
+  const setEnablePlural = useCallback((v: boolean) => patch({ enablePlural: v }), [patch]);
+  const setEnableFeminine = useCallback((v: boolean) => patch({ enableFeminine: v }), [patch]);
+
+  // A saved selection may name categories that were deleted (or come from another server's backup):
+  // ignore the vanished ones, and if nothing is left fall back to "all". An explicitly cleared list stays empty.
+  const selectedCats = useMemo(() => {
+    const saved = settings.selectedCats;
+    if (saved.length === 0 || saved.includes('all') || categories.length === 0) return saved;
+    const valid = saved.filter((id) => categories.some((c) => c.id === id));
+    return valid.length > 0 ? valid : ['all'];
+  }, [settings.selectedCats, categories]);
+
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('words');
 
   // ---- current card ----
@@ -59,35 +102,15 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     void categoriesQuery.refetch();
   }, [wordsQuery.refetch, categoriesQuery.refetch]);
 
+  // Every card the trainer can ask with the current filters (also what the SRS screen counts).
+  const cards = useMemo(
+    () => buildWordCards(words, { directionMode, selectedCats, enableBase, enablePlural, enableFeminine }),
+    [words, directionMode, selectedCats, enableBase, enablePlural, enableFeminine]
+  );
+  const poolKeys = useMemo(() => cards.map((c) => c.key), [cards]);
+
   const nextWord = useCallback(() => {
-    if (selectedCats.length === 0) {
-      setCurrentWord(null);
-      return;
-    }
-
-    const isAll = selectedCats.includes('all');
-    const activePool = words.filter((w) => isAll || selectedCats.includes(w.categoryId));
-    if (activePool.length === 0) { setCurrentWord(null); return; }
-
-    const directions: WordDirection[] = directionMode === 'mixed' ? ['ru_to_de', 'de_to_ru'] : [directionMode];
-
-    const cards: Card[] = [];
-    for (const w of activePool) {
-      const possibleForms: WordFormType[] = [];
-      if (enableBase) possibleForms.push('base');
-      if (enablePlural && w.plural) possibleForms.push('plural');
-      if (enableFeminine && w.feminine) possibleForms.push('feminine');
-      const forms = possibleForms.length > 0 ? possibleForms : (['base'] as WordFormType[]);
-      for (const direction of directions) {
-        for (const formType of forms) {
-          cards.push({ word: w, direction, formType });
-        }
-      }
-    }
-
-    if (cards.length === 0) { setCurrentWord(null); return; }
-
-    const chosenCard = pickCard(cards, (c) => srsKeys.word(c.word.id, c.direction, c.formType));
+    const chosenCard = pickCard(cards, (c) => c.key);
     if (!chosenCard) { setCurrentWord(null); return; }
 
     setCurrentWord(chosenCard.word);
@@ -95,7 +118,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     setCurrentFormType(chosenCard.formType);
     setUserInput('');
     setFeedback(null);
-  }, [words, selectedCats, pickCard, directionMode, enableBase, enablePlural, enableFeminine]);
+  }, [cards, pickCard]);
 
   // `nextWord` changes exactly when the dictionary, the filters or the SRS
   // switch change, so this re-deals a card whenever any of them does.
@@ -168,7 +191,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     enablePlural, setEnablePlural,
     enableFeminine, setEnableFeminine,
     // SRS
-    useSRS, setUseSRS, srsMap, resetSRS,
+    useSRS, setUseSRS, srsMap, resetSRS, poolKeys,
     // current card
     currentWord, activeDirection, currentFormType, currentSrsItem,
     userInput, setUserInput, feedback,

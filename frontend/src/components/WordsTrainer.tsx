@@ -13,7 +13,7 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
     directionMode, setDirectionMode, selectedCats, setSelectedCats,
     requireArticle, setRequireArticle, enableBase, setEnableBase,
     enablePlural, setEnablePlural, enableFeminine, setEnableFeminine,
-    useSRS, setUseSRS, srsMap, resetSRS,
+    useSRS, setUseSRS, srsMap, resetSRS, poolKeys,
     currentWord, activeDirection, currentFormType, currentSrsItem,
     userInput, setUserInput, feedback, nextWord, handleSubmit,
   } = useWordsQuizEngine(onAnswer);
@@ -21,6 +21,8 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const scope = selectedCats.includes('all') ? 'все категории' : `выбрано категорий: ${selectedCats.length}`;
 
   return (
     <div>
@@ -87,6 +89,8 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
           words={words}
           srsState={srsMap}
           useSRS={useSRS}
+          poolKeys={poolKeys}
+          scope={scope}
           onClose={() => setIsSrsOpen(false)}
           onResetSRS={resetSRS}
           onToggleUseSRS={setUseSRS}

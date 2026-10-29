@@ -27,6 +27,11 @@ export interface UISettings {
    * users can turn it off so focus doesn't jump away from what is being read.
    */
   autoFocus: boolean;
+  /**
+   * Show the word's category ("☕ Повседневные слова") under the question in the
+   * words and articles trainers. On by default; the category can give the answer away.
+   */
+  showCategoryHint: boolean;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -37,6 +42,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   collapseKeyboardAfterAnswer: false,
   acceptUmlautSubstitutes: false,
   autoFocus: true,
+  showCategoryHint: true,
 };
 
 export function getUISettings(): UISettings {
