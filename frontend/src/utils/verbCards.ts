@@ -50,6 +50,8 @@ export function buildVerbCards(verbs: Word[]): VerbCard[] {
     cards.push({ kind: 'praesens', verb, pronoun, form, key: srsKeys.verb.praesens(verb.id, pronoun) });
   }
   for (const { verb, pronoun, form } of praesens) {
+    // "gehen → gehen" (wir / sie/Sie) is just copying the prompt, not a question.
+    if (form.trim().toLowerCase() === verb.de.trim().toLowerCase()) continue;
     cards.push({
       kind: 'infinitive_from_praesens',
       verb,

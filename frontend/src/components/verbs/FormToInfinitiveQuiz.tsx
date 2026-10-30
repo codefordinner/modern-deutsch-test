@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
+import { LeitnerBadge } from '../srs/LeitnerBadge';
 import { UmlautBar } from '../UmlautBar';
 import { FeedbackSlot } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
@@ -9,6 +10,9 @@ import type { SRSRecord, Feedback } from '../../types';
 interface FormToInfinitiveQuizProps {
   srsItem?: SRSRecord;
   formText: string;
+  /** Präsens cards: the pronoun shown with the form ("ihr geht"), so er/sie/es and ihr are not the same question. */
+  pronoun?: string;
+  useSRS?: boolean;
   userInput: string;
   feedback: Feedback | null;
   onInputChange: (val: string) => void;
@@ -20,6 +24,8 @@ interface FormToInfinitiveQuizProps {
 export const FormToInfinitiveQuiz: React.FC<FormToInfinitiveQuizProps> = ({
   srsItem,
   formText,
+  pronoun,
+  useSRS = true,
   userInput,
   feedback,
   onInputChange,
@@ -34,11 +40,11 @@ export const FormToInfinitiveQuiz: React.FC<FormToInfinitiveQuizProps> = ({
     <div className="question-card">
       <div className="question-header">
         <div className="question-prompt-label">Форма → Инфинитив</div>
-        <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
+        <LeitnerBadge box={currentBox} useSRS={useSRS} />
       </div>
 
       <div className="question-title-row">
-        <h2 className="question-text">{formText}</h2>
+        <h2 className="question-text">{pronoun ? `${pronoun} ${formText}` : formText}</h2>
         <button type="button" className="icon-btn" onClick={() => speakGerman(formText)} title="Озвучить" aria-label="Озвучить">
           <Volume2 size={18} />
         </button>

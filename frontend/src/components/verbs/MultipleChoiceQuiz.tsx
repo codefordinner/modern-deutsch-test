@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
+import { LeitnerBadge } from '../srs/LeitnerBadge';
 import { FeedbackBox } from '../FeedbackBox';
 import { useUISettings } from '../../hooks/useUISettings';
 import { speakGerman } from '../../utils/audio';
@@ -8,6 +9,7 @@ import type { Feedback, Word, SRSRecord } from '../../types';
 interface MultipleChoiceQuizProps {
   verb: Word;
   srsItem?: SRSRecord;
+  useSRS?: boolean;
   options: string[];
   feedback: Feedback | null;
   onSelectOption: (opt: string) => void;
@@ -17,6 +19,7 @@ interface MultipleChoiceQuizProps {
 export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
   verb,
   srsItem,
+  useSRS = true,
   options,
   feedback,
   onSelectOption,
@@ -29,7 +32,7 @@ export const MultipleChoiceQuiz: React.FC<MultipleChoiceQuizProps> = ({
     <div className="question-card">
       <div className="question-header">
         <div className="question-prompt-label">Partizip II тест</div>
-        <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
+        <LeitnerBadge box={currentBox} useSRS={useSRS} />
       </div>
 
       <div className="question-title-row">

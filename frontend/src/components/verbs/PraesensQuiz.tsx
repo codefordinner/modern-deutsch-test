@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
+import { LeitnerBadge } from '../srs/LeitnerBadge';
 import { UmlautBar } from '../UmlautBar';
 import { FeedbackSlot } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
@@ -9,6 +10,7 @@ import type { Word, SRSRecord, Feedback } from '../../types';
 interface PraesensQuizProps {
   verb: Word;
   srsItem?: SRSRecord;
+  useSRS?: boolean;
   pronoun: string;
   expected: string;
   userInput: string;
@@ -22,6 +24,7 @@ interface PraesensQuizProps {
 export const PraesensQuiz: React.FC<PraesensQuizProps> = ({
   verb,
   srsItem,
+  useSRS = true,
   pronoun,
   userInput,
   feedback,
@@ -37,7 +40,7 @@ export const PraesensQuiz: React.FC<PraesensQuizProps> = ({
     <div className="question-card">
       <div className="question-header">
         <div className="question-prompt-label">Спряжение (Präsens)</div>
-        <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
+        <LeitnerBadge box={currentBox} useSRS={useSRS} />
       </div>
 
       <div className="question-title-row">

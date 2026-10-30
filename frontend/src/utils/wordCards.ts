@@ -38,7 +38,7 @@ export function buildWordCards(words: Word[], f: WordCardFilters): WordCard[] {
     if (f.enableBase) forms.push('base');
     if (f.enablePlural && word.plural) forms.push('plural');
     if (f.enableFeminine && word.feminine) forms.push('feminine');
-    if (forms.length === 0) forms.push('base');
+    // No fallback to 'base': a form the learner switched off is never asked, so the pool may be empty.
 
     for (const direction of directions) {
       for (const formType of forms) {

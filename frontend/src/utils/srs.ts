@@ -32,6 +32,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const boxOf = (record: SRSRecord | undefined): number =>
   Math.min(SRS_BOX_COUNT, Math.max(1, Math.round(record?.box || 1)));
 
+/**
+ * Makes whatever was read from storage safe to use as an SRSMap: anything that
+ * is not a plain object yields `{}`, and entries that are not records are dropped.
+ */
+export function sanitizeSRSMap(raw: unknown): SRSMap {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  const result: SRSMap = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) result[key] = value as SRSRecord;
+  }
+  return result;
+}
+
 /** Local calendar day as `YYYY-MM-DD` — "a day" for the one-promotion-per-day rule. */
 export function localDayKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -4,7 +4,7 @@ import { getErrorMessage } from '../api/client';
 import { useVerbs } from './useDictionary';
 import { oneOf, usePersistentState } from './usePersistentState';
 import { useSRSProgress } from './useSRSProgress';
-import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
+import { answersMatch, cleanText, currentMatchOptions } from '../utils/answerMatch';
 import { buildVerbCards, isCardInSelection, selectVerbCards } from '../utils/verbCards';
 import type { PraesensSubMode, VerbCard, VerbQuizMode } from '../utils/verbCards';
 import { buildPartizip2Options } from '../utils/verbQuiz';
@@ -110,6 +110,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
     if (!card || card.kind !== 'praesens') return;
+    if (!cleanText(userInput)) return; // an empty field is not an answer
     const expected = card.form ?? '';
     const ok = answersMatch(userInput, expected, currentMatchOptions());
     setFeedback({
@@ -124,6 +125,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
     if (!card || !isReverse) return;
+    if (!cleanText(userInput)) return; // an empty field is not an answer
     const infinitive = card.verb.de.trim();
     const ok = answersMatch(userInput, infinitive, currentMatchOptions());
     // Präsens-sourced forms are shown with their pronoun (ich/du/...);
@@ -141,6 +143,8 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     e.preventDefault();
     if (feedback) { nextQuestion(); return; }
     if (!card || card.kind !== 'stammformen') return;
+    // Hilfsverb always has a value ("haben" by default), so only the two text fields can be "empty".
+    if (!cleanText(praeteritumInput) && !cleanText(partizip2Input)) return;
     const verb = card.verb;
     const options = currentMatchOptions();
     const expectedHilfsverb = verb.hilfsverb || 'haben';

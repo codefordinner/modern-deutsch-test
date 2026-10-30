@@ -105,23 +105,23 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
         </div>
       ) : currentVerb && mode === 'stammformen' ? (
         <StammformenQuiz
-          verb={currentVerb} srsItem={currentSrsItem} praeteritumInput={praeteritumInput} partizip2Input={partizip2Input} hilfsverbInput={hilfsverbInput} feedback={feedback}
+          verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} praeteritumInput={praeteritumInput} partizip2Input={partizip2Input} hilfsverbInput={hilfsverbInput} feedback={feedback}
           onPraeteritumChange={setPraeteritumInput} onPartizip2Change={setPartizip2Input} onHilfsverbChange={setHilfsverbInput}
           onSubmit={handleStammSubmit} onNext={nextQuestion} onInsertChar={(c) => setPraeteritumInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'praesens' && currentPraesensType === 'praesens' ? (
         <PraesensQuiz
-          verb={currentVerb} srsItem={currentSrsItem} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
+          verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} pronoun={currentPronoun} expected={expectedPraesens} userInput={userInput} feedback={feedback}
           onInputChange={setUserInput} onSubmit={handlePraesensSubmit} onNext={nextQuestion} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'praesens' && currentPraesensType === 'form_to_infinitive' ? (
         <FormToInfinitiveQuiz
-          srsItem={currentSrsItem} formText={currentFormText} userInput={userInput} feedback={feedback}
+          srsItem={currentSrsItem} useSRS={useSRS} pronoun={currentPronoun} formText={currentFormText} userInput={userInput} feedback={feedback}
           onInputChange={setUserInput} onSubmit={handleFormToInfinitiveSubmit} onNext={nextQuestion} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : currentVerb && mode === 'multiple_choice' ? (
         <MultipleChoiceQuiz
-          verb={currentVerb} srsItem={currentSrsItem} options={mcOptions} feedback={feedback}
+          verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} options={mcOptions} feedback={feedback}
           onSelectOption={handleSelectOption}
           onNext={nextQuestion}
         />

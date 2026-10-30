@@ -9,7 +9,7 @@ import { useWordsQuizEngine } from '../hooks/useWordsQuizEngine';
 
 export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
   const {
-    words, categories, isLoading, loadError, reload,
+    words, categories, isLoading, loadError, reload, isPoolEmpty,
     directionMode, setDirectionMode, selectedCats, setSelectedCats,
     requireArticle, setRequireArticle, enableBase, setEnableBase,
     enablePlural, setEnablePlural, enableFeminine, setEnableFeminine,
@@ -70,6 +70,19 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
             <button className="btn-secondary" onClick={() => setIsSettingsOpen(true)}>
               Открыть настройки
             </button>
+          </div>
+        </div>
+      ) : isPoolEmpty ? (
+        <div className="card state-card">
+          <div className="state-icon">🧩</div>
+          <h3 className="state-title">Нет карточек для этих настроек</h3>
+          <p className="state-text state-text--narrow">
+            {!enableBase && !enablePlural && !enableFeminine
+              ? 'Все типы форм отключены. Включите хотя бы один в настройках.'
+              : 'В выбранных категориях нет слов с включёнными формами (например, отключена базовая форма, а у слов нет plural или feminin). Включите другие формы или категории в настройках.'}
+          </p>
+          <div className="state-actions">
+            <button className="btn-primary" onClick={() => setIsSettingsOpen(true)}>Открыть настройки</button>
           </div>
         </div>
       ) : currentWord ? (

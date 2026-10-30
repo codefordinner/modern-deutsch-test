@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2 } from 'lucide-react';
+import { LeitnerBadge } from '../srs/LeitnerBadge';
 import { UmlautBar } from '../UmlautBar';
 import { FeedbackSlot } from '../FeedbackBox';
 import { speakGerman } from '../../utils/audio';
@@ -9,6 +10,7 @@ import type { Word, SRSRecord, Feedback } from '../../types';
 interface StammformenQuizProps {
   verb: Word;
   srsItem?: SRSRecord;
+  useSRS?: boolean;
   praeteritumInput: string;
   partizip2Input: string;
   hilfsverbInput: string;
@@ -24,6 +26,7 @@ interface StammformenQuizProps {
 export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
   verb,
   srsItem,
+  useSRS = true,
   praeteritumInput,
   partizip2Input,
   hilfsverbInput,
@@ -51,7 +54,7 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
     <div className="question-card">
       <div className="question-header">
         <div className="question-prompt-label">3 Основные формы глагола</div>
-        <span className={`leitner-badge box-${currentBox}`}>Ящик {currentBox}</span>
+        <LeitnerBadge box={currentBox} useSRS={useSRS} />
       </div>
 
       <div className="question-title-row">

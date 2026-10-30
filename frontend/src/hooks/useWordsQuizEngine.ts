@@ -6,7 +6,7 @@ import { useSRSProgress } from './useSRSProgress';
 import { asBool, oneOf, usePersistentState } from './usePersistentState';
 import { srsKeys } from '../utils/srs';
 import { pickClosestAnswer } from '../utils/answerDiff';
-import { answersMatch, currentMatchOptions } from '../utils/answerMatch';
+import { answersMatch, cleanText, currentMatchOptions } from '../utils/answerMatch';
 import { buildWordCards } from '../utils/wordCards';
 import type { DirectionMode } from '../utils/wordCards';
 import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
@@ -108,6 +108,8 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     [words, directionMode, selectedCats, enableBase, enablePlural, enableFeminine]
   );
   const poolKeys = useMemo(() => cards.map((c) => c.key), [cards]);
+  // Words exist and a category is chosen, yet the form filters leave nothing to ask.
+  const isPoolEmpty = !isLoading && !loadError && words.length > 0 && selectedCats.length > 0 && cards.length === 0;
 
   const nextWord = useCallback(() => {
     const chosenCard = pickCard(cards, (c) => c.key);
@@ -130,6 +132,8 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     e.preventDefault();
     if (feedback) { nextWord(); return; }
     if (!currentWord) return;
+    // An accidental Enter in an empty field is not an answer: it must not reset the card or the streak.
+    if (!cleanText(userInput)) return;
 
     let expectedTarget = currentWord.de;
     if (currentFormType === 'plural' && currentWord.plural) expectedTarget = currentWord.plural;
@@ -182,7 +186,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
 
   return {
     // data
-    words, categories, isLoading, loadError, reload,
+    words, categories, isLoading, loadError, reload, isPoolEmpty,
     // settings
     directionMode, setDirectionMode,
     selectedCats, setSelectedCats,

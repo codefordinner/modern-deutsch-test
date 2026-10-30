@@ -85,11 +85,16 @@ export function parseBackup(text: string): ProgressBackup {
     if (value === undefined) continue;
     if (typeof value !== 'string') throw new Error(`Некорректное значение «${key}»`);
     if (key !== 'theme') {
+      let inner: unknown;
       try {
-        JSON.parse(value);
+        inner = JSON.parse(value);
       } catch {
         throw new Error(`Повреждены данные «${key}»`);
       }
+      // Valid JSON of the wrong shape would later break the trainers, so check the shape too.
+      const isPlainObject = typeof inner === 'object' && inner !== null && !Array.isArray(inner);
+      if (key.endsWith('_srs_state') && !isPlainObject) throw new Error(`Повреждены данные «${key}»`);
+      if (key.endsWith('_use_srs') && typeof inner !== 'boolean') throw new Error(`Повреждены данные «${key}»`);
     }
     data[key] = value;
   }

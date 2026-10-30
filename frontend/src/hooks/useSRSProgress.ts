@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { pickCardBySRS, updateSRS } from '../utils/srs';
+import { pickCardBySRS, sanitizeSRSMap, updateSRS } from '../utils/srs';
 import type { SRSMap } from '../utils/srs';
 import { isDue } from '../utils/srsDue';
 import { useStudyPrefs } from '../utils/studyPrefs';
@@ -43,8 +43,11 @@ export function useSRSProgress(storagePrefix: string) {
   const useSrsKey = `${storagePrefix}_use_srs`;
   const stateKey = `${storagePrefix}_srs_state`;
 
-  const [useSRS, setUseSRSState] = useState<boolean>(() => readJSON(useSrsKey, true));
-  const [srsMap, setSrsMap] = useState<SRSMap>(() => readJSON<SRSMap>(stateKey, {}));
+  const [useSRS, setUseSRSState] = useState<boolean>(() => {
+    const saved = readJSON<unknown>(useSrsKey, true);
+    return typeof saved === 'boolean' ? saved : true;
+  });
+  const [srsMap, setSrsMap] = useState<SRSMap>(() => sanitizeSRSMap(readJSON<unknown>(stateKey, {})));
   const [{ dueOnly }] = useStudyPrefs();
 
   const srsMapRef = useRef(srsMap);
