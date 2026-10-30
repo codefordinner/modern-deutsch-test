@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Sliders } from 'lucide-react';
 import { NumbersQuizCard } from './numbers/NumbersQuizCard';
 import { NumbersRangeModal } from './numbers/NumbersRangeModal';
+import { ModeSwitch } from './ModeSwitch';
+import { ToolbarButton } from './ToolbarButton';
 import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import { germanNumberVariants } from '../utils/numbers-generator';
 import { pickClosestAnswer } from '../utils/answerDiff';
@@ -85,14 +87,22 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
   return (
     <div>
       <div className="trainer-toolbar">
-        <div className="trainer-modes trainer-modes--flush">
-          <button type="button" className={`mode-pill ${directionMode === 'num_to_de' ? 'active' : ''}`} aria-pressed={directionMode === 'num_to_de'} onClick={() => setDirectionMode('num_to_de')}>Цифры → Немецкий</button>
-          <button type="button" className={`mode-pill ${directionMode === 'de_to_num' ? 'active' : ''}`} aria-pressed={directionMode === 'de_to_num'} onClick={() => setDirectionMode('de_to_num')}>Немецкий → Цифры</button>
-          <button type="button" className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} aria-pressed={directionMode === 'mixed'} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
-        </div>
-        <button className="btn-secondary" onClick={() => setIsModalOpen(true)}>
-          <Sliders size={15} /> Диапазон: {settings.min} – {settings.max}
-        </button>
+        <ModeSwitch<DirectionMode>
+          ariaLabel="Направление"
+          value={directionMode}
+          onChange={setDirectionMode}
+          options={[
+            { value: 'num_to_de', label: 'Цифры → Немецкий', short: 'Цифры → Нем.' },
+            { value: 'de_to_num', label: 'Немецкий → Цифры', short: 'Нем. → Цифры' },
+            { value: 'mixed', label: 'Случайно (Оба)', short: 'Случайно' },
+          ]}
+        />
+        <ToolbarButton
+          icon={<Sliders size={15} />}
+          label={`Диапазон: ${settings.min} – ${settings.max}`}
+          compactLabel={`${settings.min}–${settings.max}`}
+          onClick={() => setIsModalOpen(true)}
+        />
       </div>
 
       <NumbersQuizCard

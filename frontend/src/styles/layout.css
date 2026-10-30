@@ -1,0 +1,247 @@
+/* ==========================================================================
+   Layout / navigation.
+
+   - Header: no scrollbar any more. Tabs shrink step by step (full labels →
+     icons with a label only on the active tab → bottom bar on phones).
+   - Phones: tabs move to a bottom bar, every "pick a mode" row becomes ONE
+     dropdown (<ModeSwitch>), toolbar buttons become icon-only (<ToolbarButton>).
+   - Colours and shapes are untouched: everything uses the variables from index.css.
+
+   Imported before mobile.css (which stays last). Selectors that must beat
+   older rules in index.css / components.css are prefixed with `body` or
+   `.app-container` for specificity instead of relying on file order.
+   ========================================================================== */
+
+/* ---- Header (all sizes) ---------------------------------------------------- */
+
+.app-header .brand-sub {
+  display: none; /* decorative, and the widest part of the brand block */
+}
+
+.app-header .header-inner {
+  gap: 12px;
+}
+
+.app-header .nav-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  gap: 4px;
+  overflow: visible; /* was `auto` → showed a scrollbar on desktop */
+  padding-bottom: 0;
+}
+
+.app-header .nav-tab-btn {
+  padding: 8px 11px;
+}
+
+/* ---- Bottom bar: hidden on wide screens ------------------------------------ */
+
+.bottom-nav {
+  display: none;
+}
+
+/* ---- Mode switch / toolbar buttons (wide screens) ---------------------------- */
+
+.mode-switch {
+  min-width: 0;
+}
+
+.mode-switch .mode-switch-select {
+  display: none;
+}
+
+.toolbar-btn .btn-label-compact {
+  display: none;
+}
+
+.toolbar-filters .mode-switch + .mode-switch {
+  margin-left: 4px;
+}
+
+/* ---- Tablet / narrow desktop: only the active tab keeps its label ------------- */
+
+@media (max-width: 1100px) {
+  .app-header .nav-tab-btn:not(.active) span {
+    display: none;
+  }
+  .app-header .nav-tab-btn:not(.active) {
+    padding: 8px 10px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 820px) {
+  /* Only the flag stays visible; the title is still there for screen readers. */
+  .app-header .brand-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---- Phones ---------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  /* Header: one slim row — brand on the left, actions on the right. */
+  body .app-header .header-inner {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  body .app-header .nav-tabs {
+    display: none;
+  }
+  body .app-header .header-actions {
+    align-self: auto;
+    margin-left: auto;
+    gap: 6px;
+  }
+  body .app-header .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Bottom tab bar */
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    padding: 6px max(4px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px))
+      max(4px, env(safe-area-inset-left, 0px));
+    gap: 2px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 2px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .bottom-nav-item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--accent-primary);
+    background: var(--accent-light);
+  }
+
+  /* Keep content, footer and floating messages clear of the bar. */
+  body .app-container {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  body .app-footer {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  body .toast-host,
+  body .update-banner {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* One row per toolbar: [dropdown ............] [icon] [icon] */
+  body .app-container .trainer-toolbar,
+  body .app-container .admin-toolbar {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  body .app-container .mode-switch {
+    flex: 1 1 0;
+  }
+  body .app-container .mode-switch-pills {
+    display: none;
+  }
+  body .app-container .mode-switch .mode-switch-select {
+    display: block;
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    text-overflow: ellipsis;
+  }
+
+  body .app-container .toolbar-filters {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  body .app-container .toolbar-filters .mode-switch + .mode-switch {
+    margin-left: 0;
+  }
+  body .app-container .toolbar-filters .select-compact {
+    height: 44px;
+  }
+
+  body .app-container .trainer-toolbar > .toolbar-actions,
+  body .app-container .trainer-toolbar > :last-child {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+  body .app-container .trainer-toolbar > .toolbar-actions {
+    width: auto;
+  }
+
+  /* Toolbar buttons: icon only, 44px tap target */
+  body .app-container .toolbar-btn {
+    display: inline-flex;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  body .app-container .toolbar-btn .btn-label {
+    display: none;
+  }
+  body .app-container .toolbar-btn--text {
+    width: auto;
+    padding: 0 12px;
+  }
+  body .app-container .toolbar-btn--text .btn-label-compact {
+    display: inline;
+  }
+
+  /* "Направление:" sub-row of the verbs trainer */
+  body .app-container .submode-row {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  body .app-container .submode-label {
+    white-space: nowrap;
+  }
+}
+
+/* Very narrow phones: the daily goal chip is also shown in the "Статистика" window. */
+@media (max-width: 400px) {
+  .app-header .daily-chip {
+    display: none;
+  }
+}

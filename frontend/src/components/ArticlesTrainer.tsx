@@ -3,6 +3,7 @@ import { Layers, RefreshCw, Volume2 } from 'lucide-react';
 import { ArticlesSRSModal } from './articles/ArticlesSRSModal';
 import { FeedbackBox } from './FeedbackBox';
 import { SRSIdleCard } from './srs/SRSIdleCard';
+import { ToolbarButton } from './ToolbarButton';
 import { getErrorMessage } from '../api/client';
 import { useCategories, useWords } from '../hooks/useDictionary';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -197,7 +198,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
           </select>
         </div>
         <div className="toolbar-actions">
-          <button className="btn-secondary" onClick={() => setIsSrsOpen(true)}><Layers size={15} /> SRS</button>
+          <ToolbarButton icon={<Layers size={15} />} label="SRS" onClick={() => setIsSrsOpen(true)} />
         </div>
       </div>
 

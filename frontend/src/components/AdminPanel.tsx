@@ -9,6 +9,8 @@ import { DuplicatesTab } from './admin/DuplicatesTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
+import { ModeSwitch } from './ModeSwitch';
+import { ToolbarButton } from './ToolbarButton';
 import {
   UNAUTHORIZED_EVENT, bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, checkSession, createCategory,
   createWord, deleteCategory, deleteWord, logout, updateCategory, updateWord,
@@ -170,14 +172,19 @@ export const AdminPanel: React.FC = () => {
   return (
     <div>
       <div className="admin-toolbar">
-        <div className="trainer-modes trainer-modes--flush">
-          <button type="button" className={`mode-pill ${tab === 'words' ? 'active' : ''}`} aria-pressed={tab === 'words'} onClick={() => setTab('words')}><BookOpen size={14} /> Слова</button>
-          <button type="button" className={`mode-pill ${tab === 'categories' ? 'active' : ''}`} aria-pressed={tab === 'categories'} onClick={() => setTab('categories')}><Tag size={14} /> Категории</button>
-          <button type="button" className={`mode-pill ${tab === 'import' ? 'active' : ''}`} aria-pressed={tab === 'import'} onClick={() => setTab('import')}><ArrowLeftRight size={14} /> Импорт / Экспорт</button>
-          <button type="button" className={`mode-pill ${tab === 'duplicates' ? 'active' : ''}`} aria-pressed={tab === 'duplicates'} onClick={() => setTab('duplicates')}><Copy size={14} /> Дубликаты</button>
-          <button type="button" className={`mode-pill ${tab === 'analytics' ? 'active' : ''}`} aria-pressed={tab === 'analytics'} onClick={() => setTab('analytics')}><BarChart3 size={14} /> Аналитика</button>
-        </div>
-        <button className="btn-secondary" onClick={handleLogout}><LogOut size={14} /> Выйти</button>
+        <ModeSwitch<AdminTab>
+          ariaLabel="Раздел админки"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'words', label: 'Слова', icon: <BookOpen size={14} /> },
+            { value: 'categories', label: 'Категории', icon: <Tag size={14} /> },
+            { value: 'import', label: 'Импорт / Экспорт', icon: <ArrowLeftRight size={14} /> },
+            { value: 'duplicates', label: 'Дубликаты', icon: <Copy size={14} /> },
+            { value: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
+          ]}
+        />
+        <ToolbarButton icon={<LogOut size={14} />} label="Выйти" onClick={handleLogout} />
       </div>
 
       {tab === 'words' && (

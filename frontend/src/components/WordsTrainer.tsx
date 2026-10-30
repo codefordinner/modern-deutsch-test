@@ -5,7 +5,10 @@ import { WordsDictionaryModal } from './words/WordsDictionaryModal';
 import { WordsSRSModal } from './words/WordsSRSModal';
 import { WordsSettingsModal } from './words/WordsSettingsModal';
 import { SRSIdleCard } from './srs/SRSIdleCard';
+import { ModeSwitch } from './ModeSwitch';
+import { ToolbarButton } from './ToolbarButton';
 import { useWordsQuizEngine } from '../hooks/useWordsQuizEngine';
+import type { DirectionMode } from '../hooks/useWordsQuizEngine';
 
 export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
   const {
@@ -27,15 +30,20 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
   return (
     <div>
       <div className="trainer-toolbar">
-        <div className="trainer-modes trainer-modes--flush">
-          <button type="button" className={`mode-pill ${directionMode === 'ru_to_de' ? 'active' : ''}`} aria-pressed={directionMode === 'ru_to_de'} onClick={() => setDirectionMode('ru_to_de')}>Русский → Немецкий</button>
-          <button type="button" className={`mode-pill ${directionMode === 'de_to_ru' ? 'active' : ''}`} aria-pressed={directionMode === 'de_to_ru'} onClick={() => setDirectionMode('de_to_ru')}>Немецкий → Русский</button>
-          <button type="button" className={`mode-pill ${directionMode === 'mixed' ? 'active' : ''}`} aria-pressed={directionMode === 'mixed'} onClick={() => setDirectionMode('mixed')}>Случайно (Оба)</button>
-        </div>
+        <ModeSwitch<DirectionMode>
+          ariaLabel="Направление"
+          value={directionMode}
+          onChange={setDirectionMode}
+          options={[
+            { value: 'ru_to_de', label: 'Русский → Немецкий', short: 'Рус → Нем' },
+            { value: 'de_to_ru', label: 'Немецкий → Русский', short: 'Нем → Рус' },
+            { value: 'mixed', label: 'Случайно (Оба)', short: 'Случайно' },
+          ]}
+        />
         <div className="toolbar-actions">
-          <button className="btn-secondary" onClick={() => setIsSrsOpen(true)}><Layers size={15} /> SRS</button>
-          <button className="btn-secondary" onClick={() => setIsDictOpen(true)}><BookOpen size={15} /> Словарь</button>
-          <button className="btn-secondary" onClick={() => setIsSettingsOpen(true)}><Sliders size={15} /> Настройки</button>
+          <ToolbarButton icon={<Layers size={15} />} label="SRS" onClick={() => setIsSrsOpen(true)} />
+          <ToolbarButton icon={<BookOpen size={15} />} label="Словарь" onClick={() => setIsDictOpen(true)} />
+          <ToolbarButton icon={<Sliders size={15} />} label="Настройки" onClick={() => setIsSettingsOpen(true)} />
         </div>
       </div>
 

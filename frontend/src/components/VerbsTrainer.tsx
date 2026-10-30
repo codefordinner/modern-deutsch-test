@@ -7,8 +7,10 @@ import { StammformenQuiz } from './verbs/StammformenQuiz';
 import { MultipleChoiceQuiz } from './verbs/MultipleChoiceQuiz';
 import { FormToInfinitiveQuiz } from './verbs/FormToInfinitiveQuiz';
 import { SRSIdleCard } from './srs/SRSIdleCard';
+import { ModeSwitch } from './ModeSwitch';
+import { ToolbarButton } from './ToolbarButton';
 import { useVerbsQuizEngine } from '../hooks/useVerbsQuizEngine';
-import type { VerbQuizMode } from '../hooks/useVerbsQuizEngine';
+import type { PraesensSubMode, VerbQuizMode } from '../hooks/useVerbsQuizEngine';
 
 export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ onAnswer }) => {
   const {
@@ -34,14 +36,19 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
   return (
     <div>
       <div className="trainer-toolbar">
-        <div className="trainer-modes trainer-modes--flush">
-          <button type="button" className={`mode-pill ${mode === 'stammformen' ? 'active' : ''}`} aria-pressed={mode === 'stammformen'} onClick={() => setMode('stammformen')}>3 Формы (Stammformen)</button>
-          <button type="button" className={`mode-pill ${mode === 'praesens' ? 'active' : ''}`} aria-pressed={mode === 'praesens'} onClick={() => setMode('praesens')}>Спряжение / Форма → Инфинитив</button>
-          <button type="button" className={`mode-pill ${mode === 'multiple_choice' ? 'active' : ''}`} aria-pressed={mode === 'multiple_choice'} onClick={() => setMode('multiple_choice')}>Тест (4 варианта)</button>
-        </div>
+        <ModeSwitch<VerbQuizMode>
+          ariaLabel="Режим тренировки"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'stammformen', label: '3 Формы (Stammformen)', short: '3 Формы' },
+            { value: 'praesens', label: 'Спряжение / Форма → Инфинитив', short: 'Спряжение / Форма → Инф.' },
+            { value: 'multiple_choice', label: 'Тест (4 варианта)', short: 'Тест (4 варианта)' },
+          ]}
+        />
         <div className="toolbar-actions">
-          <button className="btn-secondary" onClick={() => setIsSrsOpen(true)}><Layers size={15} /> SRS</button>
-          <button className="btn-secondary" onClick={() => setIsTableOpen(true)}><BookOpen size={15} /> Таблица глаголов</button>
+          <ToolbarButton icon={<Layers size={15} />} label="SRS" onClick={() => setIsSrsOpen(true)} />
+          <ToolbarButton icon={<BookOpen size={15} />} label="Таблица глаголов" onClick={() => setIsTableOpen(true)} />
         </div>
       </div>
 
@@ -49,26 +56,16 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
         <div className="submode-bar">
           <div className="submode-row">
             <span className="submode-label">Направление:</span>
-            <div className="trainer-modes trainer-modes--flush">
-              <button type="button"
-                className={`mode-pill ${praesensSubMode === 'both' ? 'active' : ''}`} aria-pressed={praesensSubMode === 'both'}
-                onClick={() => handleSetPraesensSubMode('both')}
-              >
-                Вперемешку
-              </button>
-              <button type="button"
-                className={`mode-pill ${praesensSubMode === 'praesens' ? 'active' : ''}`} aria-pressed={praesensSubMode === 'praesens'}
-                onClick={() => handleSetPraesensSubMode('praesens')}
-              >
-                Только Спряжение
-              </button>
-              <button type="button"
-                className={`mode-pill ${praesensSubMode === 'form_to_infinitive' ? 'active' : ''}`} aria-pressed={praesensSubMode === 'form_to_infinitive'}
-                onClick={() => handleSetPraesensSubMode('form_to_infinitive')}
-              >
-                Только Форма → Инфинитив
-              </button>
-            </div>
+            <ModeSwitch<PraesensSubMode>
+              ariaLabel="Направление"
+              value={praesensSubMode}
+              onChange={handleSetPraesensSubMode}
+              options={[
+                { value: 'both', label: 'Вперемешку' },
+                { value: 'praesens', label: 'Только Спряжение', short: 'Только спряжение' },
+                { value: 'form_to_infinitive', label: 'Только Форма → Инфинитив', short: 'Только форма → инфинитив' },
+              ]}
+            />
           </div>
           {praesensSubMode !== 'praesens' && (
             <div className="submode-hint">

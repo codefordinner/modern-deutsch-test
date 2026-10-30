@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { HelpCircle, Clock, Sparkles } from 'lucide-react';
 import { TimeFlashCard } from './time/TimeFlashCard';
 import { TimeRulesModal } from './time/TimeRulesModal';
+import { ModeSwitch } from './ModeSwitch';
+import { ToolbarButton } from './ToolbarButton';
 import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import { getGermanTime, generateRandomTime } from '../utils/time-generator';
 
@@ -32,7 +34,7 @@ export const TimeTrainer: React.FC = () => {
   // Keyboard shortcut listener for space/enter
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || isRulesOpen) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || isRulesOpen) return;
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         if (!isRevealed) setIsRevealed(true);
@@ -48,29 +50,28 @@ export const TimeTrainer: React.FC = () => {
   return (
     <div>
       <div className="trainer-toolbar">
-        <div className="trainer-modes trainer-modes--flush">
-          <button type="button" className={`mode-pill ${stepMode === 'any' ? 'active' : ''}`} aria-pressed={stepMode === 'any'} onClick={() => setStepMode('any')}>
-            <Sparkles size={13} /> Любая минута (kurz vor / nach)
-          </button>
-          <button type="button" className={`mode-pill ${stepMode === '5min' ? 'active' : ''}`} aria-pressed={stepMode === '5min'} onClick={() => setStepMode('5min')}>
-            Шаг 5 минут
-          </button>
-
-          <div className="mode-divider" aria-hidden="true" />
-
-          <button type="button" className={`mode-pill ${displayMode === 'analog' ? 'active' : ''}`} aria-pressed={displayMode === 'analog'} onClick={() => setDisplayMode('analog')}>
-            <Clock size={13} /> Стрелки
-          </button>
-          <button type="button" className={`mode-pill ${displayMode === 'digital' ? 'active' : ''}`} aria-pressed={displayMode === 'digital'} onClick={() => setDisplayMode('digital')}>
-            Цифры
-          </button>
-          <button type="button" className={`mode-pill ${displayMode === 'both' ? 'active' : ''}`} aria-pressed={displayMode === 'both'} onClick={() => setDisplayMode('both')}>
-            Оба (Стрелки + Цифры)
-          </button>
+        <div className="toolbar-filters">
+          <ModeSwitch<StepMode>
+            ariaLabel="Какие минуты"
+            value={stepMode}
+            onChange={setStepMode}
+            options={[
+              { value: 'any', label: 'Любая минута (kurz vor / nach)', short: 'Любая минута', icon: <Sparkles size={13} /> },
+              { value: '5min', label: 'Шаг 5 минут', short: 'Шаг 5 минут' },
+            ]}
+          />
+          <ModeSwitch<DisplayMode>
+            ariaLabel="Вид времени"
+            value={displayMode}
+            onChange={setDisplayMode}
+            options={[
+              { value: 'analog', label: 'Стрелки', short: 'Стрелки', icon: <Clock size={13} /> },
+              { value: 'digital', label: 'Цифры', short: 'Цифры' },
+              { value: 'both', label: 'Оба (Стрелки + Цифры)', short: 'Стрелки + цифры' },
+            ]}
+          />
         </div>
-        <button className="btn-secondary" onClick={() => setIsRulesOpen(true)}>
-          <HelpCircle size={15} /> Справка и правила
-        </button>
+        <ToolbarButton icon={<HelpCircle size={15} />} label="Справка и правила" onClick={() => setIsRulesOpen(true)} />
       </div>
 
       <TimeFlashCard
