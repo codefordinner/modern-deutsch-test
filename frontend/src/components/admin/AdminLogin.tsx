@@ -33,7 +33,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         <h2>Вход в панель управления</h2>
       </div>
       <p className="login-lead">Доступ к управлению базой слов, категорий и аналитикой.</p>
-
+		<p className="login-lead">Администратор: @garcheg</p>
       <form onSubmit={handleLogin}>
         <div className="login-field">
           <label className="sr-only" htmlFor="admin-password-input">Пароль администратора</label>
