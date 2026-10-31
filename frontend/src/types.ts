@@ -46,6 +46,15 @@ export interface SRSRecord {
   promotedOn?: string; // local day YYYY-MM-DD of the last promotion (max one box up per day)
 }
 
+/** Trainers whose SRS progress can be synced between devices (see utils/srsSync.ts). */
+export type SrsTrainer = 'words' | 'verbs' | 'articles';
+
+/** The SRS snapshot exchanged with the server: progress per trainer + the time of its last reset (ms, 0 = never). */
+export interface SrsSyncData {
+  srs: Record<SrsTrainer, Record<string, SRSRecord>>;
+  resetAt: Record<SrsTrainer, number>;
+}
+
 export interface NumberRangeSettings {
   min: number;
   max: number;

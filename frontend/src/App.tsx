@@ -13,6 +13,7 @@ import { trackEvent } from './api/client';
 import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
+import { useSrsSync } from './hooks/useSrsSync';
 import type { ScoredTab } from './hooks/useScores';
 import type { TrainerTab } from './types';
 
@@ -53,6 +54,9 @@ export function App() {
 
   // Leitner box probabilities configured by the admin (defaults until loaded).
   useSrsWeightsSync();
+
+  // Keeps SRS progress in step with the learner's other devices when a sync key is set.
+  useSrsSync();
 
   // NOTE: the light theme in index.css is scoped to `html.light` (dark is
   // the default `:root`), so toggling a `dark` class here (as before) never

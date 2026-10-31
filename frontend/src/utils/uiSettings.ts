@@ -32,6 +32,11 @@ export interface UISettings {
    * words and articles trainers. On by default; the category can give the answer away.
    */
   showCategoryHint: boolean;
+  /**
+   * Key for syncing SRS progress between devices: devices with the same key share
+   * progress (see utils/srsSync.ts). Empty (default) = no sync, nothing leaves the device.
+   */
+  syncKey: string;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -43,6 +48,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   acceptUmlautSubstitutes: false,
   autoFocus: true,
   showCategoryHint: true,
+  syncKey: '',
 };
 
 export function getUISettings(): UISettings {
@@ -51,7 +57,9 @@ export function getUISettings(): UISettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_UI_SETTINGS;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_UI_SETTINGS, ...parsed };
+    const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
+    if (typeof merged.syncKey !== 'string') merged.syncKey = '';
+    return merged;
   } catch {
     return DEFAULT_UI_SETTINGS;
   }

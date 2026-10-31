@@ -1,9 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { Download, Focus, Keyboard, Languages, Tag, Target, Type, Upload } from 'lucide-react';
+import { Download, Focus, Keyboard, Languages, RefreshCw, Tag, Target, Type, Upload } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
 import { applyBackup, downloadBackup, parseBackup } from '../utils/progressBackup';
+import { useSyncStatus } from '../hooks/useSrsSync';
+import { syncNow } from '../utils/srsSync';
+import { MAX_SYNC_KEY_LENGTH, MIN_SYNC_KEY_LENGTH, readSyncKey } from '../utils/srsSyncData';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
@@ -14,6 +17,18 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
   const [prefs, setPrefs] = useStudyPrefs();
   const fileInput = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [keyDraft, setKeyDraft] = useState(settings.syncKey);
+  const syncStatus = useSyncStatus();
+
+  const draftTrimmed = keyDraft.trim();
+  const draftValid = draftTrimmed === '' || readSyncKey(draftTrimmed) !== null;
+  const draftChanged = draftTrimmed !== settings.syncKey;
+
+  const saveSyncKey = () => {
+    if (!draftValid) return;
+    updateSettings({ syncKey: draftTrimmed });
+    setKeyDraft(draftTrimmed);
+  };
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -131,6 +146,62 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
             </span>
           </div>
         </label>
+
+        <div className="settings-divider">
+          <label className="setting-toggle-title" htmlFor="sync-key-input">
+            <RefreshCw size={14} /> Ключ синхронизации
+          </label>
+          <div className="backup-actions">
+            <input
+              id="sync-key-input"
+              type="text"
+              className="text-input w-full"
+              value={keyDraft}
+              maxLength={MAX_SYNC_KEY_LENGTH}
+              placeholder="Пусто — без синхронизации"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveSyncKey();
+              }}
+            />
+            <button type="button" className="btn-secondary" onClick={saveSyncKey} disabled={!draftChanged || !draftValid}>
+              Сохранить
+            </button>
+          </div>
+          <span className="setting-toggle-desc">
+            Впишите одинаковый ключ на всех своих устройствах — прогресс SRS (слова, глаголы, артикли) будет общим.
+            Пусто — синхронизации нет, ничего не отправляется. Ключ — это ваш «пароль»: выберите длинный и не
+            показывайте его другим (от {MIN_SYNC_KEY_LENGTH} символов).
+          </span>
+          {!draftValid && (
+            <div className="status-msg status-msg--error" role="alert">
+              Ключ должен быть не короче {MIN_SYNC_KEY_LENGTH} символов.
+            </div>
+          )}
+          {settings.syncKey !== '' && draftValid && (
+            <div
+              className={`status-msg${syncStatus.state === 'error' ? ' status-msg--error' : syncStatus.state === 'ok' ? ' status-msg--success' : ''}`}
+              role="status"
+            >
+              {syncStatus.state === 'syncing' && 'Синхронизация…'}
+              {syncStatus.state === 'ok' && `Синхронизировано в ${new Date(syncStatus.lastSyncedAt).toLocaleTimeString('ru-RU')}`}
+              {syncStatus.state === 'error' && syncStatus.message}
+              {syncStatus.state === 'off' && 'Ожидание синхронизации…'}
+              {settings.syncKey !== '' && syncStatus.state !== 'syncing' && (
+                <>
+                  {' '}
+                  <button type="button" className="btn-secondary" onClick={() => void syncNow()}>
+                    Синхронизировать сейчас
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="settings-divider backup-section">
           <span className="settings-group-title">Перенос прогресса между устройствами</span>

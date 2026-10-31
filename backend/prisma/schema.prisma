@@ -65,3 +65,13 @@ model Setting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+/// SRS progress shared between a learner's devices through a sync key.
+/// `keyHash` = sha256 of the key (the key itself is never stored); `data` = JSON snapshot,
+/// see src/services/srsSync.ts.
+model SyncProfile {
+  keyHash   String   @id
+  data      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

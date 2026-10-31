@@ -13,6 +13,7 @@ export const BACKUP_KEYS = [
   'verbs_srs_state',
   'articles_use_srs',
   'articles_srs_state',
+  'app_srs_reset_at', // SRS sync: when each trainer was last reset
   'verbs_praesens_submode',
   // Trainer settings (usePersistentState)
   'words_settings',

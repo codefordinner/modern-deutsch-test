@@ -1,4 +1,4 @@
-import type { AnalyticsStats, Category, PartOfSpeech, Word, WordsPage } from '../types';
+import type { AnalyticsStats, Category, PartOfSpeech, SrsSyncData, Word, WordsPage } from '../types';
 
 /** Dispatched on `window` when the server rejects our admin session (expired / invalid). */
 export const UNAUTHORIZED_EVENT = 'api:unauthorized';
@@ -164,6 +164,12 @@ export const saveSrsWeights = (weights: number[]) =>
 
 /** Back to the built-in defaults. */
 export const resetSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'DELETE', auth: true });
+
+// ---- SRS sync between devices (by a shared sync key) ----
+
+/** Sends this device's SRS snapshot, gets back the merged one. Public: the key is the only credential. */
+export const syncSrs = (key: string, data: SrsSyncData) =>
+  request<SrsSyncData>('/sync/srs', { method: 'POST', body: { key, ...data } });
 
 // ---- Admin endpoints ----
 

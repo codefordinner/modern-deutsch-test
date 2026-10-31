@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { pickCardBySRS, sanitizeSRSMap, updateSRS } from '../utils/srs';
 import type { SRSMap } from '../utils/srs';
 import { isDue } from '../utils/srsDue';
 import { useStudyPrefs } from '../utils/studyPrefs';
 import { pickRandom } from '../utils/random';
+import { markSrsReset, scheduleSync, SRS_SYNCED_EVENT, toSrsTrainer } from '../utils/srsSync';
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -38,6 +39,8 @@ function writeJSON(key: string, value: unknown): void {
  *   `pickCard` changes identity when that preference changes, which makes the
  *   trainers deal a fresh card.
  * - `recordAnswer` updates and persists progress; it does nothing while SRS is off.
+ * - With a sync key set (Settings), changes are pushed to the server shortly after
+ *   and progress from other devices arrives through SRS_SYNCED_EVENT (utils/srsSync.ts).
  */
 export function useSRSProgress(storagePrefix: string) {
   const useSrsKey = `${storagePrefix}_use_srs`;
@@ -55,6 +58,17 @@ export function useSRSProgress(storagePrefix: string) {
 
   const lastKeyRef = useRef<string | undefined>(undefined);
 
+  // Progress merged in from the server (another device answered) → refresh our copy.
+  useEffect(() => {
+    const onSynced = () => {
+      const next = sanitizeSRSMap(readJSON<unknown>(stateKey, {}));
+      srsMapRef.current = next;
+      setSrsMap(next);
+    };
+    window.addEventListener(SRS_SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(SRS_SYNCED_EVENT, onSynced);
+  }, [stateKey]);
+
   const setUseSRS = useCallback(
     (value: boolean) => {
       setUseSRSState(value);
@@ -70,6 +84,7 @@ export function useSRSProgress(storagePrefix: string) {
       srsMapRef.current = next;
       setSrsMap(next);
       writeJSON(stateKey, next);
+      scheduleSync();
     },
     [useSRS, stateKey]
   );
@@ -82,7 +97,13 @@ export function useSRSProgress(storagePrefix: string) {
     } catch {
       // ignore
     }
-  }, [stateKey]);
+    // Tell the other devices too, otherwise the sync would bring the old progress back.
+    const trainer = toSrsTrainer(storagePrefix);
+    if (trainer) {
+      markSrsReset(trainer);
+      scheduleSync();
+    }
+  }, [stateKey, storagePrefix]);
 
   const pickCard = useCallback(
     <T>(items: T[], keyFn: (item: T) => string): T | undefined => {
