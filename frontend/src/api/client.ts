@@ -147,6 +147,24 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
   request('/analytics/event', { method: 'POST', body: { eventType, trainerType, isCorrect } }).catch(() => {});
 }
 
+// ---- SRS box weights (server-wide setting) ----
+
+export interface SrsWeightsResponse {
+  /** Relative weights of Leitner boxes 1..5. */
+  weights: number[];
+  /** true = nothing saved yet, the built-in defaults are in use. */
+  isDefault: boolean;
+}
+
+/** Public: every learner's browser reads the weights to pick the next card. */
+export const fetchSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights');
+
+export const saveSrsWeights = (weights: number[]) =>
+  request<SrsWeightsResponse>('/settings/srs-weights', { method: 'PUT', body: { weights }, auth: true });
+
+/** Back to the built-in defaults. */
+export const resetSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'DELETE', auth: true });
+
 // ---- Admin endpoints ----
 
 /** Signs in; on success the server sets the session cookie. */

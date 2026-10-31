@@ -12,6 +12,7 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { trackEvent } from './api/client';
 import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
+import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import type { ScoredTab } from './hooks/useScores';
 import type { TrainerTab } from './types';
 
@@ -49,6 +50,9 @@ export function App() {
 
   const { scores, recordAnswer, resetScore } = useScores();
   const scoredTab: ScoredTab | null = activeTab === 'admin' ? null : activeTab;
+
+  // Leitner box probabilities configured by the admin (defaults until loaded).
+  useSrsWeightsSync();
 
   // NOTE: the light theme in index.css is scoped to `html.light` (dark is
   // the default `:root`), so toggling a `dark` class here (as before) never

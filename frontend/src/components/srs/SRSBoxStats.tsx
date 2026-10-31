@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { boxProbabilityPercent } from '../../utils/srs';
+import { useSrsWeights } from '../../utils/srsWeights';
 import type { SRSRecord } from '../../types';
 
 const BOX_LABELS: Record<number, string> = {
@@ -19,6 +20,8 @@ interface SRSBoxStatsProps {
 
 /** How many of the cards are in each of the five Leitner boxes; a card never answered yet counts as box 1. */
 export const SRSBoxStats: React.FC<SRSBoxStatsProps> = ({ keys, srsState }) => {
+  // The probabilities are set by the admin (see the "Ящики SRS" tab), so they are read from the shared store.
+  const weights = useSrsWeights();
   const counts = useMemo(() => {
     const result = [0, 0, 0, 0, 0, 0];
     for (const key of keys) {
@@ -32,7 +35,7 @@ export const SRSBoxStats: React.FC<SRSBoxStatsProps> = ({ keys, srsState }) => {
     <div className="srs-boxes">
       {BOXES.map((box) => (
         <div key={box} className="srs-box-row">
-          <span className="srs-box-label">{BOX_LABELS[box]} · ~{boxProbabilityPercent(box)}%</span>
+          <span className="srs-box-label">{BOX_LABELS[box]} · ~{boxProbabilityPercent(box, weights)}%</span>
           <span className={`leitner-badge box-${box}`}>{counts[box]} карточек</span>
         </div>
       ))}

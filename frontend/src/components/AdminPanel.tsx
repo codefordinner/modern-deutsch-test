@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, LogOut } from 'lucide-react';
+import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, LogOut } from 'lucide-react';
 import { AdminLogin } from './admin/AdminLogin';
 import { WordsTab } from './admin/WordsTab';
 import { CategoriesTab } from './admin/CategoriesTab';
@@ -7,6 +7,7 @@ import { ImportExportTab } from './admin/ImportExportTab';
 import { ImportReviewCard } from './admin/ImportReviewCard';
 import { DuplicatesTab } from './admin/DuplicatesTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
+import { SrsSettingsTab } from './admin/SrsSettingsTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { ModeSwitch } from './ModeSwitch';
@@ -20,7 +21,7 @@ import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/use
 import { reportError, showToast } from '../utils/toast';
 import type { Word, Category, PartOfSpeech } from '../types';
 
-type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'analytics';
+type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'analytics';
 
 export const AdminPanel: React.FC = () => {
   // The session cookie is HttpOnly (invisible to JS), so the client asks the
@@ -181,6 +182,7 @@ export const AdminPanel: React.FC = () => {
             { value: 'categories', label: 'Категории', icon: <Tag size={14} /> },
             { value: 'import', label: 'Импорт / Экспорт', icon: <ArrowLeftRight size={14} /> },
             { value: 'duplicates', label: 'Дубликаты', icon: <Copy size={14} /> },
+            { value: 'srs', label: 'Ящики SRS', icon: <Layers size={14} /> },
             { value: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
           ]}
         />
@@ -214,6 +216,7 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
       {tab === 'duplicates' && <DuplicatesTab onChanged={refreshAll} />}
+      {tab === 'srs' && <SrsSettingsTab />}
       {tab === 'analytics' && <AnalyticsTab />}
 
       {isWordOpen && <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={handleSaveWord} />}

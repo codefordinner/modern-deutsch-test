@@ -4,6 +4,7 @@ import wordsRoutes from './routes/words.routes';
 import wordsAdminRoutes from './routes/words-admin.routes';
 import categoriesRoutes from './routes/categories.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import settingsRoutes from './routes/settings.routes';
 import { requireSameOrigin } from './middleware/csrf.middleware';
 import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
 
@@ -20,6 +21,7 @@ router.use('/words', wordsAdminRoutes);
 router.use('/words', wordsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/settings', settingsRoutes);
 
 export const apiRouter = router;
 export default router;

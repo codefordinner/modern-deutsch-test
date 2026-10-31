@@ -57,3 +57,11 @@ model AnalyticsEvent {
   device      String?
   timestamp   DateTime @default(now())
 }
+
+/// Server-wide settings edited in the admin panel (key → JSON-encoded value).
+/// Currently: "srsBoxWeights" — see src/services/srsSettings.ts.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

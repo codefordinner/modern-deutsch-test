@@ -1,5 +1,6 @@
 import type { SRSRecord, VerbFormSource, WordDirection, WordFormType } from '../types';
 import { pickRandom } from './random';
+import { DEFAULT_SRS_BOX_WEIGHTS, getSrsWeights } from './srsWeights';
 
 /** Leitner progress keyed by card id (build keys with `srsKeys` below). */
 export type SRSMap = Record<string, SRSRecord>;
@@ -7,16 +8,19 @@ export type SRSMap = Record<string, SRSRecord>;
 export const SRS_BOX_COUNT = 5;
 
 /**
+ * The built-in (default) box weights. The ACTIVE weights are configurable by the
+ * admin and live in utils/srsWeights.ts (`getSrsWeights` / `useSrsWeights`).
+ *
  * How often a card from each box is asked: index 0 = box 1 (the lowest: new
  * cards and cards that were just answered wrongly), index 4 = box 5 (the highest).
- * The numbers are relative weights (they happen to add up to 100, so they read as
- * percentages). Boxes that hold no card in the current pool are skipped and the
- * rest are renormalised — e.g. with only boxes 1 and 5 filled the split is 60:10.
+ * The numbers are relative weights (the defaults happen to add up to 100, so they
+ * read as percentages). Boxes that hold no card in the current pool are skipped and
+ * the rest are renormalised — e.g. with only boxes 1 and 5 filled the split is 60:10.
  */
-export const SRS_BOX_WEIGHTS: readonly number[] = [60, 15, 10, 5, 10];
+export const SRS_BOX_WEIGHTS: readonly number[] = DEFAULT_SRS_BOX_WEIGHTS;
 
-/** Nominal share (in %) of questions that come from the given box (1..5). */
-export function boxProbabilityPercent(box: number, weights: readonly number[] = SRS_BOX_WEIGHTS): number {
+/** Nominal share (in %) of questions that come from the given box (1..5). Uses the active weights by default. */
+export function boxProbabilityPercent(box: number, weights: readonly number[] = getSrsWeights()): number {
   const total = weights.reduce((sum, w) => sum + Math.max(0, w), 0);
   if (total <= 0) return 0;
   return Math.round((Math.max(0, weights[box - 1] ?? 0) / total) * 100);
@@ -126,7 +130,7 @@ export function updateSRS(records: SRSMap, id: string, isCorrect: boolean, now: 
 export interface PickOptions {
   /** Key of a card that should not be asked again right away (ignored when it is the only card). */
   excludeKey?: string;
-  /** Replaces `SRS_BOX_WEIGHTS`. */
+  /** Replaces the active (admin-configured) box weights. */
   weights?: readonly number[];
   /** Replaces `Math.random` (for tests). */
   random?: () => number;
@@ -134,8 +138,9 @@ export interface PickOptions {
 
 /**
  * Picks the next card to practise: first a box is drawn with the probabilities
- * from `SRS_BOX_WEIGHTS` (only among boxes that hold at least one of `items`),
- * then a random card of that box.
+ * from the box weights (only among boxes that hold at least one of `items`),
+ * then a random card of that box. The weights are the admin-configured ones
+ * (utils/srsWeights.ts), read at call time.
  *
  * Only the cards in `items` take part, so it behaves the same whether all
  * categories or just a few are selected. Due dates play no role: a word that
@@ -149,7 +154,7 @@ export function pickCardBySRS<T>(
   items: T[],
   records: SRSMap,
   keyFn: (item: T) => string,
-  { excludeKey, weights = SRS_BOX_WEIGHTS, random = Math.random }: PickOptions = {}
+  { excludeKey, weights = getSrsWeights(), random = Math.random }: PickOptions = {}
 ): T | undefined {
   if (items.length === 0) return undefined;
 
