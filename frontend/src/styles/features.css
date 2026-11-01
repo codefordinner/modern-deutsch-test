@@ -1,4 +1,38 @@
-/* Styles for: articles trainer, daily goal, backup, bulk admin tools, duplicates, import review. */
+/* Styles for: articles trainer, daily goal, backup, bulk admin tools, duplicates, import review, article colours, word hint. */
+
+/* Gender colours of the articles — shared by the articles trainer buttons and the highlighted articles in the words trainer. */
+:root {
+  --article-der: #3b82f6;
+  --article-die: #ef4444;
+  --article-das: #10b981;
+}
+
+.article-word { font-weight: inherit; }
+.article-word--der { color: var(--article-der); }
+.article-word--die { color: var(--article-die); }
+.article-word--das { color: var(--article-das); }
+
+/* ---- Word hint (words trainer) ---- */
+.hint-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  width: 100%;
+  max-width: 540px;
+  min-height: 44px; /* reserved, so showing the hint never moves the layout */
+  margin-top: 10px;
+}
+.hint-btn { gap: 6px; padding: 6px 12px; font-size: 12px; }
+.hint-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+.hint-text {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
+}
 
 /* ---- Articles trainer ---- */
 .article-grid {
@@ -25,9 +59,9 @@
   transition: background-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
 }
 
-.article-btn--der { --article-color: #3b82f6; }
-.article-btn--die { --article-color: #ef4444; }
-.article-btn--das { --article-color: #10b981; }
+.article-btn--der { --article-color: var(--article-der); }
+.article-btn--die { --article-color: var(--article-die); }
+.article-btn--das { --article-color: var(--article-das); }
 
 .article-btn:hover:not(:disabled) { background: var(--bg-tertiary); transform: translateY(-1px); }
 .article-btn:disabled { cursor: default; }

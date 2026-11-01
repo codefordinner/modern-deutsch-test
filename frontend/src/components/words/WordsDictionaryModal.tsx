@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Volume2 } from 'lucide-react';
 import { Modal } from '../Modal';
+import { ArticleText } from '../ArticleText';
 import type { Word, Category } from '../../types';
 import { speakGerman } from '../../utils/audio';
 
@@ -60,13 +61,13 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
             <tbody>
               {filtered.map((w) => (
                 <tr key={w.id}>
-                  <td className="cell-strong">{w.de}</td>
+                  <td className="cell-strong"><ArticleText text={w.de} /></td>
                   <td>
                     {w.ru}
                     {w.hint && <div className="cell-hint">{w.hint}</div>}
                   </td>
                   <td className="cell-secondary">
-                    {w.plural && <div>Pl: {w.plural}</div>}
+                    {w.plural && <div>Pl: <ArticleText text={w.plural} /></div>}
                     {w.praeteritum && <div>{w.praeteritum} / {w.partizip2}</div>}
                   </td>
                   <td>

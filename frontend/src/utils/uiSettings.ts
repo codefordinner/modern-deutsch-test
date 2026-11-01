@@ -33,6 +33,11 @@ export interface UISettings {
    */
   showCategoryHint: boolean;
   /**
+   * Colour the article (der / die / das) of a German word by its gender in the
+   * words trainer and the dictionary. On by default.
+   */
+  highlightArticles: boolean;
+  /**
    * Key for syncing SRS progress between devices: devices with the same key share
    * progress (see utils/srsSync.ts). Empty (default) = no sync, nothing leaves the device.
    */
@@ -48,6 +53,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   acceptUmlautSubstitutes: false,
   autoFocus: true,
   showCategoryHint: true,
+  highlightArticles: true,
   syncKey: '',
 };
 
@@ -59,6 +65,7 @@ export function getUISettings(): UISettings {
     const parsed = JSON.parse(raw);
     const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
     if (typeof merged.syncKey !== 'string') merged.syncKey = '';
+    if (typeof merged.highlightArticles !== 'boolean') merged.highlightArticles = true;
     return merged;
   } catch {
     return DEFAULT_UI_SETTINGS;

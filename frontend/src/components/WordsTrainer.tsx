@@ -18,7 +18,7 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
     enablePlural, setEnablePlural, enableFeminine, setEnableFeminine,
     useSRS, setUseSRS, srsMap, resetSRS, poolKeys,
     currentWord, activeDirection, currentFormType, currentSrsItem,
-    userInput, setUserInput, feedback, nextWord, handleSubmit,
+    userInput, setUserInput, feedback, hint, requestHint, nextWord, handleSubmit,
   } = useWordsQuizEngine(onAnswer);
 
   const [isDictOpen, setIsDictOpen] = useState(false);
@@ -97,7 +97,7 @@ export const WordsTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> 
         <WordsQuizCard
           currentWord={currentWord} direction={activeDirection} formType={currentFormType}
           srsItem={currentSrsItem} useSRS={useSRS}
-          userInput={userInput} feedback={feedback} onInputChange={setUserInput}
+          userInput={userInput} feedback={feedback} hint={hint} onHint={requestHint} onInputChange={setUserInput}
           onSubmit={handleSubmit} onNext={nextWord} onInsertChar={(c) => setUserInput((p) => p + c)}
         />
       ) : (

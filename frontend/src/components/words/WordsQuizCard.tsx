@@ -1,9 +1,11 @@
 import React from 'react';
-import { Volume2 } from 'lucide-react';
+import { Lightbulb, Volume2 } from 'lucide-react';
 import { UmlautBar } from '../UmlautBar';
 import { FeedbackSlot } from '../FeedbackBox';
+import { ArticleText, ArticleWord } from '../ArticleText';
 import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
+import type { WordHint } from '../../utils/wordHint';
 import type { Word, SRSRecord, Feedback } from '../../types';
 
 interface WordsQuizCardProps {
@@ -14,6 +16,8 @@ interface WordsQuizCardProps {
   useSRS?: boolean;
   userInput: string;
   feedback: Feedback | null;
+  hint: WordHint;
+  onHint: () => void;
   onInputChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onNext: () => void;
@@ -28,6 +32,8 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
   useSRS = true,
   userInput,
   feedback,
+  hint,
+  onHint,
   onInputChange,
   onSubmit,
   onNext,
@@ -61,6 +67,7 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
   }
 
   const audioTarget = formType === 'plural' ? (currentWord.plural || currentWord.de) : formType === 'feminine' ? (currentWord.feminine || currentWord.de) : currentWord.de;
+  const hintExhausted = hint.level >= hint.maxLevel;
 
   return (
     <div className="question-card">
@@ -74,7 +81,7 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
       </div>
 
       <div className="question-title-row">
-        <h2 className="question-text">{mainText}</h2>
+        <h2 className="question-text">{direction === 'de_to_ru' ? <ArticleText text={mainText} /> : mainText}</h2>
         {direction === 'de_to_ru' && (
           <button type="button" className="icon-btn" onClick={() => speakGerman(audioTarget)} title="Озвучить" aria-label="Озвучить">
             <Volume2 size={18} />
@@ -118,6 +125,31 @@ export const WordsQuizCard: React.FC<WordsQuizCardProps> = ({
           )}
         </div>
       </form>
+
+      {/* The row is always rendered, so showing a hint never moves the layout (see FeedbackSlot). */}
+      <div className="hint-row">
+        <button
+          type="button"
+          className="btn-secondary btn-xs hint-btn"
+          disabled={feedback !== null || hintExhausted}
+          // Keep focus (and the on-screen keyboard) in the answer field when the button is tapped.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onHint}
+          title={hint.level === 0 ? 'Показать артикль, дальше — по букве' : 'Показать ещё одну букву'}
+        >
+          <Lightbulb size={14} aria-hidden="true" /> Подсказка
+        </button>
+        {hint.level > 0 && (
+          <span className="hint-text" aria-live="polite">
+            {hint.article && (
+              <>
+                <ArticleWord article={hint.article} />{' '}
+              </>
+            )}
+            {hint.masked}
+          </span>
+        )}
+      </div>
 
       <UmlautBar onInsert={onInsertChar} />
 

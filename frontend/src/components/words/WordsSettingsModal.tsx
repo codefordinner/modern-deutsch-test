@@ -120,6 +120,16 @@ export const WordsSettingsModal: React.FC<WordsSettingsModalProps> = ({
           <span>Строго требовать артикль (der / die / das)</span>
         </label>
 
+        {/* Article colours */}
+        <label className="setting-toggle setting-toggle--center">
+          <input
+            type="checkbox"
+            checked={uiSettings.highlightArticles}
+            onChange={(e) => updateUiSettings({ highlightArticles: e.target.checked })}
+          />
+          <span>Подсвечивать артикль цветом рода (der — синий, die — красный, das — зелёный)</span>
+        </label>
+
         {/* Category hint under the question */}
         <label className="setting-toggle setting-toggle--center">
           <input

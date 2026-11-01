@@ -8,6 +8,7 @@ import { srsKeys } from '../utils/srs';
 import { pickClosestAnswer } from '../utils/answerDiff';
 import { answersMatch, cleanText, currentMatchOptions } from '../utils/answerMatch';
 import { buildWordCards } from '../utils/wordCards';
+import { buildHint } from '../utils/wordHint';
 import type { DirectionMode } from '../utils/wordCards';
 import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
 
@@ -17,6 +18,13 @@ const ARTICLE_PREFIX = /^(der|die|das)\s+/i;
 
 /** "a, b / c" → ["a", "b", "c"]: any of the listed translations is accepted. */
 const splitTranslations = (ru: string): string[] => ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
+
+/** The German text the learner has to produce for this form of the word. */
+function germanTarget(word: Word, formType: WordFormType): string {
+  if (formType === 'plural' && word.plural) return word.plural;
+  if (formType === 'feminine' && word.feminine) return word.feminine;
+  return word.de;
+}
 
 /** Quiz settings kept in localStorage (`words_settings`). */
 interface WordsSettings {
@@ -92,6 +100,8 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const [currentFormType, setCurrentFormType] = useState<WordFormType>('base');
   const [userInput, setUserInput] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  /** How many times "Подсказка" was pressed on the current card. */
+  const [hintLevel, setHintLevel] = useState(0);
 
   const failedQuery = [wordsQuery, categoriesQuery].find((q) => !q.hasData && q.error !== undefined);
   const loadError = failedQuery ? getErrorMessage(failedQuery.error, 'Не удалось загрузить слова') : null;
@@ -112,6 +122,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const isPoolEmpty = !isLoading && !loadError && words.length > 0 && selectedCats.length > 0 && cards.length === 0;
 
   const nextWord = useCallback(() => {
+    setHintLevel(0);
     const chosenCard = pickCard(cards, (c) => c.key);
     if (!chosenCard) { setCurrentWord(null); return; }
 
@@ -128,6 +139,21 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     if (words.length > 0) nextWord();
   }, [words.length, nextWord]);
 
+  // ---- hint: article first (when the answer has one), then one more letter per press ----
+  const hint = useMemo(() => {
+    if (!currentWord) return buildHint('', 0);
+    const target =
+      activeDirection === 'ru_to_de'
+        ? germanTarget(currentWord, currentFormType)
+        : (splitTranslations(currentWord.ru)[0] ?? currentWord.ru);
+    return buildHint(target, hintLevel);
+  }, [currentWord, activeDirection, currentFormType, hintLevel]);
+
+  const requestHint = useCallback(() => {
+    if (feedback) return;
+    setHintLevel((level) => Math.min(level + 1, hint.maxLevel));
+  }, [feedback, hint.maxLevel]);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (feedback) { nextWord(); return; }
@@ -135,9 +161,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     // An accidental Enter in an empty field is not an answer: it must not reset the card or the streak.
     if (!cleanText(userInput)) return;
 
-    let expectedTarget = currentWord.de;
-    if (currentFormType === 'plural' && currentWord.plural) expectedTarget = currentWord.plural;
-    if (currentFormType === 'feminine' && currentWord.feminine) expectedTarget = currentWord.feminine;
+    const expectedTarget = germanTarget(currentWord, currentFormType);
 
     // Case, stray/double spaces and Unicode form never matter; ae/oe/ue/ss for ä/ö/ü/ß is a user setting.
     let isCorrect: boolean;
@@ -199,6 +223,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     // current card
     currentWord, activeDirection, currentFormType, currentSrsItem,
     userInput, setUserInput, feedback,
+    hint, requestHint,
     nextWord, handleSubmit,
   };
 }
