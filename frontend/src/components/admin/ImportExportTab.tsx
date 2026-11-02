@@ -25,7 +25,7 @@ function buildAiPrompt(categories: Category[]): string {
 Поля:
 - "de" (обязательно) — немецкое слово. Существительные ВСЕГДА с артиклем: "der Tisch", "die Stadt". Глаголы — инфинитив: "gehen". Если слово дано только по-русски — подбери немецкое.
 - "ru" (обязательно) — перевод на русский. Несколько значений через запятую: "идти, ходить".
-- "category" — название категории. Существующие: ${categoryList}. Выбирай из них; если ничего не подходит — придумай короткое новое название.
+- "category" — название категории. Существующие: ${categoryList}. Выбирай из них; если ничего не подходит — придумай короткое новое название. Если слово подходит сразу к нескольким категориям — укажи их МАССИВОМ: ["Профессии", "Семья и люди"] (первая — основная). Одна категория — обычной строкой.
 - "partOfSpeech" — ровно одно из: "noun", "verb", "adjective", "adverb", "other".
 - "hint" — короткая подсказка, чтобы различать омонимы: "замок (здание)". Только если нужно.
 - "plural" — множественное число с артиклем: "die Tische" (для существительных).
@@ -40,14 +40,14 @@ function buildAiPrompt(categories: Category[]): string {
 1. Не добавляй никаких других полей. Пустые или неизвестные поля просто не пиши.
 2. Не выдумывай формы. Если не уверен в форме глагола — лучше пропусти поле, чем ошибись.
 3. Не меняй написание слов из моего списка, кроме добавления артикля и исправления явных опечаток.
-4. Не пиши одно и то же слово дважды.
+4. Не пиши одно и то же слово дважды. Если слово относится к нескольким категориям — это ОДНА запись с массивом в поле "category", а НЕ несколько записей с разными категориями (иначе в тренажёре будут дубли карточек).
 5. Ответ должен быть валидным JSON: двойные кавычки, без комментариев и без запятой после последнего элемента.
 
 ПРИМЕР:
 \`\`\`json
 [
   {"de": "der Tisch", "ru": "стол", "category": "Повседневные слова", "partOfSpeech": "noun", "plural": "die Tische"},
-  {"de": "der Arzt", "ru": "врач", "category": "Профессии", "partOfSpeech": "noun", "plural": "die Ärzte", "feminine": "die Ärztin", "femininePlural": "die Ärztinnen"},
+  {"de": "der Arzt", "ru": "врач", "category": ["Профессии", "Семья и люди"], "partOfSpeech": "noun", "plural": "die Ärzte", "feminine": "die Ärztin", "femininePlural": "die Ärztinnen"},
   {"de": "gehen", "ru": "идти, ходить", "category": "Глаголы", "partOfSpeech": "verb", "praeteritum": "ging", "partizip2": "gegangen", "hilfsverb": "sein", "praesensIch": "gehe", "praesensDu": "gehst", "praesensErSieEs": "geht", "praesensIhr": "geht"}
 ]
 \`\`\`
@@ -210,7 +210,7 @@ export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, on
           <textarea
             className="text-input w-full textarea-mono"
             rows={9}
-            placeholder={'[\n  {"de": "der Hund", "ru": "собака", "category": "Животные", "partOfSpeech": "noun", "plural": "die Hunde"}\n]'}
+            placeholder={'[\n  {"de": "der Hund", "ru": "собака", "category": ["Животные", "Дом"], "partOfSpeech": "noun", "plural": "die Hunde"}\n]'}
             value={importText}
             onChange={(e) => handleTextChange(e.target.value)}
             aria-label="Данные для импорта"
@@ -253,7 +253,8 @@ export const ImportExportTab: React.FC<ImportExportTabProps> = ({ categories, on
         <div>
           <h3 className="card-title"><Download size={20} /> Экспорт базы слов</h3>
           <p className="card-note">
-            Выгрузка всех слов и категорий в JSON — в том же формате, что читает импорт. Годится для резервной копии,
+            Выгрузка всех слов и категорий в JSON — в том же формате, что читает импорт (слово из нескольких категорий
+            выгружается одной записью с массивом «category»). Годится для резервной копии,
             переноса на другой сервер или чтобы отдать словарь нейросети на анализ. Файл можно вставить обратно в
             импорт: уже существующие слова будут пропущены.
           </p>

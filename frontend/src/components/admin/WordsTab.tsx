@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
+import { wordCategories } from '../../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../../types';
 
 interface WordsTabProps {
@@ -98,7 +99,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
           <strong className="bulk-count">Выбрано: {selectedIds.length}</strong>
 
           <div className="bulk-group">
-            <select className="text-input select-compact" aria-label="Новая категория" value={targetCategory} onChange={(e) => setTargetCategory(e.target.value)}>
+            <select className="text-input select-compact" aria-label="Новая категория" title="Слова окажутся только в этой категории" value={targetCategory} onChange={(e) => setTargetCategory(e.target.value)}>
               <option value="">Перенести в категорию…</option>
               {categories.map((c) => (<option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>))}
             </select>
@@ -106,6 +107,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
               type="button"
               className="btn-secondary"
               disabled={busy || !targetCategory}
+              title="Остальные категории этих слов будут убраны"
               onClick={() => run(() => onBulkCategory(selectedIds, targetCategory))}
             >
               Перенести
@@ -153,7 +155,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
               </th>
               <th>Немецкий</th>
               <th>Русский</th>
-              <th>Категория</th>
+              <th>Категории</th>
               <th>Дополнительно</th>
               <th className="th-actions">Действия</th>
             </tr>
@@ -172,7 +174,13 @@ export const WordsTab: React.FC<WordsTabProps> = ({
                     {w.ru}
                     {w.hint && <div className="cell-hint">{w.hint}</div>}
                   </td>
-                  <td><span className="category-chip">{w.category?.icon} {w.category?.name}</span></td>
+                  <td>
+                    <div className="category-chips">
+                      {wordCategories(w).map((c) => (
+                        <span key={c.id} className="category-chip">{c.icon} {c.name}</span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="cell-secondary">
                     {w.plural && <div>Pl: {w.plural}</div>}
                     {w.praeteritum && <div>{w.praeteritum} / {w.partizip2} ({w.hilfsverb})</div>}

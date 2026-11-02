@@ -14,6 +14,7 @@ import {
   resolvePartOfSpeech,
 } from '../services/wordImport';
 import type { ParsedRow, RowError } from '../services/wordImport';
+import { WORD_INCLUDE, allCategoriesExist, readCategoryIds, serializeWord } from '../services/wordCategories';
 
 const router = Router();
 
@@ -26,8 +27,12 @@ const normalizeForSearch = (value: string | null | undefined): string => (value 
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { categoryId, search, limit = '200', page = '1' } = req.query;
-    const where: { categoryId?: string } = {};
-    if (categoryId && categoryId !== 'all') where.categoryId = String(categoryId);
+    // A word matches a category when it is its primary one OR one of its additional ones.
+    const where: Prisma.WordWhereInput = {};
+    if (categoryId && categoryId !== 'all') {
+      const id = String(categoryId);
+      where.OR = [{ categoryId: id }, { extraCategories: { some: { id } } }];
+    }
 
     const take = Math.min(Number(limit) || 200, 1000);
     const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
@@ -38,11 +43,11 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (!query) {
       [words, total] = await Promise.all([
-        prisma.word.findMany({ where, include: { category: true }, take, skip, orderBy: [{ de: 'asc' }, { id: 'asc' }] }),
+        prisma.word.findMany({ where, include: WORD_INCLUDE, take, skip, orderBy: [{ de: 'asc' }, { id: 'asc' }] }),
         prisma.word.count({ where }),
       ]);
     } else {
-      const candidates = await prisma.word.findMany({ where, include: { category: true }, orderBy: [{ de: 'asc' }, { id: 'asc' }] });
+      const candidates = await prisma.word.findMany({ where, include: WORD_INCLUDE, orderBy: [{ de: 'asc' }, { id: 'asc' }] });
       const matched = candidates.filter((w) =>
         [w.de, w.ru, w.hint].some((field) => normalizeForSearch(field).includes(query))
       );
@@ -50,7 +55,7 @@ router.get('/', async (req: Request, res: Response) => {
       words = matched.slice(skip, skip + take);
     }
 
-    res.json({ words, total, page: Number(page), limit: take });
+    res.json({ words: words.map(serializeWord), total, page: Number(page), limit: take });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch words' });
   }
@@ -73,13 +78,15 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
       praesensWir,
       praesensIhr,
       praesensSie,
-      categoryId,
     } = req.body;
-    if (!de || !ru || !categoryId) return res.status(400).json({ error: 'Missing required fields' });
+    const categoryIds = readCategoryIds(req.body);
+    if (!de || !ru || !categoryIds) return res.status(400).json({ error: 'Missing required fields' });
+    if (!(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
 
     const pos = readPartOfSpeech(req.body, { keepIfMissing: false });
     if (!pos.ok) return res.status(400).json({ error: pos.error });
 
+    const [primaryId, ...extraIds] = categoryIds;
     const word = await prisma.word.create({
       data: {
         de,
@@ -97,11 +104,12 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
         praesensWir,
         praesensIhr,
         praesensSie,
-        categoryId,
+        category: { connect: { id: primaryId } },
+        extraCategories: { connect: extraIds.map((id) => ({ id })) },
       },
-      include: { category: true },
+      include: WORD_INCLUDE,
     });
-    res.status(201).json(word);
+    res.status(201).json(serializeWord(word));
   } catch (error) {
     res.status(500).json({ error: 'Failed to create word' });
   }
@@ -124,11 +132,14 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       praesensWir,
       praesensIhr,
       praesensSie,
-      categoryId,
     } = req.body;
 
     const pos = readPartOfSpeech(req.body, { keepIfMissing: true });
     if (!pos.ok) return res.status(400).json({ error: pos.error });
+
+    // No categories in the body = leave the word's categories as they are.
+    const categoryIds = readCategoryIds(req.body);
+    if (categoryIds && !(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
 
     const word = await prisma.word.update({
       where: { id: req.params.id },
@@ -148,11 +159,14 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
         praesensWir,
         praesensIhr,
         praesensSie,
-        categoryId,
+        ...(categoryIds && {
+          category: { connect: { id: categoryIds[0] } },
+          extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) },
+        }),
       },
-      include: { category: true },
+      include: WORD_INCLUDE,
     });
-    res.json(word);
+    res.json(serializeWord(word));
   } catch (error) {
     res.status(500).json({ error: 'Failed to update word' });
   }
@@ -169,13 +183,12 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
 
 // ---- Bulk import / export ---------------------------------------------------
 
-const CREATE_CHUNK = 200;
 const DEFAULT_CATEGORY_ICON = '📌';
 const DEFAULT_CATEGORY_COLOR = '#2563eb';
 
 interface PlannedWord {
   row: ParsedRow;
-  categoryName: string;
+  categoryNames: string[];
 }
 
 /**
@@ -183,6 +196,7 @@ interface PlannedWord {
  * the admin panel) or plain text lines. With `dryRun` nothing is written — the
  * response only says what would happen, so the admin can check before importing.
  *
+ * A row may name several categories (array in "category"): it is still ONE word.
  * Rows with problems are reported and skipped; the valid rows are still imported.
  */
 router.post('/import', requireAdmin, async (req: Request, res: Response) => {
@@ -225,8 +239,8 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
     const newCategoryNames = new Map<string, string>(); // lower-case key → display name
 
     for (const row of rows) {
-      const categoryName = row.category ?? defaultCategoryName;
-      if (!categoryName) {
+      const categoryNames = row.categories.length > 0 ? row.categories : defaultCategoryName ? [defaultCategoryName] : [];
+      if (categoryNames.length === 0) {
         rowErrors.push({ row: row.index, de: row.de, message: 'Не указана категория (поле category или категория по умолчанию)' });
         continue;
       }
@@ -238,11 +252,13 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
       }
       seen.add(key);
 
-      const categoryKey = categoryName.trim().toLowerCase();
-      if (!categoryByName.has(categoryKey) && !newCategoryNames.has(categoryKey)) {
-        newCategoryNames.set(categoryKey, categoryName.trim());
+      for (const name of categoryNames) {
+        const categoryKey = name.trim().toLowerCase();
+        if (!categoryByName.has(categoryKey) && !newCategoryNames.has(categoryKey)) {
+          newCategoryNames.set(categoryKey, name.trim());
+        }
       }
-      planned.push({ row, categoryName: categoryName.trim() });
+      planned.push({ row, categoryNames });
     }
 
     rowErrors.sort((a, b) => a.row - b.row);
@@ -274,23 +290,26 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
     }
 
     const fallbackPos: PartOfSpeech | null = partOfSpeech ?? null;
-    const records: Prisma.WordCreateManyInput[] = planned.map(({ row, categoryName }) => {
-      const category = categoryByName.get(categoryName.toLowerCase());
-      if (!category) throw new Error(`Category "${categoryName}" is missing`);
-      return {
-        de: row.de,
-        ru: row.ru,
-        partOfSpeech: resolvePartOfSpeech(row, category.name, fallbackPos),
-        ...row.fields,
-        categoryId: category.id,
-      };
+    const operations = planned.map(({ row, categoryNames }) => {
+      const unique = new Map<string, (typeof categories)[number]>();
+      for (const name of categoryNames) {
+        const category = categoryByName.get(name.trim().toLowerCase());
+        if (!category) throw new Error(`Category "${name}" is missing`);
+        unique.set(category.id, category);
+      }
+      const [primary, ...extra] = [...unique.values()];
+      return prisma.word.create({
+        data: {
+          de: row.de,
+          ru: row.ru,
+          partOfSpeech: resolvePartOfSpeech(row, [primary, ...extra].map((c) => c.name).join(' '), fallbackPos),
+          ...row.fields,
+          category: { connect: { id: primary.id } },
+          extraCategories: { connect: extra.map((c) => ({ id: c.id })) },
+        },
+      });
     });
-
-    const operations: Prisma.PrismaPromise<Prisma.BatchPayload>[] = [];
-    for (let i = 0; i < records.length; i += CREATE_CHUNK) {
-      operations.push(prisma.word.createMany({ data: records.slice(i, i + CREATE_CHUNK) }));
-    }
-    // All chunks succeed or none does.
+    // All words succeed or none does.
     await prisma.$transaction(operations);
 
     res.json(summary);
@@ -305,7 +324,7 @@ router.get('/export', requireAdmin, async (_req: Request, res: Response) => {
   try {
     const [categories, words] = await Promise.all([
       prisma.category.findMany({ orderBy: { name: 'asc' } }),
-      prisma.word.findMany({ include: { category: true }, orderBy: [{ category: { name: 'asc' } }, { de: 'asc' }] }),
+      prisma.word.findMany({ include: WORD_INCLUDE, orderBy: [{ category: { name: 'asc' } }, { de: 'asc' }] }),
     ]);
 
     res.json({
@@ -313,7 +332,9 @@ router.get('/export', requireAdmin, async (_req: Request, res: Response) => {
       exportedAt: new Date().toISOString(),
       categories: categories.map((c) => ({ name: c.name, icon: c.icon, color: c.color })),
       words: words.map((w) => {
-        const entry: Record<string, string> = { de: w.de, ru: w.ru, category: w.category.name };
+        const names = serializeWord(w).categories.map((c) => c.name);
+        // One category stays a plain string (as in older exports); several become an array.
+        const entry: Record<string, string | string[]> = { de: w.de, ru: w.ru, category: names.length === 1 ? names[0] : names };
         if (w.partOfSpeech) entry.partOfSpeech = w.partOfSpeech;
         for (const field of TEXT_FIELDS) {
           const value = w[field];

@@ -1,0 +1,13 @@
+/* Words in several categories: chips in the admin table, the category picker in the word form. */
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.category-primary-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}

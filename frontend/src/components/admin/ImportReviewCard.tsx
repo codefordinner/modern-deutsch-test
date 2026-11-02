@@ -18,10 +18,15 @@ interface EditableRow {
   status: 'ok' | 'duplicate';
   de: string;
   ru: string;
+  /** One category, or several separated by " | " (the first is the primary one). */
   category: string;
   partOfSpeech: PartOfSpeech | '';
   fields: Record<string, string>;
 }
+
+/** "Еда | Дом" → ["Еда", "Дом"] */
+const splitCategories = (value: string): string[] =>
+  value.split('|').map((part) => part.trim()).filter(Boolean);
 
 /**
  * Import with a review step: parse → fix the rows in a table → import.
@@ -88,7 +93,7 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
 
   const problem = (r: EditableRow): string | null => {
     if (!r.de.trim() || !r.ru.trim()) return 'Заполните de и ru';
-    if (!r.category.trim() && !defaultCategory) return 'Нужна категория';
+    if (splitCategories(r.category).length === 0 && !defaultCategory) return 'Нужна категория';
     return null;
   };
 
@@ -101,13 +106,17 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
     setError(null);
     try {
       const payload = {
-        words: ready.map((r) => ({
-          de: r.de.trim(),
-          ru: r.ru.trim(),
-          category: r.category.trim() || undefined,
-          partOfSpeech: r.partOfSpeech || undefined,
-          ...r.fields,
-        })),
+        words: ready.map((r) => {
+          const names = splitCategories(r.category);
+          return {
+            de: r.de.trim(),
+            ru: r.ru.trim(),
+            // One name stays a string; several go as an array (one word, several categories).
+            category: names.length === 0 ? undefined : names.length === 1 ? names[0] : names,
+            partOfSpeech: r.partOfSpeech || undefined,
+            ...r.fields,
+          };
+        }),
         categories: preview?.categories ?? [],
       };
       const outcome = await importWords({
@@ -134,7 +143,8 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
       <h3 className="card-title"><Eye size={20} /> Импорт с проверкой и правкой</h3>
       <p className="card-note">
         Вставьте JSON или текст (так же, как выше), нажмите «Разобрать» — слова появятся в таблице. Исправьте
-        переводы, категории и части речи, снимите галочки с лишнего и только потом импортируйте.
+        переводы, категории и части речи, снимите галочки с лишнего и только потом импортируйте. Слово может быть
+        в нескольких категориях — перечислите их через « | » (первая — основная).
       </p>
 
       <textarea
@@ -191,7 +201,7 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
                   </th>
                   <th>Немецкий</th>
                   <th>Русский</th>
-                  <th>Категория</th>
+                  <th>Категории</th>
                   <th>Часть речи</th>
                   <th>Plural</th>
                   <th />
@@ -200,7 +210,7 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
               <tbody>
                 {rows.map((r) => {
                   const issue = r.include ? problem(r) : null;
-                  const newCategory = r.category.trim() && !categoryNames.has(r.category.trim().toLowerCase());
+                  const newCategory = splitCategories(r.category).some((name) => !categoryNames.has(name.toLowerCase()));
                   return (
                     <tr key={r.key} className={`${r.include ? '' : 'is-excluded'} ${issue ? 'has-issue' : ''}`}>
                       <td className="th-check">
@@ -214,13 +224,13 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
                       <td>
                         <input
                           className="text-input"
-                          aria-label="Категория"
+                          aria-label="Категории (через |)"
                           list="review-categories"
                           value={r.category}
-                          placeholder={defaultCategory ? 'по умолчанию' : 'категория'}
+                          placeholder={defaultCategory ? 'по умолчанию' : 'категория | категория'}
                           onChange={(e) => update(r.key, { category: e.target.value })}
                         />
-                        {newCategory && <div className="review-note">будет создана</div>}
+                        {newCategory && <div className="review-note">будет создана новая категория</div>}
                       </td>
                       <td>
                         <select className="text-input" aria-label="Часть речи" value={r.partOfSpeech} onChange={(e) => update(r.key, { partOfSpeech: e.target.value as PartOfSpeech | '' })}>

@@ -1,5 +1,6 @@
 import type { Word, WordDirection, WordFormType } from '../types';
 import { srsKeys } from './srs';
+import { wordInAnyCategory } from './wordCategories';
 
 export type DirectionMode = WordDirection | 'mixed';
 
@@ -24,15 +25,17 @@ export interface WordCardFilters {
  * The single place that decides which cards the words trainer has. The quiz
  * draws from this list and the SRS screen counts progress over the very same
  * list, so the two can't disagree.
+ *
+ * Cards are built per WORD (not per category): a word that is in several of the selected
+ * categories still yields one card per direction/form.
  */
 export function buildWordCards(words: Word[], f: WordCardFilters): WordCard[] {
   if (f.selectedCats.length === 0) return [];
-  const isAll = f.selectedCats.includes('all');
   const directions: WordDirection[] = f.directionMode === 'mixed' ? ['ru_to_de', 'de_to_ru'] : [f.directionMode];
 
   const cards: WordCard[] = [];
   for (const word of words) {
-    if (!isAll && !f.selectedCats.includes(word.categoryId)) continue;
+    if (!wordInAnyCategory(word, f.selectedCats)) continue;
 
     const forms: WordFormType[] = [];
     if (f.enableBase) forms.push('base');

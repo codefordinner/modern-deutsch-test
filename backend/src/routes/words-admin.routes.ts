@@ -13,6 +13,7 @@ import {
   normalizeRows,
   resolvePartOfSpeech,
 } from '../services/wordImport';
+import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
 
 /**
  * Admin-only tools for working with many words at once:
@@ -38,6 +39,7 @@ function chunked<T>(items: T[]): T[][] {
   return result;
 }
 
+/** "Перенести в категорию": the words end up in exactly this one category (their other categories are dropped). */
 router.post('/bulk/category', requireAdmin, async (req: Request, res: Response) => {
   try {
     const ids = readIds(req.body?.ids);
@@ -49,7 +51,16 @@ router.post('/bulk/category', requireAdmin, async (req: Request, res: Response) 
 
     let count = 0;
     for (const chunk of chunked(ids)) {
-      count += (await prisma.word.updateMany({ where: { id: { in: chunk } }, data: { categoryId } })).count;
+      const existing = await prisma.word.findMany({ where: { id: { in: chunk } }, select: { id: true } });
+      await prisma.$transaction(
+        existing.map((w) =>
+          prisma.word.update({
+            where: { id: w.id },
+            data: { category: { connect: { id: categoryId } }, extraCategories: { set: [] } },
+          })
+        )
+      );
+      count += existing.length;
     }
     res.json({ success: true, count });
   } catch (error) {
@@ -94,7 +105,7 @@ router.post('/bulk/delete', requireAdmin, async (req: Request, res: Response) =>
 /** Groups of words with the same German form (same rule the import uses: case/spaces/Unicode form ignored). */
 router.get('/duplicates', requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const words = await prisma.word.findMany({ include: { category: true }, orderBy: { createdAt: 'asc' } });
+    const words = (await prisma.word.findMany({ include: WORD_INCLUDE, orderBy: { createdAt: 'asc' } })).map(serializeWord);
 
     const byKey = new Map<string, typeof words>();
     for (const word of words) {
@@ -118,6 +129,7 @@ router.get('/duplicates', requireAdmin, async (_req: Request, res: Response) => 
 /**
  * Keeps one word and deletes the others, first copying over every field the kept
  * word is missing (the first non-empty value among the removed words wins).
+ * The kept word also joins every category the removed words were in.
  */
 router.post('/duplicates/merge', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -127,10 +139,14 @@ router.post('/duplicates/merge', requireAdmin, async (req: Request, res: Respons
       return res.status(400).json({ error: 'Нужны keepId и removeIds' });
     }
 
-    const keeper = await prisma.word.findUnique({ where: { id: keepId } });
+    const keeper = await prisma.word.findUnique({ where: { id: keepId }, include: WORD_INCLUDE });
     if (!keeper) return res.status(404).json({ error: 'Слово не найдено' });
 
-    const removed = await prisma.word.findMany({ where: { id: { in: removeIds } }, orderBy: { createdAt: 'asc' } });
+    const removed = await prisma.word.findMany({
+      where: { id: { in: removeIds } },
+      include: WORD_INCLUDE,
+      orderBy: { createdAt: 'asc' },
+    });
     if (removed.length !== removeIds.length) return res.status(404).json({ error: 'Некоторые слова не найдены' });
     const keeperKey = duplicateKey(keeper.de);
     if (removed.some((w) => duplicateKey(w.de) !== keeperKey)) {
@@ -144,8 +160,22 @@ router.post('/duplicates/merge', requireAdmin, async (req: Request, res: Respons
       if (donor?.[field]) patch[field] = donor[field] as string;
     }
 
+    // Union of the categories: the kept word's primary stays primary, everything else becomes additional.
+    const allCategoryIds = new Set<string>([keeper.categoryId]);
+    for (const w of [keeper, ...removed]) {
+      allCategoryIds.add(w.categoryId);
+      w.extraCategories.forEach((c) => allCategoryIds.add(c.id));
+    }
+    allCategoryIds.delete(keeper.categoryId);
+
     await prisma.$transaction([
-      prisma.word.update({ where: { id: keepId }, data: patch as Prisma.WordUpdateInput }),
+      prisma.word.update({
+        where: { id: keepId },
+        data: {
+          ...(patch as Prisma.WordUpdateInput),
+          extraCategories: { set: [...allCategoryIds].map((id) => ({ id })) },
+        },
+      }),
       prisma.word.deleteMany({ where: { id: { in: removeIds } } }),
     ]);
 
@@ -161,6 +191,7 @@ router.post('/duplicates/merge', requireAdmin, async (req: Request, res: Respons
  * Parses and validates pasted import data WITHOUT writing anything and returns
  * the rows in an editable shape. The admin fixes them in the UI and then sends
  * the corrected list to the normal /words/import endpoint.
+ * `category` of a row is a string; several categories are separated by " | ".
  */
 router.post('/import/preview', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -196,13 +227,13 @@ router.post('/import/preview', requireAdmin, async (req: Request, res: Response)
       const key = duplicateKey(row.de);
       const status = seen.has(key) ? ('duplicate' as const) : ('ok' as const);
       seen.add(key);
-      const category = row.category ?? defaultCategoryName;
+      const names = row.categories.length > 0 ? row.categories : defaultCategoryName ? [defaultCategoryName] : [];
       return {
         index: row.index,
         de: row.de,
         ru: row.ru,
-        category,
-        partOfSpeech: resolvePartOfSpeech(row, category, fallback),
+        category: names.join(' | '),
+        partOfSpeech: resolvePartOfSpeech(row, names.join(' '), fallback),
         fields: row.fields,
         status,
       };

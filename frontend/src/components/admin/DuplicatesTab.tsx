@@ -3,6 +3,7 @@ import { Copy, RefreshCw } from 'lucide-react';
 import { getDuplicates, mergeDuplicates } from '../../api/client';
 import type { DuplicateGroup } from '../../api/client';
 import { reportError, showToast } from '../../utils/toast';
+import { formatCategories } from '../../utils/wordCategories';
 import type { Word } from '../../types';
 
 interface DuplicatesTabProps {
@@ -97,7 +98,7 @@ export const DuplicatesTab: React.FC<DuplicatesTabProps> = ({ onChanged }) => {
 
       <p className="card-note">
         Дубликат — слово с той же немецкой формой (регистр и пробелы не важны). Выберите, какую запись оставить:
-        пустые поля в ней будут заполнены данными из удаляемых.
+        пустые поля в ней будут заполнены данными из удаляемых, а категории всех записей объединятся.
       </p>
 
       {groups === null ? null : groups.length === 0 ? (
@@ -123,7 +124,7 @@ export const DuplicatesTab: React.FC<DuplicatesTabProps> = ({ onChanged }) => {
                 <span className="dup-row-main">
                   <span className="cell-strong">{w.de}</span> — {w.ru}
                   <span className="cell-secondary">
-                    {' '}· {w.category?.icon} {w.category?.name} · заполнено полей: {filledCount(w)}
+                    {' '}· {formatCategories(w)} · заполнено полей: {filledCount(w)}
                   </span>
                 </span>
                 <span className="dup-row-tag">{keep[group.key] === w.id ? 'оставить' : 'удалить'}</span>

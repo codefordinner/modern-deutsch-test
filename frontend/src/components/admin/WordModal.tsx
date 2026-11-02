@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { Modal } from '../Modal';
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
+import { wordCategoryIds } from '../../utils/wordCategories';
 import type { PartOfSpeech, Word, Category } from '../../types';
 
 interface WordModalProps {
@@ -30,7 +32,8 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   const [praesensIhr, setPraesensIhr] = useState('');
   const [praesensSie, setPraesensSie] = useState('');
   const [showConjugation, setShowConjugation] = useState(false);
-  const [categoryId, setCategoryId] = useState('');
+  /** The word's categories in the order they were ticked; the first one is the primary one. */
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const LAST_CATEGORY_KEY = 'admin_last_word_category_id';
 
   useEffect(() => {
@@ -53,18 +56,33 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       if (word.praesensIch || word.praesensDu || word.praesensErSieEs) {
         setShowConjugation(true);
       }
-      setCategoryId(word.categoryId);
+      setCategoryIds(wordCategoryIds(word));
     } else if (categories.length > 0) {
-      const savedCategoryId = localStorage.getItem(LAST_CATEGORY_KEY);
+      let savedCategoryId: string | null = null;
+      try {
+        savedCategoryId = localStorage.getItem(LAST_CATEGORY_KEY);
+      } catch {
+        // storage unavailable: just take the first category
+      }
       const savedCategoryExists = savedCategoryId && categories.some((c) => c.id === savedCategoryId);
-      setCategoryId(savedCategoryExists ? savedCategoryId : categories[0].id);
+      setCategoryIds([savedCategoryExists ? (savedCategoryId as string) : categories[0].id]);
     }
   }, [word, categories]);
 
+  const toggleCategory = (id: string) =>
+    setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+
+  const primaryCategory = categories.find((c) => c.id === categoryIds[0]);
+  const noCategory = categoryIds.length === 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!de || !ru || !categoryId) return;
-    localStorage.setItem(LAST_CATEGORY_KEY, categoryId);
+    if (!de || !ru || noCategory) return;
+    try {
+      localStorage.setItem(LAST_CATEGORY_KEY, categoryIds[0]);
+    } catch {
+      // Non-blocking
+    }
     onSave({
       de,
       ru,
@@ -81,7 +99,8 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       praesensWir: praesensWir || null,
       praesensIhr: praesensIhr || null,
       praesensSie: praesensSie || null,
-      categoryId,
+      categoryId: categoryIds[0],
+      categoryIds,
     });
   };
 
@@ -105,27 +124,43 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
             <input id="word-hint" type="text" className="text-input w-full" placeholder="напр. «коса (причёска)» или «замок (здание)»" value={hint} onChange={(e) => setHint(e.target.value)} />
           </div>
 
-          <div className="form-grid-2">
-            <div>
-              <label className="field-label" htmlFor="word-category">Категория *</label>
-              <select id="word-category" className="text-input w-full" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>
-                ))}
-              </select>
+          <div role="group" aria-labelledby="word-categories-label">
+            <span id="word-categories-label" className="field-label">Категории * (можно несколько)</span>
+            <div className="category-picker">
+              {categories.map((c) => {
+                const checked = categoryIds.includes(c.id);
+                return (
+                  <label key={c.id} className={`category-option ${checked ? 'is-checked' : ''}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleCategory(c.id)} />
+                    <span className="category-option-label">{c.icon || '📌'} {c.name}</span>
+                  </label>
+                );
+              })}
             </div>
-            <div>
-              <label className="field-label" htmlFor="word-pos">
-                Часть речи{' '}
-                <span className="field-label--xs">(определяет, попадёт ли слово в тренажёр глаголов)</span>
-              </label>
-              <select id="word-pos" className="text-input w-full" value={partOfSpeech} onChange={(e) => setPartOfSpeech(e.target.value as PartOfSpeech | typeof AUTO)}>
-                <option value={AUTO}>Определить автоматически</option>
-                {PART_OF_SPEECH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+            <div className="category-primary-note">
+              {primaryCategory
+                ? `Основная категория — первая отмеченная: ${primaryCategory.icon || '📌'} ${primaryCategory.name}. `
+                : ''}
+              Слово остаётся одной карточкой, сколько бы категорий ни было.
             </div>
+            {noCategory && (
+              <div className="form-error" role="alert">
+                <AlertCircle size={16} /> Выберите хотя бы одну категорию.
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="word-pos">
+              Часть речи{' '}
+              <span className="field-label--xs">(определяет, попадёт ли слово в тренажёр глаголов)</span>
+            </label>
+            <select id="word-pos" className="text-input w-full" value={partOfSpeech} onChange={(e) => setPartOfSpeech(e.target.value as PartOfSpeech | typeof AUTO)}>
+              <option value={AUTO}>Определить автоматически</option>
+              {PART_OF_SPEECH_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="form-grid-2">
@@ -204,7 +239,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
         </div>
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Отмена</button>
-          <button type="submit" className="btn-primary">Сохранить</button>
+          <button type="submit" className="btn-primary" disabled={noCategory}>Сохранить</button>
         </div>
       </form>
     </Modal>

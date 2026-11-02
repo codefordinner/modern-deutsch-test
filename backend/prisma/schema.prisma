@@ -9,14 +9,17 @@ datasource db {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String
-  icon      String?
-  color     String?
-  isBuiltin Boolean  @default(false)
-  words     Word[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  icon       String?
+  color      String?
+  isBuiltin  Boolean  @default(false)
+  /// Words whose PRIMARY category this is (Word.categoryId).
+  words      Word[]   @relation("PrimaryCategory")
+  /// Words that additionally belong to this category (many-to-many).
+  extraWords Word[]   @relation("WordExtraCategories")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Word {
@@ -39,8 +42,12 @@ model Word {
   praesensWir     String?
   praesensIhr     String?
   praesensSie     String?
+  /// PRIMARY category (the first of the word's categories). Kept as a plain column so existing data
+  /// needs no migration; the rest of the word's categories are in `extraCategories`.
   categoryId      String
-  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category        Category   @relation("PrimaryCategory", fields: [categoryId], references: [id], onDelete: Cascade)
+  /// Additional categories. The API exposes primary + extras as one list (`categories` / `categoryIds`).
+  extraCategories Category[] @relation("WordExtraCategories")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

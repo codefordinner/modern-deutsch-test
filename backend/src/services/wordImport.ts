@@ -9,6 +9,9 @@ import type { PartOfSpeech } from './partOfSpeech';
  *    обёрнутый в ```json ... ``` — именно так отвечают нейросети;
  *  - простой текст: одно слово на строку, колонки через TAB, «;» или «,»:
  *    немецкий | русский | множественное число | подсказка.
+ *
+ * Поле "category" — название категории или МАССИВ названий (слово в нескольких категориях;
+ * первая — основная). Строка с несколькими названиями тоже допустима: «Еда | Дом».
  */
 
 export const MAX_IMPORT_ROWS = 5000;
@@ -37,7 +40,8 @@ export interface ParsedRow {
   index: number;
   de: string;
   ru: string;
-  category: string | null;
+  /** Names of the word's categories (the first is the primary one); empty = none given. */
+  categories: string[];
   partOfSpeech: PartOfSpeech | null;
   fields: Partial<Record<TextField, string>>;
 }
@@ -80,6 +84,24 @@ function toText(value: unknown): string {
 
 /** Key for detecting "the same word": case, extra spaces and Unicode form don't matter. */
 export const duplicateKey = (de: string): string => de.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Category names from the "category" field: an array of names, or a string (several names
+ * separated by "|"). Repeats (ignoring case) are dropped; order is kept — the first is the primary one.
+ */
+export function toCategoryNames(value: unknown): string[] {
+  const parts = Array.isArray(value) ? value.map(toText) : toText(value).split('|');
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const part of parts) {
+    const name = part.replace(/\s+/g, ' ').trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
 
 function extractCodeBlock(text: string): string {
   const fenced = /```[\w-]*[ \t]*\r?\n([\s\S]*?)```/.exec(text);
@@ -183,7 +205,14 @@ export function normalizeRows(raw: unknown[]): { rows: ParsedRow[]; errors: RowE
       fields.hilfsverb = normalized;
     }
 
-    rows.push({ index, de, ru, category: toText(item.category ?? item.categoryName) || null, partOfSpeech, fields });
+    rows.push({
+      index,
+      de,
+      ru,
+      categories: toCategoryNames(item.category ?? item.categoryName ?? item.categories),
+      partOfSpeech,
+      fields,
+    });
   });
 
   return { rows, errors };

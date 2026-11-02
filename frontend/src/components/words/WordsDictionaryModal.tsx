@@ -4,6 +4,7 @@ import { Modal } from '../Modal';
 import { ArticleText } from '../ArticleText';
 import type { Word, Category } from '../../types';
 import { speakGerman } from '../../utils/audio';
+import { wordInCategory } from '../../utils/wordCategories';
 
 interface WordsDictionaryModalProps {
   words: Word[];
@@ -16,7 +17,7 @@ export const WordsDictionaryModal: React.FC<WordsDictionaryModalProps> = ({ word
   const [filterCat, setFilterCat] = useState('all');
 
   const filtered = words.filter((w) => {
-    const matchCat = filterCat === 'all' || w.categoryId === filterCat;
+    const matchCat = filterCat === 'all' || wordInCategory(w, filterCat);
     const matchSearch =
       !search ||
       w.de.toLowerCase().includes(search.toLowerCase()) ||

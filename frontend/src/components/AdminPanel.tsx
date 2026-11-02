@@ -19,6 +19,7 @@ import {
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';
+import { wordInCategory } from '../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../types';
 
 type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'analytics';
@@ -67,7 +68,8 @@ export const AdminPanel: React.FC = () => {
   }, [isAuthed, wordsError]);
 
   const words = allWords.filter((w) => {
-    const matchesCategory = category === 'all' || w.categoryId === category;
+    // A word with several categories shows up under each of them.
+    const matchesCategory = category === 'all' || wordInCategory(w, category);
     const q = search.trim().toLowerCase();
     const matchesSearch = !q || w.de.toLowerCase().includes(q) || w.ru.toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
@@ -91,14 +93,15 @@ export const AdminPanel: React.FC = () => {
     if (!confirm('Удалить слово?')) return;
     try {
       await deleteWord(id);
-      refreshDictionary();
+      // Category counters change too.
+      refreshAll();
     } catch (e) {
       reportError(e, 'Не удалось удалить слово');
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Удалить категорию?')) return;
+    if (!confirm('Удалить категорию? Слова, которые есть только в ней, будут удалены; слова из нескольких категорий останутся.')) return;
     try {
       await deleteCategory(id);
       refreshAll();
@@ -113,7 +116,8 @@ export const AdminPanel: React.FC = () => {
       if (editingWord) await updateWord(editingWord.id, word);
       else await createWord(word);
       setIsWordOpen(false);
-      refreshDictionary();
+      // Category counters change too.
+      refreshAll();
     } catch (e) {
       reportError(e, 'Не удалось сохранить слово');
     }

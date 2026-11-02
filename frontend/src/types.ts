@@ -33,8 +33,12 @@ export interface Word {
   praesensWir?: string | null;
   praesensIhr?: string | null;
   praesensSie?: string | null;
+  /** The PRIMARY category (the first of the word's categories). Read all of them via utils/wordCategories.ts. */
   categoryId: string;
   category?: Category;
+  /** Every category of the word, primary first. Absent in responses of an older server / cache. */
+  categories?: Category[];
+  categoryIds?: string[];
 }
 
 export interface SRSRecord {

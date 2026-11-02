@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Layers, RefreshCw, Volume2 } from 'lucide-react';
+import { Layers, RefreshCw, Tag, Volume2 } from 'lucide-react';
 import { ArticlesSRSModal } from './articles/ArticlesSRSModal';
+import { ArticlesCategoriesModal } from './articles/ArticlesCategoriesModal';
 import { FeedbackBox } from './FeedbackBox';
 import { SRSIdleCard } from './srs/SRSIdleCard';
 import { ToolbarButton } from './ToolbarButton';
@@ -12,11 +13,23 @@ import { useUISettings } from '../hooks/useUISettings';
 import { ARTICLES, articleSrsKey, isArticleNoun, splitArticle } from '../utils/articles';
 import type { Article } from '../utils/articles';
 import { speakGerman } from '../utils/audio';
+import { formatCategories, wordCategoryIds, wordInAnyCategory } from '../utils/wordCategories';
 import type { Word } from '../types';
 
 /**
+ * Stored selection of categories: `['all']`, a list of ids, or `[]` (explicitly cleared).
+ * Older versions saved a single id / 'all' as a plain string — still understood.
+ */
+function sanitizeCategories(raw: unknown): string[] {
+  if (typeof raw === 'string') return raw ? [raw] : ['all'];
+  if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
+  return ['all'];
+}
+
+/**
  * "der / die / das": the noun is shown without its article, the learner taps one of
- * three buttons (or presses 1 / 2 / 3). One Leitner card per noun.
+ * three buttons (or presses 1 / 2 / 3). One Leitner card per noun — a noun that is in
+ * several of the selected categories is still asked once.
  */
 export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void }> = ({ onAnswer }) => {
   const { words, hasData, error, isLoading, refetch } = useWords();
@@ -24,25 +37,33 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('articles');
   const [uiSettings] = useUISettings();
 
-  const [savedCategoryId, setCategoryId] = usePersistentState<string>('articles_category', 'all', (raw) =>
-    typeof raw === 'string' && raw ? raw : 'all'
-  );
-  // A saved category may have been deleted since: fall back to "all" instead of an empty pool.
-  const categoryId =
-    savedCategoryId === 'all' || categories.length === 0 || categories.some((c) => c.id === savedCategoryId)
-      ? savedCategoryId
-      : 'all';
+  const [savedCats, setSavedCats] = usePersistentState<string[]>('articles_category', ['all'], sanitizeCategories);
+  // A saved category may have been deleted since: ignore the vanished ones, and if nothing is left
+  // fall back to "all". An explicitly cleared list stays empty.
+  const selectedCats = useMemo(() => {
+    if (savedCats.length === 0 || savedCats.includes('all') || categories.length === 0) return savedCats;
+    const valid = savedCats.filter((id) => categories.some((c) => c.id === id));
+    return valid.length > 0 ? valid : ['all'];
+  }, [savedCats, categories]);
+  const isAllCategories = selectedCats.includes('all');
+
   const [current, setCurrent] = useState<Word | null>(null);
   const [picked, setPicked] = useState<Article | null>(null);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
+  const [isCatsOpen, setIsCatsOpen] = useState(false);
 
   const nouns = useMemo(() => words.filter(isArticleNoun), [words]);
   const pool = useMemo(
-    () => (categoryId === 'all' ? nouns : nouns.filter((w) => w.categoryId === categoryId)),
-    [nouns, categoryId]
+    () => (selectedCats.length === 0 ? [] : nouns.filter((w) => wordInAnyCategory(w, selectedCats))),
+    [nouns, selectedCats]
   );
   const poolKeys = useMemo(() => pool.map((w) => articleSrsKey(w.id)), [pool]);
-  const scope = categoryId === 'all' ? 'все категории' : (categories.find((c) => c.id === categoryId)?.name ?? 'категория');
+  const nounCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const noun of nouns) for (const id of wordCategoryIds(noun)) counts[id] = (counts[id] ?? 0) + 1;
+    return counts;
+  }, [nouns]);
+  const scope = isAllCategories ? 'все категории' : `выбрано категорий: ${selectedCats.length}`;
 
   const nextWord = useCallback(() => {
     setCurrent(pickCard(pool, (w) => articleSrsKey(w.id)) ?? null);
@@ -70,14 +91,14 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
   // Keys 1 / 2 / 3 answer; "Дальше" holds focus, so Enter / Space move on without a handler here.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isSrsOpen || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isSrsOpen || isCatsOpen || event.ctrlKey || event.metaKey || event.altKey) return;
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
       const index = ['1', '2', '3'].indexOf(event.key);
       if (index >= 0) answer(ARTICLES[index]);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [answer, isSrsOpen]);
+  }, [answer, isSrsOpen, isCatsOpen]);
 
   const loadError = !hasData && error !== undefined ? getErrorMessage(error, 'Не удалось загрузить слова') : null;
   const boxNumber = (current ? srsMap[articleSrsKey(current.id)]?.box : undefined) ?? 1;
@@ -105,12 +126,28 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
         </div>
       );
     }
+    if (selectedCats.length === 0) {
+      return (
+        <div className="card state-card">
+          <div className="state-icon">📂</div>
+          <h3 className="state-title">Категории не выбраны</h3>
+          <p className="state-text state-text--narrow">Выберите нужные категории или включите все сразу.</p>
+          <div className="state-actions">
+            <button className="btn-primary" onClick={() => setSavedCats(['all'])}>Выбрать все категории</button>
+            <button className="btn-secondary" onClick={() => setIsCatsOpen(true)}>Выбрать категории</button>
+          </div>
+        </div>
+      );
+    }
     if (pool.length === 0) {
       return (
         <div className="card state-card">
           <div className="state-icon">📂</div>
-          <h3 className="state-title">В этой категории нет подходящих слов</h3>
-          <button className="btn-primary" onClick={() => setCategoryId('all')}>Все категории</button>
+          <h3 className="state-title">В выбранных категориях нет подходящих слов</h3>
+          <div className="state-actions">
+            <button className="btn-primary" onClick={() => setSavedCats(['all'])}>Все категории</button>
+            <button className="btn-secondary" onClick={() => setIsCatsOpen(true)}>Выбрать категории</button>
+          </div>
         </div>
       );
     }
@@ -142,7 +179,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
 
         <div className="question-subtext">
           {current.ru}
-          {uiSettings.showCategoryHint && current.category ? ` · ${current.category.icon || '📁'} ${current.category.name}` : ''}
+          {uiSettings.showCategoryHint && formatCategories(current, '📁') ? ` · ${formatCategories(current, '📁')}` : ''}
         </div>
         {current.hint && <div className="question-subtext question-subtext--hint">💡 {current.hint}</div>}
 
@@ -181,21 +218,18 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
     );
   };
 
+  const categoriesLabel = `Категории: ${isAllCategories ? 'все' : selectedCats.length}`;
+
   return (
     <div>
       <div className="trainer-toolbar">
-        <div className="toolbar-filters">
-          <select
-            className="text-input select-compact"
-            aria-label="Категория"
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="all">Все категории</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.icon || '📌'} {c.name}</option>
-            ))}
-          </select>
+        <div className="toolbar-actions">
+          <ToolbarButton
+            icon={<Tag size={15} />}
+            label={categoriesLabel}
+            compactLabel={isAllCategories ? 'Все' : String(selectedCats.length)}
+            onClick={() => setIsCatsOpen(true)}
+          />
         </div>
         <div className="toolbar-actions">
           <ToolbarButton icon={<Layers size={15} />} label="SRS" onClick={() => setIsSrsOpen(true)} />
@@ -204,6 +238,15 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
 
       {renderBody()}
 
+      {isCatsOpen && (
+        <ArticlesCategoriesModal
+          categories={categories}
+          selected={selectedCats}
+          counts={nounCounts}
+          onChange={setSavedCats}
+          onClose={() => setIsCatsOpen(false)}
+        />
+      )}
       {isSrsOpen && (
         <ArticlesSRSModal
           nouns={nouns}
