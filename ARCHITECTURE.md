@@ -138,7 +138,7 @@
 Новый воркер сам не активируется: `useServiceWorkerUpdates` + `UpdateBanner` предлагают «Обновить», после согласия страница перезагружается.
 
 ## Сборка и деплой
-- Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), образы собирает GitHub Actions (`deploy.yml`: `npm ci` + сборка `backend/` и `frontend/`, затем push в GHCR). Образы используют `node:24-alpine`, а `.nvmrc`/`engines` требуют Node 22 — держите версии согласованными.
+- Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), образы собирает GitHub Actions (`deploy.yml`: `npm ci` + сборка `backend/` и `frontend/`, затем push в GHCR). Сборочные образы используют `node:22-alpine`; это согласовано с `.nvmrc` и требованием `engines` в корневом `package.json`.
 - nginx: `/api/` → `app-backend:3001` (имя резолвится на каждый запрос), `client_max_body_size 6m`, `sw.js`/manifest без кэша, `/assets/` — год и `immutable`, остальное — SPA-fallback.
 - Корневой `server.ts` — для dev и «одного процесса»: поднимает БД (`prisma db push` + seed в пустую), API, Vite или статику. Prisma-клиент берётся из `backend/node_modules`: в `backend/` выполните `npm install && npx prisma generate` (после любого изменения схемы — снова `prisma generate`; `npm run build` в `backend/` делает это сам).
 - Новые таблицы (`Setting`, `SyncProfile`) создаются автоматически через `prisma db push` при старте.

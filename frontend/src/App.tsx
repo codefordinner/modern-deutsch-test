@@ -43,8 +43,12 @@ export function App() {
   const activeTab = useHashRoute();
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('theme');
-    return saved ? saved === 'dark' : true; // Default dark theme
+    try {
+      const saved = localStorage.getItem('theme');
+      return saved ? saved === 'dark' : true; // Default dark theme
+    } catch {
+      return true;
+    }
   });
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -65,10 +69,18 @@ export function App() {
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.remove('light');
-      localStorage.setItem('theme', 'dark');
+      try {
+        localStorage.setItem('theme', 'dark');
+      } catch {
+        // Keep the theme usable when browser storage is unavailable.
+      }
     } else {
       document.documentElement.classList.add('light');
-      localStorage.setItem('theme', 'light');
+      try {
+        localStorage.setItem('theme', 'light');
+      } catch {
+        // Keep the theme usable when browser storage is unavailable.
+      }
     }
   }, [isDark]);
 

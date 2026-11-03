@@ -6,6 +6,7 @@ import type { AnalyticsStats } from '../../types';
 const tabLabels: Record<string, string> = {
   numbers: '🔢 Числительные',
   words: '📚 Словарь',
+  articles: '🔤 Артикли',
   verbs: '⚡ Глаголы',
   time: '⏰ Время',
   admin: '⚙️ Админка',
