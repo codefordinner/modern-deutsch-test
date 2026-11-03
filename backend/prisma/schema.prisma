@@ -57,12 +57,17 @@ model AnalyticsEvent {
   eventType   String
   trainerType String?
   isCorrect   Boolean?
+  /// Random id from the long-lived `visitor_id` cookie (see src/services/visitor.ts).
+  /// null = event recorded before the cookie existed.
+  visitorId   String?
   ipAddress   String?
   userAgent   String?
   browser     String?
   os          String?
   device      String?
   timestamp   DateTime @default(now())
+
+  @@index([eventType, timestamp])
 }
 
 /// Server-wide settings edited in the admin panel (key → JSON-encoded value).

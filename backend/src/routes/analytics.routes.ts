@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { resolveVisitorId } from '../services/visitor';
 
 const router = Router();
 
@@ -37,14 +38,24 @@ function lastDays(todayKey: string, count: number): string[] {
   return keys;
 }
 
+/**
+ * Identity of a visitor for "unique visitors". Events recorded after the cookie was introduced
+ * carry `visitorId`. Older rows have none; the best that can be done for them is IP + User-Agent
+ * (still better than IP alone), and those can't be merged with the new ids.
+ */
+const visitorKey = (e: { visitorId: string | null; ipAddress: string | null; userAgent: string | null }): string =>
+  e.visitorId ? `id:${e.visitorId}` : `legacy:${e.ipAddress ?? 'unknown'}|${e.userAgent ?? ''}`;
+
 router.post('/event', async (req: Request, res: Response) => {
   try {
-    const { eventType, trainerType, isCorrect } = req.body;
+    const { eventType, trainerType, isCorrect } = req.body ?? {};
+    const visitorId = resolveVisitorId(req, res);
     await prisma.analyticsEvent.create({
       data: {
         eventType: eventType || 'action',
         trainerType: trainerType || null,
         isCorrect: isCorrect !== undefined ? Boolean(isCorrect) : null,
+        visitorId,
         ipAddress: req.ip || null,
         userAgent: req.headers['user-agent'] || null,
       },
@@ -62,13 +73,13 @@ router.get('/stats', requireAdmin, async (_req: Request, res: Response) => {
   try {
     const visitEvents = await prisma.analyticsEvent.findMany({
       where: { eventType: 'visit' },
-      select: { ipAddress: true, timestamp: true },
+      select: { visitorId: true, ipAddress: true, userAgent: true, timestamp: true },
       orderBy: { timestamp: 'desc' },
       take: 5000,
     });
 
     const totalVisits = visitEvents.length;
-    const uniqueVisitors = new Set(visitEvents.map((e) => e.ipAddress || 'unknown')).size;
+    const uniqueVisitors = new Set(visitEvents.map(visitorKey)).size;
 
     const todayKey = dayKey(new Date());
     const dayBuckets: Record<string, number> = {};
