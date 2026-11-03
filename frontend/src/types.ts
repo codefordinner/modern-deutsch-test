@@ -124,20 +124,83 @@ export interface WordsPage {
   limit: number;
 }
 
-export interface DayCount {
+// ---- Analytics (GET /api/analytics/stats) ----
+
+/** What happened in one time slot (a day, a week, an hour of the day, a weekday). */
+export interface StatsBucket {
+  visits: number;
+  /** Distinct visitors that opened the app in this slot. */
+  visitors: number;
+  /** Quiz answers given in this slot. */
+  answers: number;
+}
+
+export interface DailyStat extends StatsBucket {
+  /** YYYY-MM-DD in the server's statistics time zone. */
   date: string;
+}
+
+export interface WeeklyStat extends StatsBucket {
+  /** Monday of the week, YYYY-MM-DD. */
+  weekStart: string;
+}
+
+export interface HourlyStat extends StatsBucket {
+  /** 0…23 */
+  hour: number;
+}
+
+export interface WeekdayStat extends StatsBucket {
+  /** 0 = Monday … 6 = Sunday */
+  weekday: number;
+}
+
+export interface TrainerStat {
+  trainer: string;
+  answers: number;
+  correct: number;
+  /** Percent, null without answers. */
+  accuracy: number | null;
+}
+
+export interface NamedCount {
+  name: string;
   count: number;
 }
 
-export interface TabCount {
-  tab: string;
-  count: number;
+export interface AnalyticsTotals {
+  /** All visits ever recorded (not limited to the chosen range). */
+  allTimeVisits: number;
+  visits: number;
+  uniqueVisitors: number;
+  visitsToday: number;
+  uniqueToday: number;
+  answers: number;
+  correct: number;
+  accuracy: number | null;
+  /** Days of the range with at least one visit. */
+  activeDays: number;
+  avgVisitsPerDay: number;
+  /** Visitors who came on two or more different days of the range. */
+  returningVisitors: number;
+  returningRate: number;
 }
 
 export interface AnalyticsStats {
-  totalVisits: number;
-  uniqueVisitors: number;
-  visitsToday: number;
-  last7Days: DayCount[];
-  topTabs: TabCount[];
+  days: number;
+  timeZone: string;
+  generatedAt: string;
+  /** true = the server hit its event cap, the oldest events are missing. */
+  truncated: boolean;
+  totals: AnalyticsTotals;
+  daily: DailyStat[];
+  weekly: WeeklyStat[];
+  hourly: HourlyStat[];
+  weekdays: WeekdayStat[];
+  /** visits[weekday 0=Mon…6=Sun][hour 0…23] */
+  heatmap: number[][];
+  trainers: TrainerStat[];
+  tabs: NamedCount[];
+  devices: NamedCount[];
+  browsers: NamedCount[];
 }

@@ -315,10 +315,19 @@ export interface WordsExport {
 
 export const exportWords = () => request<WordsExport>('/words/export', { auth: true });
 
-export async function getStats(): Promise<AnalyticsStats> {
-  const data = await request<Partial<AnalyticsStats>>('/analytics/stats', { auth: true });
+/** Visitor statistics for the last `days` days (the server accepts 7, 30, 90 or 365). */
+export async function getStats(days = 30): Promise<AnalyticsStats> {
+  const data = await request<Partial<AnalyticsStats>>(`/analytics/stats?days=${days}`, { auth: true });
   // Defend against an old/mismatched backend build that doesn't return the expected shape.
-  if (!Array.isArray(data.last7Days) || !Array.isArray(data.topTabs)) {
+  if (
+    typeof data.totals !== 'object' ||
+    data.totals === null ||
+    !Array.isArray(data.daily) ||
+    !Array.isArray(data.weekly) ||
+    !Array.isArray(data.hourly) ||
+    !Array.isArray(data.weekdays) ||
+    !Array.isArray(data.heatmap)
+  ) {
     throw new ApiError('Сервер вернул статистику в неожиданном формате', 200);
   }
   return data as AnalyticsStats;
