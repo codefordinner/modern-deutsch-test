@@ -4,6 +4,20 @@ import { audioCacheStats, clearAudioCache, getOrCreateAudio, MAX_AUDIO_TEXT_LENG
 
 const router = Router();
 
+router.get('/admin/stats', requireAdmin, async (_req, res) => {
+  try { res.json(await audioCacheStats()); } catch { res.status(500).json({ error: 'Не удалось прочитать кэш озвучки' }); }
+});
+
+router.delete('/admin/cache', requireAdmin, async (_req, res) => {
+  try { res.json({ count: await clearAudioCache() }); } catch { res.status(500).json({ error: 'Не удалось очистить кэш озвучки' }); }
+});
+
+router.post('/admin/regenerate-words', requireAdmin, async (_req, res) => {
+  try { res.json(await regenerateWordAudio()); } catch { res.status(502).json({ error: 'Не удалось сгенерировать озвучку слов' }); }
+});
+
+// Keep this catch-all route after the admin routes: Express treats `/` as a
+// prefix inside a router, so putting it first would intercept `/admin/stats`.
 router.get('/', async (req: Request, res: Response) => {
   const text = typeof req.query.text === 'string' ? req.query.text : '';
   const kind = req.query.kind === 'sentence' ? 'sentence' : 'word';
@@ -15,18 +29,6 @@ router.get('/', async (req: Request, res: Response) => {
     console.error('[audio] generation failed:', error);
     res.status(502).json({ error: 'Не удалось сгенерировать озвучку' });
   }
-});
-
-router.get('/admin/stats', requireAdmin, async (_req, res) => {
-  try { res.json(await audioCacheStats()); } catch { res.status(500).json({ error: 'Не удалось прочитать кэш озвучки' }); }
-});
-
-router.delete('/admin/cache', requireAdmin, async (_req, res) => {
-  try { res.json({ count: await clearAudioCache() }); } catch { res.status(500).json({ error: 'Не удалось очистить кэш озвучки' }); }
-});
-
-router.post('/admin/regenerate-words', requireAdmin, async (_req, res) => {
-  try { res.json(await regenerateWordAudio()); } catch { res.status(502).json({ error: 'Не удалось сгенерировать озвучку слов' }); }
 });
 
 export default router;
