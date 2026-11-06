@@ -78,6 +78,21 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+/// Generated speech audio. The same table supports individual words today and
+/// complete sentences later; `cacheKey` includes the text and TTS settings.
+model AudioCache {
+  id        String   @id @default(cuid())
+  cacheKey  String   @unique
+  kind      String   // word | sentence
+  text      String
+  audio     Bytes
+  mimeType  String   @default("audio/wav")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+}
+
 /// SRS progress shared between a learner's devices through a sync key.
 /// `keyHash` = sha256 of the key (the key itself is never stored); `data` = JSON snapshot,
 /// see src/services/srsSync.ts.

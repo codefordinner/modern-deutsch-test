@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, AnalyticsEvent, Setting, SyncProfile (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, AnalyticsEvent, Setting, AudioCache, SyncProfile (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -42,6 +42,7 @@
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; колонки `browser`, `os`, `device` есть в схеме, но не заполняются.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Сейчас один ключ: `srsBoxWeights` (5 весов ящиков). Нет строки → значения по умолчанию.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
+- **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
 
 ## Переменные окружения
@@ -56,6 +57,9 @@
 | `TRUST_PROXY` | число прокси перед приложением | `backend/`: 1; `server.ts`: 0 |
 | `STATS_TIMEZONE` | часовой пояс «дня» в статистике | часовой пояс сервера |
 | `PORT` | порт отдельного backend | 3001 (`server.ts` — всегда 3000) |
+| `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
+| `PIPER_VOICE` | голос Piper | `de_DE-thorsten-medium` |
+| `PIPER_TIMEOUT_MS` | таймаут генерации WAV | `30000` |
 
 Пустое значение (`TRUST_PROXY=`) не равно «не задано» — оно превращается в 0. Необязательные переменные не оставляйте пустыми.
 
@@ -68,6 +72,7 @@
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
 - **settings**: `GET /settings/srs-weights` (публичный) → `{weights: number[5], isDefault}`; `PUT` (админ) `{weights}` — ровно 5 чисел 0…1000, хотя бы одно > 0; `DELETE` (админ) — сброс к умолчанию (60/15/10/5/10). Валидация — `services/srsSettings.ts`.
+- **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
 - **Импорт** (`wordImport.ts`): JSON (в т. ч. в ```json```), либо текст «слово;перевод;plural;подсказка». Строки с ошибками пропускаются и отчитываются; `dryRun`; дубликаты по `duplicateKey`.
 - **Старт** (`backfillPartOfSpeech`): нормализует `hilfsverb`, затем заполняет `partOfSpeech`. Идемпотентно.

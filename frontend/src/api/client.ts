@@ -147,6 +147,24 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
   request('/analytics/event', { method: 'POST', body: { eventType, trainerType, isCorrect } }).catch(() => {});
 }
 
+export async function getSpeechAudio(text: string, kind: 'word' | 'sentence' = 'word'): Promise<Blob> {
+  const params = new URLSearchParams({ text, kind });
+  let response: Response;
+  try { response = await fetch(`/api/audio?${params.toString()}`, { credentials: 'same-origin' }); }
+  catch { throw new ApiError('Нет соединения с сервером', 0); }
+  if (!response.ok) {
+    let message = `Ошибка сервера (${response.status})`;
+    try { message = (await response.json()).error || message; } catch { /* non-JSON error */ }
+    throw new ApiError(message, response.status);
+  }
+  return response.blob();
+}
+
+export interface AudioCacheStats { total: number; words: number; sentences: number }
+export const getAudioCacheStats = () => request<AudioCacheStats>('/audio/admin/stats', { auth: true });
+export const clearAudioCache = () => request<{ count: number }>('/audio/admin/cache', { method: 'DELETE', auth: true });
+export const regenerateWordAudio = () => request<{ total: number; generated: number }>('/audio/admin/regenerate-words', { method: 'POST', auth: true });
+
 // ---- SRS box weights (server-wide setting) ----
 
 export interface SrsWeightsResponse {

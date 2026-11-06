@@ -8,6 +8,7 @@ import settingsRoutes from './routes/settings.routes';
 import syncRoutes from './routes/sync.routes';
 import { requireSameOrigin } from './middleware/csrf.middleware';
 import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
+import audioRoutes from './routes/audio.routes';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/words', wordsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/audio', audioRoutes);
 router.use('/sync', syncRoutes);
 
 export const apiRouter = router;

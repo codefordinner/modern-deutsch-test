@@ -1,27 +1,26 @@
-export function speakGerman(text: string): void {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+import { getSpeechAudio } from '../api/client';
 
+const urlCache = new Map<string, string>();
+let currentAudio: HTMLAudioElement | null = null;
+let requestId = 0;
+
+export async function speakGerman(text: string, kind: 'word' | 'sentence' = 'word'): Promise<void> {
+  const cleanText = text.replace(/[\(\)\[\]\/]/g, ' ').trim();
+  if (!cleanText || typeof window === 'undefined') return;
+  const id = ++requestId;
   try {
-    // Cancel any previous speech
-    window.speechSynthesis.cancel();
-
-    // Clean up text if needed (e.g. remove punctuation or brackets)
-    const cleanText = text.replace(/[\(\)\[\]\/]/g, ' ').trim();
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'de-DE';
-    utterance.rate = 0.9; // slightly slower for language learners
-
-    // Try to find German voice
-    const voices = window.speechSynthesis.getVoices();
-    const deVoice = voices.find((v) => v.lang === 'de-DE' || v.lang.startsWith('de'));
-    if (deVoice) {
-      utterance.voice = deVoice;
+    currentAudio?.pause();
+    const key = `${kind}:${cleanText}`;
+    let url = urlCache.get(key);
+    if (!url) {
+      const blob = await getSpeechAudio(cleanText, kind);
+      if (id !== requestId) return;
+      url = URL.createObjectURL(blob);
+      urlCache.set(key, url);
     }
-
-    window.speechSynthesis.speak(utterance);
-  } catch (e) {
-    console.warn('Speech synthesis error:', e);
-  }
+    if (id !== requestId) return;
+    const audio = new Audio(url);
+    currentAudio = audio;
+    await audio.play();
+  } catch (error) { console.warn('Speech playback error:', error); }
 }
