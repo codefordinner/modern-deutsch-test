@@ -18,19 +18,19 @@ router.get('/admin', requireAdmin, async (_req: Request, res: Response) => {
 });
 
 router.post('/', requireAdmin, async (req: Request, res: Response) => {
-  const { title, dataUrl, isActive } = req.body as { title?: unknown; dataUrl?: unknown; isActive?: unknown };
+  const { title, description, dataUrl, isActive } = req.body as { title?: unknown; description?: unknown; dataUrl?: unknown; isActive?: unknown };
   if (typeof dataUrl !== 'string' || dataUrl.length > MAX_DATA_URL_LENGTH || !IMAGE_PATTERN.test(dataUrl)) {
     return res.status(400).json({ error: 'Загрузите корректное изображение JPEG, PNG, WebP или GIF размером до 5 МБ' });
   }
   try {
     return res.status(201).json(await prisma.picture.create({
-      data: { dataUrl, title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 200) : null, isActive: isActive !== false },
+      data: { dataUrl, title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 200) : null, description: typeof description === 'string' && description.trim() ? description.trim().slice(0, 5000) : null, isActive: isActive !== false },
     }));
   } catch { return res.status(500).json({ error: 'Не удалось сохранить картинку' }); }
 });
 
 router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
-  const { title, dataUrl, isActive } = req.body as { title?: unknown; dataUrl?: unknown; isActive?: unknown };
+  const { title, description, dataUrl, isActive } = req.body as { title?: unknown; description?: unknown; dataUrl?: unknown; isActive?: unknown };
   if (dataUrl !== undefined && (typeof dataUrl !== 'string' || dataUrl.length > MAX_DATA_URL_LENGTH || !IMAGE_PATTERN.test(dataUrl))) {
     return res.status(400).json({ error: 'Некорректное изображение' });
   }
@@ -38,6 +38,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     return res.json(await prisma.picture.update({ where: { id: req.params.id }, data: {
       ...(dataUrl !== undefined ? { dataUrl } : {}),
       ...(title !== undefined ? { title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 200) : null } : {}),
+      ...(description !== undefined ? { description: typeof description === 'string' && description.trim() ? description.trim().slice(0, 5000) : null } : {}),
       ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
     } }));
   } catch { return res.status(500).json({ error: 'Не удалось обновить картинку' }); }

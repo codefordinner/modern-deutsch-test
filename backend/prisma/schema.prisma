@@ -126,6 +126,7 @@ model SyncProfile {
 model Picture {
   id        String   @id @default(cuid())
   title     String?
+  description String?
   dataUrl   String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())

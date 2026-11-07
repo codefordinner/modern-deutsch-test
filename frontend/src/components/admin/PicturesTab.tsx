@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { createPicture, deletePicture, getAdminPictures, updatePicture, type Picture } from '../../api/pictures';
 import { reportError, showToast } from '../../utils/toast';
 
@@ -11,6 +11,9 @@ export function PicturesTab() {
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [title, setTitle] = useState('');
   const [dataUrl, setDataUrl] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const load = () => getAdminPictures().then(setPictures).catch((error) => reportError(error, 'Не удалось загрузить картинки'));
   useEffect(() => { void load(); }, []);
   const add = async () => {
@@ -28,7 +31,13 @@ export function PicturesTab() {
       <button className="btn-primary" onClick={add}>Добавить картинку</button>
     </div>
     <div className="pictures-admin-grid">{pictures.map((picture) => <div className="card picture-admin-card" key={picture.id}>
-      <img src={picture.dataUrl} alt={picture.title || 'Картинка'} /><div className="picture-admin-card-footer"><span>{picture.title || 'Без названия'}</span><button className="icon-btn icon-btn--danger" aria-label="Удалить картинку" onClick={async () => { if (!confirm('Удалить картинку?')) return; try { await deletePicture(picture.id); await load(); } catch (error) { reportError(error, 'Не удалось удалить картинку'); } }}><Trash2 size={16} /></button></div>
+      <img src={picture.dataUrl} alt={picture.title || 'Картинка'} /><div className="picture-admin-card-footer"><span>{picture.title || 'Без названия'}</span><div><button className="icon-btn" aria-label="Редактировать картинку" onClick={() => { setEditingId(picture.id); setEditTitle(picture.title || ''); setEditDescription(picture.description || ''); }}><Pencil size={16} /></button><button className="icon-btn icon-btn--danger" aria-label="Удалить картинку" onClick={async () => { if (!confirm('Удалить картинку?')) return; try { await deletePicture(picture.id); await load(); } catch (error) { reportError(error, 'Не удалось удалить картинку'); } }}><Trash2 size={16} /></button></div></div>
+      {editingId === picture.id && <div className="picture-edit-form">
+        <input className="text-input" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} placeholder="Название" aria-label="Название картинки" />
+        <textarea className="text-input" value={editDescription} onChange={(event) => setEditDescription(event.target.value)} placeholder="Описание" rows={5} aria-label="Описание картинки" />
+        <button className="btn-secondary btn-xs" onClick={() => showToast('Заполнение с помощью ИИ пока недоступно', 'info')}><Sparkles size={14} /> Заполнить с помощью ИИ</button>
+        <button className="btn-primary btn-xs" onClick={async () => { try { await updatePicture(picture.id, { title: editTitle, description: editDescription }); setEditingId(null); await load(); showToast('Картинка обновлена', 'success'); } catch (error) { reportError(error, 'Не удалось сохранить картинку'); } }}>Сохранить</button>
+      </div>}
       <button className="btn-secondary btn-xs" onClick={async () => { try { await updatePicture(picture.id, { isActive: !picture.isActive }); await load(); } catch (error) { reportError(error, 'Не удалось изменить статус картинки'); } }}>{picture.isActive ? 'Скрыть из тренажёра' : 'Показывать в тренажёре'}</button>
     </div>)}</div>
   </div>;
