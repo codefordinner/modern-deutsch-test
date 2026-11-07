@@ -167,30 +167,34 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
   if (!profile?.model) throw new Error('MISSING_MODEL');
   const match = /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,(.+)$/.exec(dataUrl);
   if (!match) throw new Error('INVALID_IMAGE');
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { text: [
-          profile.prompt,
-        ].join(' ') },
-        { inline_data: { mime_type: match[1], data: match[2] } },
-      ] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            title: { type: 'STRING' },
-            description: { type: 'STRING' },
+  let response: Response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: [profile.prompt].join(' ') },
+          { inline_data: { mime_type: match[1], data: match[2] } },
+        ] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              title: { type: 'STRING' },
+              description: { type: 'STRING' },
+            },
+            required: ['title', 'description'],
           },
-          required: ['title', 'description'],
         },
-      },
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') throw new Error('AI_TIMEOUT');
+    throw error;
+  }
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;

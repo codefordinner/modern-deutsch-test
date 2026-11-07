@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { createPicture, deletePicture, generatePictureDescription, getAdminPictures, updatePicture, type Picture } from '../../api/pictures';
 import { reportError, showToast } from '../../utils/toast';
@@ -20,6 +20,7 @@ export function PicturesTab() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const aiBusyRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const load = async () => {
@@ -63,10 +64,12 @@ export function PicturesTab() {
 
   const openEdit = (picture: Picture) => { setEditingId(picture.id); setEditTitle(picture.title || ''); setEditDescription(picture.description || ''); };
   const fillWithAI = async (id: string) => {
+    if (aiBusyRef.current) return;
+    aiBusyRef.current = true;
     setBusy(true);
     try { const result = await generatePictureDescription(id); setPictures((items) => items.map((item) => item.id === id ? result : item)); setEditTitle(result.title || ''); setEditDescription(result.description || ''); showToast('Название и описание заполнены ИИ', 'success'); }
     catch (error) { reportError(error, 'Не удалось заполнить описание через ИИ'); }
-    finally { setBusy(false); }
+    finally { aiBusyRef.current = false; setBusy(false); }
   };
   const saveEdit = async (id: string) => {
     setBusy(true);
@@ -126,7 +129,7 @@ export function PicturesTab() {
       {editingId === picture.id && <div className="picture-edit-form">
         <input className="text-input" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} placeholder="Название" aria-label="Название картинки" />
         <textarea className="text-input" value={editDescription} onChange={(event) => setEditDescription(event.target.value)} placeholder="Описание на русском" rows={5} aria-label="Описание картинки" />
-        <div className="picture-edit-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={() => void fillWithAI(picture.id)}><Sparkles size={14} /> Заполнить с помощью ИИ</button>
+        <div className="picture-edit-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={() => void fillWithAI(picture.id)}><Sparkles size={14} /> {busy ? 'ИИ обрабатывает…' : 'Заполнить с помощью ИИ'}</button>
         <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveEdit(picture.id)}>Сохранить</button></div>
       </div>}
       <button type="button" className="btn-secondary picture-status-button" disabled={busy} onClick={() => void toggleActive(picture)}>{picture.isActive ? 'Скрыть из тренажёра' : 'Показывать в тренажёре'}</button>

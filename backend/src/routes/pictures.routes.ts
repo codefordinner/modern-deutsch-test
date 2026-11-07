@@ -7,6 +7,7 @@ import { checkPictureAnswer, generatePictureMetadata, MAX_PICTURE_ANSWER_LENGTH 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const MAX_DATA_URL_LENGTH = 5 * 1024 * 1024;
+const activePictureDescriptions = new Set<string>();
 const pictureCheckLimiter = rateLimit({
   windowMs: 60_000,
   limit: 10,
@@ -54,6 +55,8 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
 });
 
 router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Response) => {
+  if (activePictureDescriptions.has(req.params.id)) return res.status(409).json({ error: 'Эта картинка уже обрабатывается. Дождитесь завершения.' });
+  activePictureDescriptions.add(req.params.id);
   try {
     const picture = await prisma.picture.findUnique({ where: { id: req.params.id } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
@@ -66,10 +69,13 @@ router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Respo
       MISSING_MODEL: [400, 'Сначала выберите модель Gemini'],
       INVALID_API_KEY: [400, 'Ключ Gemini недействителен'],
       GEMINI_UNAVAILABLE: [502, 'Gemini не смог обработать изображение'],
+      AI_TIMEOUT: [504, 'ИИ не ответил вовремя. Попробуйте ещё раз.'],
       INVALID_AI_RESPONSE: [502, 'Gemini вернул некорректный ответ'],
     };
     const result = error instanceof Error ? messages[error.message] : undefined;
     return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось заполнить описание через ИИ' });
+  } finally {
+    activePictureDescriptions.delete(req.params.id);
   }
 });
 
