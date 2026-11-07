@@ -11,10 +11,20 @@ export interface AISettingsPublic {
   model: GeminiModel;
   hasApiKey: boolean;
   isDefault: boolean;
+  prompt: string;
 }
 
-interface StoredAISettings { provider: 'gemini'; model: GeminiModel; apiKey: string }
+interface StoredAISettings { provider: 'gemini'; model: GeminiModel; apiKey: string; prompt: string }
 const DEFAULT_MODEL = '';
+export const DEFAULT_PICTURE_PROMPT = [
+  'Ты готовишь эталонные данные для тренажёра описания картинки.',
+  'Ответь только на русском языке.',
+  'Опиши только то, что непосредственно видно на изображении. Не угадывай личности, намерения, возраст, профессию, точное место, время или события, если это нельзя уверенно определить.',
+  'Название должно быть кратким и нейтральным: 3–8 слов.',
+  'Описание должно быть подробным, но фактическим: укажи общую сцену и место (только если видно), затем людей или животных, их видимые действия и положение, заметные предметы, цвета, фон и другие важные детали.',
+  'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
+  'Верни объект с ровно двумя строковыми полями: title и description.',
+].join(' ');
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -28,7 +38,7 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Record<string, unknown>;
   if (raw.provider !== 'gemini' || (raw.model !== '' && !isGeminiModel(raw.model)) || !isValidApiKey(raw.apiKey)) return null;
-  return { provider: 'gemini', model: raw.model, apiKey: raw.apiKey.trim() };
+  return { provider: 'gemini', model: raw.model, apiKey: raw.apiKey.trim(), prompt: typeof raw.prompt === 'string' && raw.prompt.trim() ? raw.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_PROMPT };
 }
 
 async function readStored(): Promise<StoredAISettings | null> {
@@ -44,17 +54,20 @@ export async function readAISettings(): Promise<AISettingsPublic> {
     model: stored?.model ?? DEFAULT_MODEL,
     hasApiKey: Boolean(stored?.apiKey),
     isDefault: !stored,
+    prompt: stored?.prompt ?? DEFAULT_PICTURE_PROMPT,
   };
 }
 
-export async function writeAISettings(input: { model: unknown; apiKey: unknown }): Promise<AISettingsPublic> {
+export async function writeAISettings(input: { model: unknown; apiKey: unknown; prompt?: unknown }): Promise<AISettingsPublic> {
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
-  const value: StoredAISettings = { provider: 'gemini', model: input.model || current?.model || '', apiKey: apiKey.trim() };
+  const prompt = input.prompt === undefined ? current?.prompt ?? DEFAULT_PICTURE_PROMPT : input.prompt;
+  if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
+  const value: StoredAISettings = { provider: 'gemini', model: input.model || current?.model || '', apiKey: apiKey.trim(), prompt: prompt.trim() };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
-  return { provider: 'gemini', model: value.model, hasApiKey: true, isDefault: false };
+  return { provider: 'gemini', model: value.model, hasApiKey: true, isDefault: false, prompt: value.prompt };
 }
 
 export async function resetAISettings(): Promise<AISettingsPublic> {
@@ -111,13 +124,7 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
     body: JSON.stringify({
       contents: [{ parts: [
         { text: [
-          'Ты готовишь эталонные данные для тренажёра описания картинки.',
-          'Ответь только на русском языке.',
-          'Опиши только то, что непосредственно видно на изображении. Не угадывай личности, намерения, возраст, профессию, точное место, время или события, если это нельзя уверенно определить.',
-          'Название должно быть кратким и нейтральным: 3–8 слов.',
-          'Описание должно быть подробным, но фактическим: укажи общую сцену и место (только если видно), затем людей или животных, их видимые действия и положение, заметные предметы, цвета, фон и другие важные детали.',
-          'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
-          'Верни объект с ровно двумя строковыми полями: title и description.',
+          stored.prompt,
         ].join(' ') },
         { inline_data: { mime_type: match[1], data: match[2] } },
       ] }],
