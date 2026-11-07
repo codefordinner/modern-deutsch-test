@@ -1,12 +1,8 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
-import { NumbersTrainer } from './components/NumbersTrainer';
-import { WordsTrainer } from './components/WordsTrainer';
-import { ArticlesTrainer } from './components/ArticlesTrainer';
-import { VerbsTrainer } from './components/VerbsTrainer';
-import { TimeTrainer } from './components/TimeTrainer';
+import { TrainerContent } from './components/routing/TrainerContent';
 import { ToastHost } from './components/ToastHost';
 import { UpdateBanner } from './components/UpdateBanner';
 import { trackEvent } from './api/client';
@@ -14,31 +10,9 @@ import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
-import type { ScoredTab } from './hooks/useScores';
-import type { TrainerTab } from './types';
+import type { ScoredTab } from './config/tabs';
+import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
-
-// The admin panel (tables, forms, analytics) is only for the site owner, so it
-// is split into its own chunk that ordinary learners never download.
-const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
-
-const titles: Record<TrainerTab, string> = {
-  numbers: '🔢 Числительные',
-  words: '📚 Словарь',
-  articles: '🔤 Артикли (der / die / das)',
-  verbs: '⚡ Глаголы (Präsens, Präteritum, Partizip II)',
-  time: '⏰ Немецкое время (Uhrzeit)',
-  admin: '⚙️ Панель управления',
-};
-
-const pageTitles: Record<TrainerTab, string> = {
-  numbers: 'Числительные',
-  words: 'Словарь',
-  articles: 'Артикли',
-  verbs: 'Глаголы',
-  time: 'Время',
-  admin: 'Админка',
-};
 
 export function App() {
   const activeTab = useHashRoute();
@@ -62,7 +36,7 @@ export function App() {
   };
 
   const { scores, recordAnswer, resetScore } = useScores();
-  const scoredTab: ScoredTab | null = activeTab === 'admin' ? null : activeTab;
+  const scoredTab: ScoredTab | null = getTabDefinition(activeTab).scored ? activeTab as ScoredTab : null;
 
   // Leitner box probabilities configured by the admin (defaults until loaded).
   useSrsWeightsSync();
@@ -107,7 +81,7 @@ export function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    document.title = `${pageTitles[activeTab]} — Deutsch Trainer`;
+    document.title = `${getTabDefinition(activeTab).pageTitle} — Deutsch Trainer`;
   }, [activeTab]);
 
   const handleAnswer = (isCorrect: boolean) => {
@@ -127,25 +101,16 @@ export function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      <main className="app-container" id="main">
-        {activeTab === 'numbers' && <NumbersTrainer onAnswer={handleAnswer} />}
-        {activeTab === 'words' && <WordsTrainer onAnswer={handleAnswer} />}
-        {activeTab === 'articles' && <ArticlesTrainer onAnswer={handleAnswer} />}
-        {activeTab === 'verbs' && <VerbsTrainer onAnswer={handleAnswer} />}
-        {activeTab === 'time' && <TimeTrainer />}
-        {activeTab === 'admin' && (
-          <Suspense fallback={<div className="centered-message">Загрузка панели управления…</div>}>
-            <AdminPanel />
-          </Suspense>
-        )}
-      </main>
+       <main className="app-container" id="main">
+         <TrainerContent activeTab={activeTab} onAnswer={handleAnswer} />
+       </main>
 
       {isStatsOpen && scoredTab && (
         <StatsPanel
            score={scores[scoredTab]}
            scores={scores}
           onReset={() => resetScore(scoredTab)}
-          trainerName={titles[activeTab]}
+           trainerName={getTabDefinition(activeTab).title}
           onClose={() => setIsStatsOpen(false)}
         />
       )}

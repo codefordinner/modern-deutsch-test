@@ -5,6 +5,8 @@ import { readAudioSettings, type AudioSettings } from './audioSettings';
 export const MAX_AUDIO_TEXT_LENGTH = 10_000;
 const DEFAULT_PIPER_URL = 'http://piper-tts:5000';
 const inFlight = new Map<string, Promise<Buffer>>();
+const AUDIO_DB_RETRIES = 6;
+const AUDIO_DB_RETRY_DELAY_MS = 250;
 
 // SQLite allows only one writer at a time. Piper generation can stay parallel,
 // but writing several (potentially large) WAV blobs and job updates in parallel
@@ -17,7 +19,16 @@ async function withAudioDbWriteLock<T>(operation: () => Promise<T>): Promise<T> 
   audioDbWriteQueue = new Promise<void>((resolve) => { release = resolve; });
   await previous;
   try {
-    return await operation();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const retryable = /timed out|database is locked|SQLITE_BUSY|transaction.?timeout/i.test(message);
+        if (!retryable || attempt >= AUDIO_DB_RETRIES) throw error;
+        await new Promise((resolve) => setTimeout(resolve, AUDIO_DB_RETRY_DELAY_MS * (attempt + 1)));
+      }
+    }
   } finally {
     release();
   }
@@ -142,21 +153,30 @@ async function runRegeneration(jobId: string): Promise<void> {
 
   let next = 0;
   let generated = 0;
+  let lastPersisted = 0;
+  const persistProgress = async (force = false) => {
+    if (!force && generated - lastPersisted < 10) return;
+    const value = generated;
+    if (value <= lastPersisted && !force) return;
+    lastPersisted = value;
+    await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
+      where: { id: jobId },
+      data: { generated: value, durationMs: Math.max(0, Date.now() - startedAt) },
+    }));
+  };
   const worker = async () => {
     while (true) {
       const index = next++;
       if (index >= words.length) return;
       await getOrCreateAudio(words[index].de, 'word');
       generated++;
-      // Persist every item. This is intentionally simple and makes a refresh show
-      // useful progress even when Piper generation is slow.
-      await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
-          where: { id: jobId },
-          data: { generated: { increment: 1 }, durationMs: Math.max(0, Date.now() - startedAt) },
-        }));
+      // SQLite has one writer. Persisting every completed word made four workers
+      // queue thousands of tiny writes and eventually hit the connector timeout.
+      await persistProgress();
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, words.length || 1) }, worker));
+  await persistProgress(true);
   await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { status: 'completed', total: words.length } }));
 }
 

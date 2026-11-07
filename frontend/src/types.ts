@@ -64,7 +64,7 @@ export interface NumberRangeSettings {
   max: number;
 }
 
-export type TrainerTab = 'numbers' | 'words' | 'articles' | 'verbs' | 'time' | 'admin';
+export type { AppTab, TrainerTab } from './config/tabs';
 
 export interface ScoreState {
   correct: number;

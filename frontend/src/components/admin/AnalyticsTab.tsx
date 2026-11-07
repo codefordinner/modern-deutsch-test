@@ -5,16 +5,9 @@ import { ModeSwitch } from '../ModeSwitch';
 import { ColumnChart, Heatmap } from './AnalyticsCharts';
 import type { ChartItem } from './AnalyticsCharts';
 import type { AnalyticsStats, NamedCount, StatsBucket } from '../../types';
+import { ANALYTICS_TAB_LABELS } from '../../config/tabs';
 
-const tabLabels: Record<string, string> = {
-  numbers: '🔢 Числительные',
-  words: '📚 Словарь',
-  articles: '🔤 Артикли',
-  verbs: '⚡ Глаголы',
-  time: '⏰ Время',
-  admin: '⚙️ Админка',
-  other: 'Прочее',
-};
+const tabLabels = ANALYTICS_TAB_LABELS;
 
 const deviceLabels: Record<string, string> = {
   mobile: '📱 Телефон',

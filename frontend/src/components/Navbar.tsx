@@ -1,26 +1,18 @@
 import React from 'react';
-import type { TrainerTab } from '../types';
+import { APP_TABS } from '../config/tabs';
+import type { AppTab } from '../config/tabs';
 import { tabHref } from '../hooks/useHashRoute';
 import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
-import { Hash, BookOpen, Type, Zap, Clock, ShieldCheck, Sun, Moon, BarChart3, Settings } from 'lucide-react';
+import { Sun, Moon, Settings, BarChart3 } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: TrainerTab;
+  activeTab: AppTab;
   isDark: boolean;
   onToggleTheme: () => void;
   onOpenStats: () => void;
   showStats: boolean;
   onOpenSettings: () => void;
 }
-
-const tabs = [
-  { id: 'numbers' as TrainerTab, label: 'Числа', icon: Hash },
-  { id: 'words' as TrainerTab, label: 'Слова', icon: BookOpen },
-  { id: 'articles' as TrainerTab, label: 'Артикли', icon: Type },
-  { id: 'verbs' as TrainerTab, label: 'Глаголы', icon: Zap },
-  { id: 'time' as TrainerTab, label: 'Время', icon: Clock },
-  { id: 'admin' as TrainerTab, label: 'Админка', icon: ShieldCheck },
-];
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
@@ -53,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Wide screens: tabs in the header. Phones: the same tabs live in the bottom bar below. */}
           <nav className="nav-tabs" aria-label="Разделы">
-            {tabs.map((t) => {
+            {APP_TABS.map((t) => {
               const Icon = t.icon;
               const isActive = activeTab === t.id;
               return (
@@ -118,8 +110,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      <nav className="bottom-nav" aria-label="Разделы">
-        {tabs.map((t) => {
+      <nav className="bottom-nav" aria-label="Разделы" style={{ '--bottom-nav-count': APP_TABS.length } as React.CSSProperties}>
+        {APP_TABS.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
           return (

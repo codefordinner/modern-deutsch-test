@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ScoreState } from '../types';
+import { SCORED_TABS, type ScoredTab } from '../config/tabs';
 import { incrementDailyCount } from '../utils/studyPrefs';
 
 /** Trainers that keep a score (the admin panel has none). */
-export type ScoredTab = 'numbers' | 'words' | 'articles' | 'verbs' | 'time';
-
 export type Scores = Record<ScoredTab, ScoreState>;
 
 const STORAGE_KEY = 'app_scores';
-const SCORED_TABS: readonly ScoredTab[] = ['numbers', 'words', 'articles', 'verbs', 'time'];
-
 export const emptyScore = (): ScoreState => ({ correct: 0, total: 0, streak: 0, bestStreak: 0 });
 
 const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;

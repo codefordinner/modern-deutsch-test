@@ -18,8 +18,8 @@ Deutsch Trainer: тренажёр немецкого для русскоязыч
   Внимание: `tsc -p frontend/tsconfig.json` ничего не проверяет — это «solution»-конфиг с `files: []`, нужен именно `-b`.
 - Проверка бэкенда: `npm run build` в `backend/` (`prisma generate && tsc`).
 - Сборка: `npm run build` в корне (фронт + `dist/server.cjs`). CI собирает только `backend/` и `frontend/` (+ Docker-образы).
-- ESLint: конфиг `frontend/eslint.config.js` есть, но пакетов eslint в `frontend/package.json` нет — `npm run lint` во `frontend/` пока не работает. Подключите зависимости, прежде чем рассчитывать на линтер.
-- Автотестов пока нет. Новую чистую логику (`utils/*`, `services/*`) покрывайте тестами (vitest), если добавляете раннер.
+- ESLint и Vitest подключены в `frontend/package.json`; перед завершением запускайте `npm run lint`, `npm run build` и `npm run test` в `frontend/`.
+- Новую чистую логику (`utils/*`, `services/*`, конфигурационные registry) покрывайте тестами (vitest).
 
 ## Жёсткие правила
 
@@ -56,7 +56,7 @@ Deutsch Trainer: тренажёр немецкого для русскоязыч
 22. Выбор режима — через `ModeSwitch` (на телефонах превращается в выпадающий список), кнопки панелей — через `ToolbarButton`.
 
 ### Новый тренажёр / вкладка (чек-лист)
-`types.ts` (`TrainerTab`) → `hooks/useHashRoute.ts` (`TABS`) → `components/Navbar.tsx` (`tabs`) → `styles/layout.css` (`grid-template-columns: repeat(N, …)` у `.bottom-nav` — число вкладок записано жёстко) → `App.tsx` (`titles`, `pageTitles`, рендер) → `hooks/useScores.ts` (`ScoredTab`, `SCORED_TABS`) → `components/admin/AnalyticsTab.tsx` (`tabLabels`; сейчас там нет «articles») → если есть SRS: пункт 15 → `ARCHITECTURE.md`.
+`config/tabs.ts` (`APP_TABS`) → компонент вкладки → при необходимости настройки, scoring и SRS. Hash-роутинг, Navbar, аналитика, заголовки и mobile-навигация используют registry автоматически. При добавлении SRS-тренажёра дополнительно обновите backend `SYNC_TRAINERS`, frontend `SRS_TRAINERS`, `SrsTrainer`, `emptySyncData` и тесты.
 
 ### PWA / Service Worker
 23. `frontend/public/sw.js` кэширует только публичные `GET /api/words` и `GET /api/categories`. Админские, аналитические, `/api/settings/*` и `/api/sync/*` кэшировать **нельзя**. При изменении правил кэширования поднимите `VERSION`.
@@ -67,7 +67,7 @@ Deutsch Trainer: тренажёр немецкого для русскоязыч
 26. Дубликаты слов определяются `duplicateKey()` (`services/wordImport.ts`) — используйте её везде.
 
 ### Безопасность
-27. Токен админа живёт в HttpOnly-cookie. Известный долг: `/auth/login` дополнительно возвращает его в теле ответа, а `client.ts` кладёт его в `localStorage` (`admin_token`) — это ослабляет защиту cookie. Не расширяйте использование этого канала; цель — убрать его.
+27. Токен админа живёт только в HttpOnly-cookie и не передаётся клиентскому JavaScript через тело ответа или `localStorage`.
 28. Секреты — только из окружения (`ADMIN_PASSWORD`, `JWT_SECRET`), не в клиент и не в репозиторий. В production обязательно задавайте оба.
 29. Не логируйте персональные данные (IP и User-Agent из аналитики — только в БД).
 

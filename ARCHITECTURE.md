@@ -23,7 +23,9 @@
    ├─ nginx.conf, Dockerfile статика + прокси /api → app-backend:3001
    ├─ public/                favicon, manifest.webmanifest, sw.js, icons/
    └─ src/
-      ├─ main.tsx, App.tsx   вход, вкладки, тема, счёт
+       ├─ main.tsx, App.tsx   вход, глобальная оболочка, тема, счёт
+       │  ├─ config/tabs.ts   единый registry вкладок и их возможностей
+       │  └─ components/routing/TrainerContent.tsx  выбор содержимого вкладки
       ├─ types.ts            общие типы
       ├─ api/                client.ts (весь HTTP), queryCache.ts (кэш запросов)
       ├─ hooks/              useDictionary, useSRSProgress, useSrsWeightsSync, useSrsSync, useScores, useHashRoute,
@@ -70,7 +72,7 @@
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
-- **settings**: `GET/PUT/DELETE /settings/audio-settings` читают и изменяют модель Piper, `length_scale`, `noise_scale`, `noise_w_scale` и `sentence_silence`; старые endpoints `audio-voice` остаются для совместимости. `POST /audio/admin/preview` генерирует тестовый WAV без записи в кэш.
+- **settings**: `GET/PUT/DELETE /settings/audio-settings` читают и изменяют модель Piper, `length_scale`, `noise_scale`, `noise_w_scale` и `sentence_silence`; старые endpoints `audio-voice` остаются для совместимости. `POST /audio/admin/preview` генерирует тестовый WAV без записи в кэш. Изменение настроек не запускает массовую генерацию автоматически: новые варианты создаются при первом прослушивании или через явную кнопку регенерации.
 - **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
 - **Импорт** (`wordImport.ts`): JSON (в т. ч. в ```json```), либо текст «слово;перевод;plural;подсказка». Строки с ошибками пропускаются и отчитываются; `dryRun`; дубликаты по `duplicateKey`.
@@ -82,6 +84,8 @@
 `api/client.ts` → `api/queryCache.ts` (общий кэш, stale-while-revalidate, `invalidateQueries`) → `hooks/useDictionary.ts` → тренажёры и админка. Один запрос словаря обслуживает все вкладки.
 
 ### Вкладки (hash-роутинг `#/numbers|words|articles|verbs|time|admin`)
+
+Метаданные вкладок находятся в едином registry `frontend/src/config/tabs.ts`: id, подпись, заголовок, иконка, участие в счёте и поддержка SRS. Hash-роутинг, Navbar, подписи аналитики и список scored-вкладок используют этот registry. Содержимое вкладок выбирает `components/routing/TrainerContent.tsx`. При добавлении вкладки сначала добавьте её в registry, затем компонент и специализированные настройки/SRS по необходимости; не создавайте отдельные ручные списки вкладок.
 | Вкладка | Компонент | Логика |
 |---|---|---|
 | Числа | `NumbersTrainer` | `numbers-generator.ts` (`germanNumberVariants`), `answerMatch` |
@@ -150,10 +154,10 @@
 
 ## Известные ограничения / идеи
 - Нет аккаунтов: прогресс переносится файлом или ключом синхронизации (кто знает ключ — владеет профилем; ограничение 60 запросов/мин на IP).
-- Нет автотестов; ESLint сконфигурирован (`frontend/eslint.config.js`), но пакеты не добавлены в `frontend/package.json`, поэтому `npm run lint` во `frontend/` не работает.
+- Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются отдельными командами из `frontend/`.
 - Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
-- Метка вкладки «Артикли» в `AnalyticsTab.tabLabels` не добавлена (показывается ключ `articles`).
+- Метаданные вкладок централизованы в `frontend/src/config/tabs.ts`; отдельные списки в Navbar, routing и аналитике не создаются.
 - Вкладка «Время» не ведёт счёт; компонент `time/TimeQuizCard.tsx` (режим с вводом ответа) нигде не используется.
 - Неиспользуемые файлы-остатки: `components/Footer.tsx`, `utils/analytics.ts`, `src/App.css`, `src/assets/*.svg`, `public/icons.svg` (шаблон Vite).
 - Аналитика хранит IP и User-Agent в открытом виде (GDPR).

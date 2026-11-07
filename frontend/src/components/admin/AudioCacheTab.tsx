@@ -73,7 +73,7 @@ export const AudioCacheTab: React.FC = () => {
 
   return <div className="card">
     <h3 className="card-title"><AudioLines size={20} /> Озвучка и кэш</h3>
-    <p className="card-note">Piper поддерживает модель и параметры просодии. Изменение настроек создаёт новый вариант кэша; старые WAV можно очистить.</p>
+    <p className="card-note">Piper поддерживает модель и параметры просодии. Изменение настроек не запускает генерацию автоматически: новые WAV создаются при первом прослушивании. Полную регенерацию можно запустить отдельно.</p>
     <p>В кэше: <strong>{stats?.total ?? '—'}</strong> записей (слова: {stats?.words ?? '—'}, предложения: {stats?.sentences ?? '—'})</p>
     {regeneration && <div className="audio-regeneration-status" aria-live="polite">
       <div className="settings-group-title">Фоновая генерация слов</div>
