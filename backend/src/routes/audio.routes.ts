@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
-import { audioCacheStats, clearAudioCache, getOrCreateAudio, MAX_AUDIO_TEXT_LENGTH, regenerateWordAudio } from '../services/audio';
+import { audioCacheStats, clearAudioCache, generateAudioPreview, getOrCreateAudio, MAX_AUDIO_TEXT_LENGTH, regenerateWordAudio } from '../services/audio';
+import { sanitizeAudioSettings } from '../services/audioSettings';
 
 const router = Router();
 const audioLimiter = rateLimit({
@@ -22,6 +23,20 @@ router.delete('/admin/cache', requireAdmin, async (_req, res) => {
 
 router.post('/admin/regenerate-words', requireAdmin, async (_req, res) => {
   try { res.json(await regenerateWordAudio()); } catch { res.status(502).json({ error: 'Не удалось сгенерировать озвучку слов' }); }
+});
+
+router.post('/admin/preview', requireAdmin, async (req: Request, res: Response) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text : '';
+  const settings = sanitizeAudioSettings(req.body?.settings);
+  if (!text.trim() || text.length > MAX_AUDIO_TEXT_LENGTH || !settings) {
+    return res.status(400).json({ error: 'Некорректный текст или параметры озвучки' });
+  }
+  try {
+    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }).send(await generateAudioPreview(text, settings));
+  } catch (error) {
+    console.error('[audio] preview failed:', error);
+    res.status(502).json({ error: 'Не удалось прослушать тестовую озвучку' });
+  }
 });
 
 // Keep this catch-all route after the admin routes: Express treats `/` as a

@@ -5,7 +5,7 @@ let currentAudio: HTMLAudioElement | null = null;
 let requestId = 0;
 
 export async function speakGerman(text: string, kind: 'word' | 'sentence' = 'word'): Promise<void> {
-  const cleanText = text.replace(/[\(\)\[\]\/]/g, ' ').normalize('NFC').trim();
+  const cleanText = text.replace(new RegExp('[()[\\]/]', 'g'), ' ').normalize('NFC').trim();
   if (!cleanText || typeof window === 'undefined') return;
   const id = ++requestId;
   try {

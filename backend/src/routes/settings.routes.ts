@@ -7,7 +7,16 @@ import {
   sanitizeWeights,
   writeSrsWeights,
 } from '../services/srsSettings';
-import { isAudioVoice, readAudioVoice, resetAudioVoice, writeAudioVoice } from '../services/audioSettings';
+import {
+  isAudioVoice,
+  readAudioSettings,
+  readAudioVoice,
+  resetAudioSettings,
+  resetAudioVoice,
+  sanitizeAudioSettings,
+  writeAudioSettings,
+  writeAudioVoice,
+} from '../services/audioSettings';
 
 const router = Router();
 
@@ -18,6 +27,23 @@ router.get('/audio-voice', async (_req, res) => {
   } catch {
     res.status(500).json({ error: 'Не удалось загрузить настройку голоса' });
   }
+});
+
+router.get('/audio-settings', async (_req, res) => {
+  try { res.setHeader('Cache-Control', 'no-store'); res.json(await readAudioSettings()); }
+  catch { res.status(500).json({ error: 'Не удалось загрузить настройки озвучки' }); }
+});
+
+router.put('/audio-settings', requireAdmin, async (req, res) => {
+  const settings = sanitizeAudioSettings(req.body?.settings);
+  if (!settings) return res.status(400).json({ error: 'Некорректные параметры озвучки' });
+  try { await writeAudioSettings(settings); res.json({ settings, isDefault: false }); }
+  catch { res.status(500).json({ error: 'Не удалось сохранить настройки озвучки' }); }
+});
+
+router.delete('/audio-settings', requireAdmin, async (_req, res) => {
+  try { await resetAudioSettings(); res.json(await readAudioSettings()); }
+  catch { res.status(500).json({ error: 'Не удалось сбросить настройки озвучки' }); }
 });
 
 router.put('/audio-voice', requireAdmin, async (req, res) => {
@@ -46,7 +72,7 @@ router.get('/srs-weights', async (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
     res.json(await readSrsWeights());
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch SRS settings' });
+    res.status(500).json({ error: 'Не удалось загрузить настройки SRS' });
   }
 });
 
@@ -61,7 +87,7 @@ router.put('/srs-weights', requireAdmin, async (req: Request, res: Response) => 
     await writeSrsWeights(weights);
     res.json({ weights, isDefault: false });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to save SRS settings' });
+    res.status(500).json({ error: 'Не удалось сохранить настройки SRS' });
   }
 });
 
@@ -71,7 +97,7 @@ router.delete('/srs-weights', requireAdmin, async (_req: Request, res: Response)
     await resetSrsWeights();
     res.json(await readSrsWeights());
   } catch (error) {
-    res.status(500).json({ error: 'Failed to reset SRS settings' });
+    res.status(500).json({ error: 'Не удалось сбросить настройки SRS' });
   }
 });
 

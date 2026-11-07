@@ -3,8 +3,18 @@ import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
 import { resolveVisitorId } from '../services/visitor';
 import { describeUserAgent } from '../services/userAgent';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
+const analyticsLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({ error: 'Слишком много событий. Попробуйте позже.' }),
+});
+const EVENT_TYPES = new Set(['visit', 'tab_switch', 'quiz_answer']);
+const TRAINER_TYPES = new Set(['numbers', 'words', 'articles', 'verbs', 'time', 'admin']);
 
 /**
  * "A day" in the statistics is a calendar day in ONE fixed time zone
@@ -87,13 +97,18 @@ function weekStart(key: string): string {
 const visitorKey = (e: { visitorId: string | null; ipAddress: string | null; userAgent: string | null }): string =>
   e.visitorId ? `id:${e.visitorId}` : `legacy:${e.ipAddress ?? 'unknown'}|${e.userAgent ?? ''}`;
 
-router.post('/event', async (req: Request, res: Response) => {
+router.post('/event', analyticsLimiter, async (req: Request, res: Response) => {
   try {
     const { eventType, trainerType, isCorrect } = req.body ?? {};
+    if (typeof eventType !== 'string' || !EVENT_TYPES.has(eventType)) return res.status(400).json({ error: 'Неизвестный тип события' });
+    if (trainerType !== undefined && trainerType !== null && (typeof trainerType !== 'string' || !TRAINER_TYPES.has(trainerType))) {
+      return res.status(400).json({ error: 'Неизвестный тренажёр' });
+    }
+    if (isCorrect !== undefined && typeof isCorrect !== 'boolean') return res.status(400).json({ error: 'Некорректный результат ответа' });
     const visitorId = resolveVisitorId(req, res);
     await prisma.analyticsEvent.create({
       data: {
-        eventType: eventType || 'action',
+        eventType,
         trainerType: trainerType || null,
         isCorrect: isCorrect !== undefined ? Boolean(isCorrect) : null,
         visitorId,
@@ -103,7 +118,7 @@ router.post('/event', async (req: Request, res: Response) => {
     });
     res.json({ status: 'ok' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to record event' });
+    res.status(500).json({ error: 'Не удалось записать событие' });
   }
 });
 
@@ -268,7 +283,7 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('[analytics] stats failed:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    res.status(500).json({ error: 'Не удалось загрузить статистику' });
   }
 });
 

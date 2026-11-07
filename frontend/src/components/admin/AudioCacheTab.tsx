@@ -1,42 +1,78 @@
 import React, { useEffect, useState } from 'react';
-import { AudioLines, RefreshCw, Trash2 } from 'lucide-react';
-import { clearAudioCache, fetchAudioVoice, getAudioCacheStats, regenerateWordAudio, resetAudioVoice, saveAudioVoice } from '../../api/client';
-import type { AudioCacheStats } from '../../api/client';
+import { AudioLines, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { clearAudioCache, fetchAudioSettings, getAudioCacheStats, previewAudioSettings, regenerateWordAudio, resetAudioSettings, saveAudioSettings } from '../../api/client';
+import type { AudioCacheStats, AudioSettings } from '../../api/client';
 import { reportError, showToast } from '../../utils/toast';
+
+const DEFAULTS: AudioSettings = { voice: 'de_DE-thorsten-medium', lengthScale: 1, noiseScale: 0.667, noiseWScale: 0.8, sentenceSilence: 0 };
 
 export const AudioCacheTab: React.FC = () => {
   const [stats, setStats] = useState<AudioCacheStats | null>(null);
+  const [settings, setSettings] = useState<AudioSettings>(DEFAULTS);
+  const [saved, setSaved] = useState<AudioSettings>(DEFAULTS);
+  const [sample, setSample] = useState('Guten Tag!');
   const [busy, setBusy] = useState(false);
-  const [voice, setVoice] = useState('de_DE-thorsten-medium');
-  const [voiceDraft, setVoiceDraft] = useState('de_DE-thorsten-medium');
+  const [playing, setPlaying] = useState(false);
+
   const refresh = () => getAudioCacheStats().then(setStats).catch((e) => reportError(e, 'Не удалось загрузить состояние кэша'));
   useEffect(() => {
     void refresh();
-    fetchAudioVoice().then((result) => { setVoice(result.voice); setVoiceDraft(result.voice); }).catch((e) => reportError(e, 'Не удалось загрузить настройку голоса'));
+    fetchAudioSettings().then((result) => { setSettings(result.settings); setSaved(result.settings); }).catch((e) => reportError(e, 'Не удалось загрузить настройки озвучки'));
   }, []);
-  const run = async (action: () => Promise<void>, success: string) => {
-    setBusy(true);
-    try { await action(); showToast(success, 'success'); refresh(); } catch (e) { reportError(e, 'Операция с кэшем не выполнена'); } finally { setBusy(false); }
+
+  const changed = JSON.stringify(settings) !== JSON.stringify(saved);
+  const update = (field: keyof AudioSettings, value: string | number) => setSettings((current) => ({ ...current, [field]: field === 'voice' ? value : Number(value) } as AudioSettings));
+  const preview = async () => {
+    if (!sample.trim()) return;
+    setPlaying(true);
+    try {
+      const blob = await previewAudioSettings(sample, settings);
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); setPlaying(false); };
+      audio.onerror = () => { URL.revokeObjectURL(url); setPlaying(false); };
+      await audio.play();
+    } catch (e) { setPlaying(false); reportError(e, 'Не удалось прослушать тестовую озвучку'); }
   };
+  const save = async () => {
+    setBusy(true);
+    try { const result = await saveAudioSettings(settings); setSettings(result.settings); setSaved(result.settings); showToast('Настройки озвучки сохранены', 'success'); refresh(); }
+    catch (e) { reportError(e, 'Не удалось сохранить настройки озвучки'); } finally { setBusy(false); }
+  };
+  const reset = async () => {
+    setBusy(true);
+    try { const result = await resetAudioSettings(); setSettings(result.settings); setSaved(result.settings); showToast('Настройки по умолчанию восстановлены', 'success'); refresh(); }
+    catch (e) { reportError(e, 'Не удалось сбросить настройки озвучки'); } finally { setBusy(false); }
+  };
+  const runCache = async (action: () => Promise<unknown>, message: string) => {
+    setBusy(true); try { await action(); showToast(message, 'success'); refresh(); } catch (e) { reportError(e, 'Операция с кэшем не выполнена'); } finally { setBusy(false); }
+  };
+
   return <div className="card">
     <h3 className="card-title"><AudioLines size={20} /> Озвучка и кэш</h3>
-    <p className="card-note">Используется голос Piper. Отсутствующие слова генерируются автоматически при первом прослушивании. Кэш также подготовлен для целых предложений.</p>
+    <p className="card-note">Piper поддерживает модель и параметры просодии. Изменение настроек создаёт новый вариант кэша; старые WAV можно очистить.</p>
     <p>В кэше: <strong>{stats?.total ?? '—'}</strong> записей (слова: {stats?.words ?? '—'}, предложения: {stats?.sentences ?? '—'})</p>
     <div className="settings-divider">
-      <label className="setting-toggle-title" htmlFor="audio-voice-select">Голос Piper</label>
-      <select id="audio-voice-select" className="text-input" value={voiceDraft} onChange={(e) => setVoiceDraft(e.target.value)}>
+      <label className="setting-toggle-title" htmlFor="audio-voice-select">Модель голоса Piper</label>
+      <select id="audio-voice-select" className="text-input" value={settings.voice} onChange={(e) => update('voice', e.target.value)}>
         <option value="de_DE-thorsten-medium">Thorsten — обычное качество</option>
         <option value="de_DE-thorsten-high">Thorsten — высокое качество</option>
       </select>
-      <span className="setting-toggle-desc">Модель должна быть установлена в контейнере Piper. После смены очистите или перегенерируйте кэш слов.</span>
-      <div className="import-actions">
-        <button type="button" className="btn-secondary" disabled={busy || voiceDraft === voice} onClick={() => void run(async () => { const result = await saveAudioVoice(voiceDraft); setVoice(result.voice); }, 'Голос сохранён')}>Сохранить голос</button>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(async () => { const result = await resetAudioVoice(); setVoice(result.voice); setVoiceDraft(result.voice); }, 'Голос по умолчанию восстановлен')}>По умолчанию</button>
-      </div>
+      <label className="setting-toggle-title" htmlFor="audio-length">Скорость (length_scale): {settings.lengthScale.toFixed(2)}</label>
+      <input id="audio-length" type="range" min="0.1" max="3" step="0.05" value={settings.lengthScale} onChange={(e) => update('lengthScale', e.target.value)} />
+      <label className="setting-toggle-title" htmlFor="audio-noise">Вариативность интонации (noise_scale): {settings.noiseScale.toFixed(3)}</label>
+      <input id="audio-noise" type="range" min="0" max="2" step="0.01" value={settings.noiseScale} onChange={(e) => update('noiseScale', e.target.value)} />
+      <label className="setting-toggle-title" htmlFor="audio-noise-w">Вариативность длительности (noise_w_scale): {settings.noiseWScale.toFixed(3)}</label>
+      <input id="audio-noise-w" type="range" min="0" max="2" step="0.01" value={settings.noiseWScale} onChange={(e) => update('noiseWScale', e.target.value)} />
+      <label className="setting-toggle-title" htmlFor="audio-silence">Пауза между предложениями: {settings.sentenceSilence.toFixed(1)} с</label>
+      <input id="audio-silence" type="range" min="0" max="10" step="0.1" value={settings.sentenceSilence} onChange={(e) => update('sentenceSilence', e.target.value)} />
+      <span className="setting-toggle-desc">Параметр speaker появится только если будет подключена multi-speaker модель. Текущие Thorsten-модели одноголосые.</span>
+      <div className="backup-actions"><button type="button" className="btn-secondary" disabled={busy || !changed} onClick={() => void save()}>Сохранить настройки</button><button type="button" className="btn-secondary" disabled={busy} onClick={() => void reset()}>По умолчанию</button></div>
     </div>
-    <div className="import-actions">
-      <button type="button" className="btn-secondary" disabled={busy} onClick={() => { if (confirm('Удалить весь кэш озвучки у всех слов и фраз?')) void run(async () => { await clearAudioCache(); }, 'Кэш озвучки очищен'); }}><Trash2 size={16} /> Очистить весь кэш</button>
-      <button type="button" className="btn-primary" disabled={busy} onClick={() => void run(async () => { const result = await regenerateWordAudio(); showToast(`Сгенерировано слов: ${result.generated}`, 'success'); }, 'Озвучка слов обновлена')}><RefreshCw size={16} /> {busy ? 'Подождите…' : 'Заново сгенерировать слова'}</button>
+    <div className="settings-divider">
+      <label className="setting-toggle-title" htmlFor="audio-preview-text">Проверить настройки</label>
+      <div className="backup-actions"><input id="audio-preview-text" className="text-input w-full" value={sample} maxLength={10_000} onChange={(e) => setSample(e.target.value)} placeholder="Введите немецкое слово или фразу" /><button type="button" className="btn-primary" disabled={playing || !sample.trim()} onClick={() => void preview()}><Play size={14} /> {playing ? 'Воспроизведение…' : 'Прослушать'}</button></div>
     </div>
+    <div className="import-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={() => { if (confirm('Удалить весь кэш озвучки у всех слов и фраз?')) void runCache(clearAudioCache, 'Кэш озвучки очищен'); }}><Trash2 size={16} /> Очистить весь кэш</button><button type="button" className="btn-primary" disabled={busy} onClick={() => void runCache(regenerateWordAudio, 'Озвучка слов обновлена')}><RefreshCw size={16} /> {busy ? 'Подождите…' : 'Заново сгенерировать слова'}</button></div>
   </div>;
 };

@@ -23,6 +23,7 @@ export const BACKUP_KEYS = [
   'time_step_mode',
   'verbs_mode',
   'articles_category',
+  'onboarding_seen',
 ] as const;
 
 // The daily counter (app_daily_progress) is deliberately not exported: it's meaningless on another day/device.

@@ -24,6 +24,11 @@ const router = Router();
 // a Unicode-aware lowercase; the word list is small enough for that.
 const normalizeForSearch = (value: string | null | undefined): string => (value ?? '').normalize('NFC').toLowerCase();
 
+const readPageNumber = (value: unknown, fallback: number, max: number): number => {
+  const parsed = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : fallback;
+  return Number.isSafeInteger(parsed) ? Math.min(Math.max(parsed, 1), max) : fallback;
+};
+
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { categoryId, search, limit = '200', page = '1' } = req.query;
@@ -34,8 +39,9 @@ router.get('/', async (req: Request, res: Response) => {
       where.OR = [{ categoryId: id }, { extraCategories: { some: { id } } }];
     }
 
-    const take = Math.min(Number(limit) || 200, 1000);
-    const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
+    const take = readPageNumber(limit, 200, 1000);
+    const pageNumber = readPageNumber(page, 1, 100_000);
+    const skip = (pageNumber - 1) * take;
     const query = search ? normalizeForSearch(String(search).trim()) : '';
 
     let words;
@@ -55,9 +61,9 @@ router.get('/', async (req: Request, res: Response) => {
       words = matched.slice(skip, skip + take);
     }
 
-    res.json({ words: words.map(serializeWord), total, page: Number(page), limit: take });
+    res.json({ words: words.map(serializeWord), total, page: pageNumber, limit: take });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch words' });
+    res.status(500).json({ error: 'Не удалось загрузить слова' });
   }
 });
 
@@ -80,7 +86,12 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
       praesensSie,
     } = req.body;
     const categoryIds = readCategoryIds(req.body);
-    if (!de || !ru || !categoryIds) return res.status(400).json({ error: 'Missing required fields' });
+    if (typeof de !== 'string' || typeof ru !== 'string' || !de.trim() || !ru.trim() || !categoryIds) {
+      return res.status(400).json({ error: 'Нужно заполнить немецкое слово, перевод и категорию' });
+    }
+    if (await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(de) } })) {
+      return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
+    }
     if (!(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
 
     const pos = readPartOfSpeech(req.body, { keepIfMissing: false });
@@ -89,7 +100,8 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     const [primaryId, ...extraIds] = categoryIds;
     const word = await prisma.word.create({
       data: {
-        de,
+        de: de.trim(),
+        normalizedDe: duplicateKey(de),
         ru,
         hint,
         partOfSpeech: pos.value,
@@ -111,7 +123,7 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     });
     res.status(201).json(serializeWord(word));
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create word' });
+    res.status(500).json({ error: 'Не удалось создать слово' });
   }
 });
 
@@ -140,11 +152,15 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     // No categories in the body = leave the word's categories as they are.
     const categoryIds = readCategoryIds(req.body);
     if (categoryIds && !(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
+    if (typeof de === 'string') {
+      const duplicate = await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(de), NOT: { id: req.params.id } } });
+      if (duplicate) return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
+    }
 
     const word = await prisma.word.update({
       where: { id: req.params.id },
       data: {
-        de,
+        ...(typeof de === 'string' && { de: de.trim(), normalizedDe: duplicateKey(de) }),
         ru,
         hint,
         partOfSpeech: pos.value,
@@ -168,7 +184,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     });
     res.json(serializeWord(word));
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update word' });
+    res.status(500).json({ error: 'Не удалось обновить слово' });
   }
 });
 
@@ -177,7 +193,7 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
     await prisma.word.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Word deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete word' });
+    res.status(500).json({ error: 'Не удалось удалить слово' });
   }
 });
 
@@ -204,7 +220,7 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
     const { data, defaultCategoryId, partOfSpeech, skipDuplicates = true, dryRun = false } = req.body ?? {};
 
     if (typeof data !== 'string' || !data.trim()) return res.status(400).json({ error: 'Нет данных для импорта' });
-    if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Invalid partOfSpeech' });
+    if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Недопустимая часть речи' });
 
     let raw;
     try {
@@ -281,6 +297,7 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
       const created = await prisma.category.create({
         data: {
           name,
+          normalizedName: name.trim().normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(),
           icon: meta?.icon || DEFAULT_CATEGORY_ICON,
           color: meta?.color || DEFAULT_CATEGORY_COLOR,
           isBuiltin: false,

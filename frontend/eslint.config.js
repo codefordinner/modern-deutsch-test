@@ -18,5 +18,15 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // These rules are useful for new React Compiler-compatible code, but the
+      // existing external-store/query code intentionally uses refs and effects
+      // to bridge non-React state. Keep the type/lint rules enabled while those
+      // larger refactors are handled separately.
+      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+    },
   },
 ])

@@ -38,6 +38,7 @@ export const StammformenQuiz: React.FC<StammformenQuizProps> = ({
   onNext,
   onInsertChar: _onInsertChar,
 }) => {
+  void _onInsertChar;
   const [settings] = useUISettings();
   const [activeField, setActiveField] = React.useState<'praeteritum' | 'partizip2'>('praeteritum');
   const currentBox = srsItem ? srsItem.box : 1;

@@ -39,8 +39,8 @@
 - **Category** `{id, name, icon, color, isBuiltin}` — 1:N **Word** (каскадное удаление).
 - **Word** `{de, ru, hint, partOfSpeech, plural, feminine, femininePlural, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesens{Ich,Du,ErSieEs,Wir,Ihr,Sie}, categoryId}`.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
-- **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; колонки `browser`, `os`, `device` есть в схеме, но не заполняются.
-- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights` (5 весов ящиков) и `audioVoice` (разрешённая модель Piper). Нет строки → значения по умолчанию.
+- **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
+- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights` и `audioSettings` (модель Piper, скорость, вариативность и пауза). Старый `audioVoice` читается для совместимости.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
@@ -58,20 +58,19 @@
 | `STATS_TIMEZONE` | часовой пояс «дня» в статистике | часовой пояс сервера |
 | `PORT` | порт отдельного backend | 3001 (`server.ts` — всегда 3000) |
 | `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
-| `PIPER_VOICE` | голос Piper | `de_DE-thorsten-medium` |
+ | `PIPER_VOICE` | голос Piper по умолчанию | `de_DE-thorsten-medium` |
 | `PIPER_TIMEOUT_MS` | таймаут генерации WAV | `30000` |
 
 Пустое значение (`TRUST_PROXY=`) не равно «не задано» — оно превращается в 0. Необязательные переменные не оставляйте пустыми.
 
 ## Backend
 - Express 4, JSON-лимит 5 МБ (массовый импорт); nginx — `client_max_body_size 6m`.
-- **Аутентификация админа**: пароль → JWT (HS256, 24 ч) в HttpOnly-cookie (`SameSite=None; Secure; Partitioned` по https, `Lax` по http) и заголовок `Authorization: Bearer` как запасной вариант. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
-  Сейчас `/auth/login` возвращает токен ещё и в теле ответа (см. «Известные ограничения»).
+- **Аутентификация админа**: пароль → JWT (HS256, 24 ч) только в HttpOnly-cookie. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
-- **settings**: `GET /settings/srs-weights` (публичный) → `{weights: number[5], isDefault}`; `PUT` (админ) `{weights}` — ровно 5 чисел 0…1000, хотя бы одно > 0; `DELETE` (админ) — сброс к умолчанию (60/15/10/5/10). `GET/PUT/DELETE /settings/audio-voice` читают и изменяют разрешённый голос Piper. Валидация — `services/srsSettings.ts` и `services/audioSettings.ts`.
+- **settings**: `GET/PUT/DELETE /settings/audio-settings` читают и изменяют модель Piper, `length_scale`, `noise_scale`, `noise_w_scale` и `sentence_silence`; старые endpoints `audio-voice` остаются для совместимости. `POST /audio/admin/preview` генерирует тестовый WAV без записи в кэш.
 - **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
 - **Импорт** (`wordImport.ts`): JSON (в т. ч. в ```json```), либо текст «слово;перевод;plural;подсказка». Строки с ошибками пропускаются и отчитываются; `dryRun`; дубликаты по `duplicateKey`.
@@ -131,7 +130,8 @@
 | `verbs_mode` | режим тренажёра глаголов | да |
 | `articles_category` | выбранная категория артиклей | да |
 | `app_daily_progress` | ответов за сегодня | нет |
-| `admin_token` | токен админа (запасной канал) | нет |
+| `onboarding_seen` | приветственный экран уже показан | да |
+| `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
 | `admin_last_word_category_id` | последняя категория в форме слова | нет |
 
 Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Внимание: ключ синхронизации входит в бэкап (внутри `app_ui_settings`) — файл прогресса нужно хранить как пароль.
@@ -151,7 +151,7 @@
 ## Известные ограничения / идеи
 - Нет аккаунтов: прогресс переносится файлом или ключом синхронизации (кто знает ключ — владеет профилем; ограничение 60 запросов/мин на IP).
 - Нет автотестов; ESLint сконфигурирован (`frontend/eslint.config.js`), но пакеты не добавлены в `frontend/package.json`, поэтому `npm run lint` во `frontend/` не работает.
-- Токен админа возвращается в теле `/auth/login` и дублируется в `localStorage` (`admin_token`) — это ослабляет HttpOnly-cookie; кандидат на удаление вместе с заголовком `Authorization` в `client.ts`.
+- Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
 - Метка вкладки «Артикли» в `AnalyticsTab.tabLabels` не добавлена (показывается ключ `articles`).
 - Вкладка «Время» не ведёт счёт; компонент `time/TimeQuizCard.tsx` (режим с вводом ответа) нигде не используется.

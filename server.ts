@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import apiRouter from './backend/src/api';
 import { backfillPartOfSpeech } from './backend/src/services/backfillPartOfSpeech';
+import { backfillNormalizedKeys } from './backend/src/services/backfillNormalizedKeys';
 
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = 'file:./dev.db';
@@ -87,6 +88,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
+      backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
     });
   } catch (err) {
     console.error('Failed to start server:', err);

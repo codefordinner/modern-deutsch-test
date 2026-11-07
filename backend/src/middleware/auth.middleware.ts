@@ -80,13 +80,8 @@ export const clearAuthCookie = (req: Request, res: Response): void => {
   res.setHeader('Set-Cookie', `${AUTH_COOKIE_NAME}=; ${cookieAttributes(req, 0)}`);
 };
 
-/** Reads the session token from the auth cookie or Authorization header fallback */
+/** Reads the session token from the HttpOnly auth cookie. */
 export const extractToken = (req: Request): string | null => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim();
-  }
-
   const cookie = req.headers.cookie
     ?.split(';')
     .map((part) => part.trim())

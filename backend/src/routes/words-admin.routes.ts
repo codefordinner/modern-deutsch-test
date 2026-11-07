@@ -64,7 +64,7 @@ router.post('/bulk/category', requireAdmin, async (req: Request, res: Response) 
     }
     res.json({ success: true, count });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to change category' });
+    res.status(500).json({ error: 'Не удалось изменить категорию' });
   }
 });
 
@@ -73,7 +73,7 @@ router.post('/bulk/part-of-speech', requireAdmin, async (req: Request, res: Resp
     const ids = readIds(req.body?.ids);
     const value = req.body?.partOfSpeech ?? null;
     if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
-    if (value !== null && !isPartOfSpeech(value)) return res.status(400).json({ error: 'Invalid partOfSpeech' });
+    if (value !== null && !isPartOfSpeech(value)) return res.status(400).json({ error: 'Недопустимая часть речи' });
 
     let count = 0;
     for (const chunk of chunked(ids)) {
@@ -81,7 +81,7 @@ router.post('/bulk/part-of-speech', requireAdmin, async (req: Request, res: Resp
     }
     res.json({ success: true, count });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to change part of speech' });
+    res.status(500).json({ error: 'Не удалось изменить часть речи' });
   }
 });
 
@@ -96,7 +96,7 @@ router.post('/bulk/delete', requireAdmin, async (req: Request, res: Response) =>
     }
     res.json({ success: true, count });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete words' });
+    res.status(500).json({ error: 'Не удалось удалить слова' });
   }
 });
 
@@ -122,7 +122,7 @@ router.get('/duplicates', requireAdmin, async (_req: Request, res: Response) => 
 
     res.json({ groups, total: groups.length });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to find duplicates' });
+    res.status(500).json({ error: 'Не удалось найти дубликаты' });
   }
 });
 
@@ -181,7 +181,7 @@ router.post('/duplicates/merge', requireAdmin, async (req: Request, res: Respons
 
     res.json({ success: true, removed: removeIds.length, filledFields: Object.keys(patch) });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to merge words' });
+    res.status(500).json({ error: 'Не удалось объединить слова' });
   }
 });
 
@@ -197,7 +197,7 @@ router.post('/import/preview', requireAdmin, async (req: Request, res: Response)
   try {
     const { data, defaultCategoryId, partOfSpeech } = req.body ?? {};
     if (typeof data !== 'string' || !data.trim()) return res.status(400).json({ error: 'Нет данных для импорта' });
-    if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Invalid partOfSpeech' });
+    if (partOfSpeech && !isPartOfSpeech(partOfSpeech)) return res.status(400).json({ error: 'Недопустимая часть речи' });
 
     let raw;
     try {

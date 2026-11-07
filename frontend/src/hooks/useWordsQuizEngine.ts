@@ -68,6 +68,8 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   // ---- data (shared with the other trainers and the admin panel, see api/queryCache.ts) ----
   const wordsQuery = useWords();
   const categoriesQuery = useCategories();
+  const { refetch: refetchWords } = wordsQuery;
+  const { refetch: refetchCategories } = categoriesQuery;
   const { words } = wordsQuery;
   const { categories } = categoriesQuery;
 
@@ -108,9 +110,9 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const isLoading = !loadError && (wordsQuery.isLoading || categoriesQuery.isLoading);
 
   const reload = useCallback(() => {
-    void wordsQuery.refetch();
-    void categoriesQuery.refetch();
-  }, [wordsQuery.refetch, categoriesQuery.refetch]);
+    void refetchWords();
+    void refetchCategories();
+  }, [refetchWords, refetchCategories]);
 
   // Every card the trainer can ask with the current filters (also what the SRS screen counts).
   const cards = useMemo(

@@ -38,7 +38,7 @@ export function formatTime12(h: number, m: number): string {
 
 export function getGermanTime(hours: number, minutes: number): GermanTimeOutput {
   // Official format: 24h
-  let officialHour = hours === 1 ? 'ein' : twoDigitToGerman(hours);
+  const officialHour = hours === 1 ? 'ein' : twoDigitToGerman(hours);
   let official = `${officialHour} Uhr`;
   if (minutes > 0) {
     official += ` ${twoDigitToGerman(minutes)}`;

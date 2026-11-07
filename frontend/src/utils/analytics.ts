@@ -5,7 +5,7 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventType, trainerType, isCorrect }),
     }).catch(() => {});
-  } catch (e) {
+  } catch {
     // Non-blocking
   }
 }

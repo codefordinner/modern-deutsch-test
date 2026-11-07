@@ -16,6 +16,7 @@ import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
 import type { ScoredTab } from './hooks/useScores';
 import type { TrainerTab } from './types';
+import { OnboardingModal } from './components/OnboardingModal';
 
 // The admin panel (tables, forms, analytics) is only for the site owner, so it
 // is split into its own chunk that ordinary learners never download.
@@ -52,6 +53,13 @@ export function App() {
   });
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
+    try { return localStorage.getItem('onboarding_seen') !== '1'; } catch { return true; }
+  });
+  const closeOnboarding = () => {
+    try { localStorage.setItem('onboarding_seen', '1'); } catch { /* storage unavailable */ }
+    setIsOnboardingOpen(false);
+  };
 
   const { scores, recordAnswer, resetScore } = useScores();
   const scoredTab: ScoredTab | null = activeTab === 'admin' ? null : activeTab;
@@ -134,7 +142,8 @@ export function App() {
 
       {isStatsOpen && scoredTab && (
         <StatsPanel
-          score={scores[scoredTab]}
+           score={scores[scoredTab]}
+           scores={scores}
           onReset={() => resetScore(scoredTab)}
           trainerName={titles[activeTab]}
           onClose={() => setIsStatsOpen(false)}
@@ -142,6 +151,7 @@ export function App() {
       )}
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
+      {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
 
       <UpdateBanner />
       <ToastHost />

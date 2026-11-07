@@ -3,23 +3,6 @@ import type { AnalyticsStats, Category, PartOfSpeech, SrsSyncData, Word, WordsPa
 /** Dispatched on `window` when the server rejects our admin session (expired / invalid). */
 export const UNAUTHORIZED_EVENT = 'api:unauthorized';
 
-const getToken = (): string | null => {
-  try {
-    return localStorage.getItem('admin_token');
-  } catch {
-    return null;
-  }
-};
-
-const setToken = (token: string | null) => {
-  try {
-    if (token) localStorage.setItem('admin_token', token);
-    else localStorage.removeItem('admin_token');
-  } catch {
-    // Storage unavailable
-  }
-};
-
 // ---- Errors ----
 
 export class ApiError extends Error {
@@ -52,9 +35,6 @@ async function request<T>(path: string, { method = 'GET', body, auth = false, re
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
@@ -73,7 +53,6 @@ async function request<T>(path: string, { method = 'GET', body, auth = false, re
 
   if (!res.ok) {
     if (res.status === 401 && auth) {
-      setToken(null);
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     }
     const serverMessage = (data as { error?: unknown } | null)?.error;
@@ -173,6 +152,18 @@ export const saveSrsWeights = (weights: number[]) =>
 export const resetSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'DELETE', auth: true });
 
 export interface AudioVoiceResponse { voice: string; isDefault: boolean }
+export interface AudioSettings {
+  voice: string;
+  lengthScale: number;
+  noiseScale: number;
+  noiseWScale: number;
+  sentenceSilence: number;
+}
+export interface AudioSettingsResponse { settings: AudioSettings; isDefault: boolean }
+export const fetchAudioSettings = () => request<AudioSettingsResponse>('/settings/audio-settings');
+export const saveAudioSettings = (settings: AudioSettings) => request<AudioSettingsResponse>('/settings/audio-settings', { method: 'PUT', body: { settings }, auth: true });
+export const resetAudioSettings = () => request<AudioSettingsResponse>('/settings/audio-settings', { method: 'DELETE', auth: true });
+export const previewAudioSettings = (text: string, settings: AudioSettings) => request<Blob>('/audio/admin/preview', { method: 'POST', body: { text, settings }, auth: true, responseType: 'blob' });
 export const fetchAudioVoice = () => request<AudioVoiceResponse>('/settings/audio-voice');
 export const saveAudioVoice = (voice: string) => request<AudioVoiceResponse>('/settings/audio-voice', { method: 'PUT', body: { voice }, auth: true });
 export const resetAudioVoice = () => request<AudioVoiceResponse>('/settings/audio-voice', { method: 'DELETE', auth: true });
@@ -186,15 +177,12 @@ export const syncSrs = (key: string, data: SrsSyncData) =>
 // ---- Admin endpoints ----
 
 /** Signs in; on success the server sets the session cookie. */
-export async function login(password: string): Promise<{ success: boolean; token?: string }> {
-  const result = await request<{ success: boolean; token?: string }>('/admin/login', { method: 'POST', body: { password } });
-  if (result.token) setToken(result.token);
-  return result;
+export function login(password: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/admin/login', { method: 'POST', body: { password } });
 }
 
 /** Asks the server to drop the session cookie. */
 export const logout = async () => {
-  setToken(null);
   return request<unknown>('/admin/logout', { method: 'POST' });
 };
 

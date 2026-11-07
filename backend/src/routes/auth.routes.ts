@@ -40,7 +40,7 @@ router.post('/login', loginLimiter, (req: Request, res: Response) => {
 
   const token = signAdminToken();
   setAuthCookie(req, res, token);
-  res.json({ success: true, message: 'Authenticated successfully', token });
+  res.json({ success: true, message: 'Вход выполнен' });
 });
 
 // Tokens are stateless JWTs, so there is nothing to revoke server-side: logging
