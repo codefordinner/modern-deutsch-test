@@ -3,6 +3,8 @@ import { Bot, CheckCircle, RotateCcw, Save, ShieldCheck } from 'lucide-react';
 import { checkAISettings, fetchAIModels, fetchAISettings, resetAISettings, saveAISettings, type AIModel, type AISettingsResponse } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
+const PICTURE_PROFILE = 'pictureDescription';
+
 export function AISettingsTab() {
   const [settings, setSettings] = useState<AISettingsResponse | null>(null);
   const [model, setModel] = useState('');
@@ -12,27 +14,27 @@ export function AISettingsTab() {
   const [busy, setBusy] = useState(false);
   const load = async () => {
     try {
-      const result = await fetchAISettings(); setSettings(result); setModel(result.model); setPrompt(result.prompt);
-      if (result.hasApiKey) { const catalog = await fetchAIModels(); setModels(catalog.models); if (!result.model && catalog.models[0]) setModel(catalog.models[0].name); }
+      const result = await fetchAISettings(); setSettings(result); setModel(result.profiles[PICTURE_PROFILE]?.model ?? ''); setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? '');
+      if (result.hasApiKey) { const catalog = await fetchAIModels(); setModels(catalog.models); if (!result.profiles[PICTURE_PROFILE]?.model && catalog.models[0]) setModel(catalog.models[0].name); }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { void load(); }, []);
   const save = async () => {
     setBusy(true);
     try {
-      const result = await saveAISettings(model, apiKey, prompt);
+      const result = await saveAISettings(PICTURE_PROFILE, model, apiKey, prompt);
       setSettings(result);
-      setPrompt(result.prompt);
+      setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
       setApiKey('');
       // Loading the remote model catalog is a separate operation. A valid saved key
       // must remain visible even if Gemini temporarily cannot return its catalog.
       try {
         const catalog = await fetchAIModels();
         setModels(catalog.models);
-        if (!result.model && catalog.models[0]) {
-          const selected = await saveAISettings(catalog.models[0].name, undefined, result.prompt);
+        if (!result.profiles[PICTURE_PROFILE]?.model && catalog.models[0]) {
+          const selected = await saveAISettings(PICTURE_PROFILE, catalog.models[0].name, undefined, result.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
           setSettings(selected);
-          setModel(selected.model);
+          setModel(selected.profiles[PICTURE_PROFILE]?.model ?? catalog.models[0].name);
         }
       } catch (error) {
         reportError(error, 'Ключ сохранён, но список моделей Gemini загрузить не удалось');
@@ -41,14 +43,14 @@ export function AISettingsTab() {
     } catch (error) { reportError(error, 'Не удалось сохранить настройки ИИ'); }
     finally { setBusy(false); }
   };
-  const reset = async () => { if (!confirm('Сбросить настройки Gemini и удалить сохранённый ключ?')) return; setBusy(true); try { const result = await resetAISettings(); setSettings(result); setModel(result.model); setPrompt(result.prompt); setApiKey(''); showToast('Настройки ИИ сброшены', 'success'); } catch (error) { reportError(error, 'Не удалось сбросить настройки ИИ'); } finally { setBusy(false); } };
+  const reset = async () => { if (!confirm('Сбросить настройки Gemini и удалить сохранённый ключ?')) return; setBusy(true); try { const result = await resetAISettings(); setSettings(result); setModel(result.profiles[PICTURE_PROFILE]?.model ?? ''); setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? ''); setApiKey(''); showToast('Настройки ИИ сброшены', 'success'); } catch (error) { reportError(error, 'Не удалось сбросить настройки ИИ'); } finally { setBusy(false); } };
   const check = async () => { setBusy(true); try { const result = await checkAISettings(); setModels(result.models); showToast(result.message, result.ok ? 'success' : 'error'); } catch (error) { reportError(error, 'Не удалось проверить настройки ИИ'); } finally { setBusy(false); } };
   return <div className="card ai-settings-card">
     <h3 className="card-title"><Bot size={20} /> Модуль ИИ</h3>
-    <p className="card-note">Единая настройка Gemini и инструкция для автоматического описания картинок. Промпт можно изменить и сохранить.</p>
+    <p className="card-note">Провайдер — Google Gemini. Для каждого профиля можно выбрать свою модель и инструкцию. Новые профили можно добавить без изменения AI API.</p>
     <div className="settings-divider">
-      <label className="setting-toggle-title" htmlFor="ai-provider">Провайдер</label><input id="ai-provider" className="text-input" value="Google Gemini" disabled />
-      <label className="setting-toggle-title" htmlFor="ai-model">Модель Gemini</label>
+      <h4 className="ai-profile-title">Профиль: описание картинок</h4>
+      <label className="setting-toggle-title" htmlFor="ai-model">Модель для этого профиля</label>
       <select id="ai-model" className="text-input" value={model} onChange={(event) => setModel(event.target.value)} disabled={!models.length}><option value="">{models.length ? 'Выберите модель' : 'Сначала проверьте ключ'}</option>{models.map((item) => <option key={item.name} value={item.name}>{item.displayName} ({item.name})</option>)}</select>
       <label className="setting-toggle-title" htmlFor="ai-api-key">API-ключ Gemini</label>
       <input id="ai-api-key" className="text-input" type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.hasApiKey ? 'Ключ сохранён — введите новый для замены' : 'Введите API-ключ'} />
