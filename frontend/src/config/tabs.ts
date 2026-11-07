@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Clock, Hash, ShieldCheck, Type, Zap } from 'lucide-react';
+import { BookOpen, Clock, Hash, Images, ShieldCheck, Type, Zap } from 'lucide-react';
 
 export const APP_TABS = [
   { id: 'numbers', label: 'Числа', title: '🔢 Числительные', pageTitle: 'Числительные', icon: Hash, scored: true, srs: false },
@@ -7,6 +7,7 @@ export const APP_TABS = [
   { id: 'articles', label: 'Артикли', title: '🔤 Артикли (der / die / das)', pageTitle: 'Артикли', icon: Type, scored: true, srs: true },
   { id: 'verbs', label: 'Глаголы', title: '⚡ Глаголы (Präsens, Präteritum, Partizip II)', pageTitle: 'Глаголы', icon: Zap, scored: true, srs: true },
   { id: 'time', label: 'Время', title: '⏰ Немецкое время (Uhrzeit)', pageTitle: 'Время', icon: Clock, scored: true, srs: false },
+  { id: 'pictures', label: 'Картинки', title: '🖼️ Описание картинки', pageTitle: 'Описание картинки', icon: Images, scored: false, srs: false },
   { id: 'admin', label: 'Админка', title: '⚙️ Панель управления', pageTitle: 'Админка', icon: ShieldCheck, scored: false, srs: false },
 ] as const satisfies readonly {
   id: string;

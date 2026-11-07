@@ -121,3 +121,13 @@ model SyncProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// Images used by the picture-description trainer.
+model Picture {
+  id        String   @id @default(cuid())
+  title     String?
+  dataUrl   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

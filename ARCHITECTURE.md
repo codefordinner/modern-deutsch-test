@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, AnalyticsEvent, Setting, AudioCache, SyncProfile (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AudioCache, SyncProfile (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -17,7 +17,7 @@
 │     ├─ api.ts              сборка роутера /api (порядок монтирования важен)
 │     ├─ db.ts               PrismaClient
 │     ├─ middleware/         auth (JWT, cookie), csrf (Origin/Referer), normalizeWordBody
-│     ├─ routes/             auth, words, words-admin, categories, analytics, settings, sync
+│     ├─ routes/             auth, words, words-admin, categories, pictures, analytics, settings, sync
 │     └─ services/           partOfSpeech, wordImport, hilfsverb, backfillPartOfSpeech, srsSettings, srsSync
 └─ frontend/
    ├─ nginx.conf, Dockerfile статика + прокси /api → app-backend:3001
@@ -44,6 +44,7 @@
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights` и `audioSettings` (модель Piper, скорость, вариативность и пауза). Старый `audioVoice` читается для совместимости.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
+- **Picture** `{id, title, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
 
@@ -75,6 +76,7 @@
 - **settings**: `GET/PUT/DELETE /settings/audio-settings` читают и изменяют модель Piper, `length_scale`, `noise_scale`, `noise_w_scale` и `sentence_silence`; старые endpoints `audio-voice` остаются для совместимости. `POST /audio/admin/preview` генерирует тестовый WAV без записи в кэш. Изменение настроек не запускает массовую генерацию автоматически: новые варианты создаются при первом прослушивании или через явную кнопку регенерации.
 - **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
+- **pictures**: `GET /pictures` отдаёт активные изображения; `GET /pictures/admin` и `POST/PUT/DELETE /pictures` доступны администратору.
 - **Импорт** (`wordImport.ts`): JSON (в т. ч. в ```json```), либо текст «слово;перевод;plural;подсказка». Строки с ошибками пропускаются и отчитываются; `dryRun`; дубликаты по `duplicateKey`.
 - **Старт** (`backfillPartOfSpeech`): нормализует `hilfsverb`, затем заполняет `partOfSpeech`. Идемпотентно.
 - **Аналитика**: «день» — календарный день в часовом поясе `STATS_TIMEZONE` (по умолчанию серверный); «сегодня», график 7 дней и подписи используют одну функцию `dayKey`.
@@ -150,7 +152,7 @@
 - Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), образы собирает GitHub Actions (`deploy.yml`). На pull request выполняются `npm ci`, typecheck, ESLint, тесты frontend и сборка backend/frontend; при push в `main` после успешных проверок образы собираются и публикуются в GHCR с тегами `latest` и SHA коммита. Сборочные образы используют `node:22-alpine`; это согласовано с `.nvmrc` и требованием `engines` в корневом `package.json`.
 - nginx: `/api/` → `app-backend:3001` (имя резолвится на каждый запрос), `client_max_body_size 6m`, `sw.js`/manifest без кэша, `/assets/` — год и `immutable`, остальное — SPA-fallback.
 - Корневой `server.ts` — для dev и «одного процесса»: поднимает БД (`prisma db push` + seed в пустую), API, Vite или статику. Prisma-клиент берётся из `backend/node_modules`: в `backend/` выполните `npm install && npx prisma generate` (после любого изменения схемы — снова `prisma generate`; `npm run build` в `backend/` делает это сам).
-- Новые таблицы (`Setting`, `SyncProfile`) создаются автоматически через `prisma db push` при старте.
+- Новые таблицы (`Setting`, `SyncProfile`, `Picture`) создаются автоматически через `prisma db push` при старте.
 
 ## Известные ограничения / идеи
 - Нет аккаунтов: прогресс переносится файлом или ключом синхронизации (кто знает ключ — владеет профилем; ограничение 60 запросов/мин на IP).

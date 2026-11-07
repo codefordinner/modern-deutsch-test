@@ -5,6 +5,7 @@ import { TimeTrainer } from '../TimeTrainer';
 import { VerbsTrainer } from '../VerbsTrainer';
 import { WordsTrainer } from '../WordsTrainer';
 import type { AppTab } from '../../config/tabs';
+import { PictureDescriptionTrainer } from '../PictureDescriptionTrainer';
 
 const AdminPanel = lazy(() => import('../AdminPanel').then((module) => ({ default: module.AdminPanel })));
 
@@ -20,6 +21,7 @@ export function TrainerContent({ activeTab, onAnswer }: TrainerContentProps) {
   if (activeTab === 'articles') return <ArticlesTrainer onAnswer={onAnswer} />;
   if (activeTab === 'verbs') return <VerbsTrainer onAnswer={onAnswer} />;
   if (activeTab === 'time') return <TimeTrainer />;
+  if (activeTab === 'pictures') return <PictureDescriptionTrainer />;
   return (
     <Suspense fallback={<div className="centered-message">Загрузка панели управления…</div>}>
       <AdminPanel />

@@ -7,3 +7,4 @@ export * from './settings';
 export * from './srs';
 export * from './auth';
 export * from './adminWords';
+export * from './pictures';

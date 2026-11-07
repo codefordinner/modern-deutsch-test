@@ -1,0 +1,18 @@
+.picture-trainer { max-width: 900px; margin: 0 auto; }
+.picture-trainer-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.picture-trainer-heading h2 { margin: 0 0 4px; }
+.picture-trainer-heading p { margin: 0; color: var(--text-secondary); }
+.picture-timer { font: 700 28px var(--mono); color: var(--accent-primary); white-space: nowrap; }
+.picture-stage { min-height: 420px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); }
+.picture-stage img { display: block; width: 100%; max-height: 620px; object-fit: contain; }
+.picture-hidden { display: grid; gap: 12px; justify-items: center; color: var(--text-muted); }
+.picture-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.picture-counter { margin-top: 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.picture-upload { display: grid; gap: 10px; max-width: 560px; margin-bottom: 20px; }
+.picture-file-label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--accent-primary); }
+.picture-upload input[type='file'] { font-size: 16px; }
+.pictures-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.picture-admin-card { overflow: hidden; display: grid; gap: 10px; padding: 10px; }
+.picture-admin-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
+.picture-admin-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } }
