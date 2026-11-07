@@ -6,6 +6,23 @@ export const MAX_AUDIO_TEXT_LENGTH = 10_000;
 const DEFAULT_PIPER_URL = 'http://piper-tts:5000';
 const inFlight = new Map<string, Promise<Buffer>>();
 
+// SQLite allows only one writer at a time. Piper generation can stay parallel,
+// but writing several (potentially large) WAV blobs and job updates in parallel
+// makes the Prisma SQLite connector wait for its busy timeout.
+let audioDbWriteQueue: Promise<void> = Promise.resolve();
+
+async function withAudioDbWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = audioDbWriteQueue;
+  let release!: () => void;
+  audioDbWriteQueue = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
+
 export type AudioKind = 'word' | 'sentence';
 
 export const normalizeAudioText = (text: string): string => text.replace(/[()\[\]\/]/g, ' ').normalize('NFC').trim();
@@ -51,11 +68,11 @@ export async function getOrCreateAudio(text: string, kind: AudioKind = 'word'): 
   const existing = inFlight.get(cacheKey);
   if (existing) return existing;
   const pending = generateAudioPreview(normalized, settings).then(async (audio) => {
-    await prisma.audioCache.upsert({
-      where: { cacheKey },
-      create: { cacheKey, kind, text: normalized, audio, mimeType: 'audio/wav' },
-      update: { audio, text: normalized, kind, mimeType: 'audio/wav' },
-    });
+    await withAudioDbWriteLock(() => prisma.audioCache.upsert({
+        where: { cacheKey },
+        create: { cacheKey, kind, text: normalized, audio, mimeType: 'audio/wav' },
+        update: { audio, text: normalized, kind, mimeType: 'audio/wav' },
+      }));
     return audio;
   }).finally(() => inFlight.delete(cacheKey));
   inFlight.set(cacheKey, pending);
@@ -63,7 +80,7 @@ export async function getOrCreateAudio(text: string, kind: AudioKind = 'word'): 
 }
 
 export async function clearAudioCache(): Promise<number> {
-  const result = await prisma.audioCache.deleteMany();
+  const result = await withAudioDbWriteLock(() => prisma.audioCache.deleteMany());
   return result.count;
 }
 
@@ -71,7 +88,7 @@ export async function regenerateWordAudio(): Promise<{ total: number; generated:
   const words = await prisma.word.findMany({ select: { de: true } });
   // This is an explicit admin refresh: do not reuse old word audio after the
   // voice/configuration has changed. Sentence audio remains untouched.
-  await prisma.audioCache.deleteMany({ where: { kind: 'word' } });
+  await withAudioDbWriteLock(() => prisma.audioCache.deleteMany({ where: { kind: 'word' } }));
   let generated = 0;
   let next = 0;
   const worker = async () => {
@@ -119,9 +136,9 @@ const serializeRegenerationJob = (job: {
 
 async function runRegeneration(jobId: string): Promise<void> {
   const words = await prisma.word.findMany({ select: { de: true } });
-  await prisma.audioCache.deleteMany({ where: { kind: 'word' } });
+  await withAudioDbWriteLock(() => prisma.audioCache.deleteMany({ where: { kind: 'word' } }));
   const startedAt = Date.now();
-  await prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { total: words.length, generated: 0, durationMs: 0, status: 'running', error: null } });
+  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { total: words.length, generated: 0, durationMs: 0, status: 'running', error: null } }));
 
   let next = 0;
   let generated = 0;
@@ -133,14 +150,14 @@ async function runRegeneration(jobId: string): Promise<void> {
       generated++;
       // Persist every item. This is intentionally simple and makes a refresh show
       // useful progress even when Piper generation is slow.
-      await prisma.audioRegenerationJob.update({
-        where: { id: jobId },
-        data: { generated: { increment: 1 }, durationMs: Math.max(0, Date.now() - startedAt) },
-      });
+      await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
+          where: { id: jobId },
+          data: { generated: { increment: 1 }, durationMs: Math.max(0, Date.now() - startedAt) },
+        }));
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, words.length || 1) }, worker));
-  await prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { status: 'completed', total: words.length } });
+  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { status: 'completed', total: words.length } }));
 }
 
 export async function getAudioRegenerationJob(): Promise<AudioRegenerationJob | null> {
