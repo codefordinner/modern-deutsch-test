@@ -118,8 +118,25 @@ export const numberToGermanWords = numberToGerman;
  */
 export function germanNumberVariants(n: number): string[] {
   const canonical = numberToGerman(n);
-  const optionalEin = /(?<=^|\s)ein(?=hundert|tausend)|(?<=tausend)ein(?=hundert)/g;
-  const positions = Array.from(canonical.matchAll(optionalEin), (m) => m.index as number);
+
+  // Positions of a droppable leading "ein". The regex lookbehind of the old version is replaced
+  // by manual checks so the code also runs on engines without lookbehind support.
+  const positions: number[] = [];
+  for (let index = canonical.indexOf('ein'); index !== -1; index = canonical.indexOf('ein', index + 1)) {
+    const after = canonical.slice(index + 'ein'.length);
+    const followedByHundert = after.startsWith('hundert');
+    const followedByTausend = after.startsWith('tausend');
+    if (!followedByHundert && !followedByTausend) continue;
+
+    const before = index === 0 ? '' : canonical[index - 1];
+    const atStartOrAfterSpace = index === 0 || before === ' ';
+    const afterTausend = canonical.slice(0, index).endsWith('tausend');
+    // "ein" is optional when it starts the number or a group after a space, or sits right after
+    // "tausend" (followed by "hundert") — but never right after "hundert".
+    if ((atStartOrAfterSpace || (afterTausend && followedByHundert)) && !canonical.slice(0, index).endsWith('hundert')) {
+      positions.push(index);
+    }
+  }
 
   const variants = new Set<string>([canonical]);
   for (let mask = 1; mask < 1 << positions.length; mask++) {
@@ -134,26 +151,4 @@ export function germanNumberVariants(n: number): string[] {
     variants.add(text + canonical.slice(last));
   }
   return Array.from(variants);
-}
-
-export function normalizeGermanAnswer(str: string): string {
-  return str
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/ß/g, 'ss'); // Allow forgiving ss / ß
-}
-
-export function isGermanNumberMatch(userInput: string, expectedWord: string): boolean {
-  const normUser = normalizeGermanAnswer(userInput);
-  const normExpected = normalizeGermanAnswer(expectedWord);
-
-  // Exact or normalized match
-  if (normUser === normExpected) return true;
-
-  // Sometimes user puts spaces inside German compounds (e.g. "zwei hundert" or "drei und siebzig")
-  const strippedUser = normUser.replace(/\s+/g, '');
-  const strippedExpected = normExpected.replace(/\s+/g, '');
-
-  return strippedUser === strippedExpected;
 }

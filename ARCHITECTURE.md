@@ -109,7 +109,6 @@
 | `studyPrefs.ts`, `uiSettings.ts`, `progressBackup.ts` | настройки обучения и интерфейса; экспорт/импорт прогресса |
 | `verbCards.ts`, `verbConjugation.ts`, `verbQuiz.ts`, `wordCards.ts`, `wordHint.ts`, `articles.ts`, `partOfSpeech.ts` | колоды карточек и правила тренажёров |
 | `random.ts`, `audio.ts`, `toast.ts`, `scrollGuard.ts` | служебное; аудио кэшируется на сервере, URL-файлы браузера живут только во время воспроизведения |
-| `analytics.ts` | **устарел и не используется** (дубликат `trackEvent` из `api/client.ts`) — удалить |
 
 ### SRS (Лейтнер)
 - 5 ящиков; веса выбора ящика по умолчанию `[60,15,10,5,10]` (`DEFAULT_SRS_BOX_WEIGHTS` в `utils/srsWeights.ts`; он же `SRS_BOX_WEIGHTS` в `srs.ts`), пустые ящики пропускаются, остальные пересчитываются.
@@ -152,7 +151,7 @@
 
 ## Сборка и деплой
 - Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), образы собирает GitHub Actions (`deploy.yml`). На pull request выполняются `npm ci`, typecheck, ESLint, тесты frontend и сборка backend/frontend; при push в `main` после успешных проверок образы собираются и публикуются в GHCR с тегами `latest` и SHA коммита. Сборочные образы используют `node:22-alpine`; это согласовано с `.nvmrc` и требованием `engines` в корневом `package.json`.
-- nginx: `/api/` → `app-backend:3001` (имя резолвится на каждый запрос), `client_max_body_size 6m`, `sw.js`/manifest без кэша, `/assets/` — год и `immutable`, остальное — SPA-fallback.
+- nginx: `/api/` → `app-backend:3001` (имя резолвится на каждый запрос), `client_max_body_size 6m`, таймауты прокси `proxy_connect_timeout 10s` / `proxy_send_timeout 120s` / `proxy_read_timeout 120s` (проверка описания картинки через Gemini может идти до ~60 с — без этого Cloudflare возвращал 502), `sw.js`/manifest без кэша, `/assets/` — год и `immutable`, остальное — SPA-fallback.
 - Корневой `server.ts` — для dev и «одного процесса»: поднимает БД (`prisma db push` + seed в пустую), API, Vite или статику. Prisma-клиент берётся из `backend/node_modules`: в `backend/` выполните `npm install && npx prisma generate` (после любого изменения схемы — снова `prisma generate`; `npm run build` в `backend/` делает это сам).
 - Новые таблицы (`Setting`, `SyncProfile`, `Picture`) создаются автоматически через `prisma db push` при старте.
 
@@ -163,5 +162,4 @@
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
 - Метаданные вкладок централизованы в `frontend/src/config/tabs.ts`; отдельные списки в Navbar, routing и аналитике не создаются.
 - Вкладка «Время» не ведёт счёт; компонент `time/TimeQuizCard.tsx` (режим с вводом ответа) нигде не используется.
-- Неиспользуемые файлы-остатки: `components/Footer.tsx`, `utils/analytics.ts`, `src/App.css`, `src/assets/*.svg`, `public/icons.svg` (шаблон Vite).
 - Аналитика хранит IP и User-Agent в открытом виде (GDPR).

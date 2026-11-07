@@ -24,7 +24,7 @@ Deutsch Trainer: тренажёр немецкого для русскоязыч
 ## Жёсткие правила
 
 ### Данные и API
-1. Все запросы к серверу идут **только** через `frontend/src/api/client.ts` (`request`). Не вызывайте `fetch('/api…')` из компонентов и утилит (файл `utils/analytics.ts` — устаревший дубликат `trackEvent`, он не используется и подлежит удалению).
+1. Все запросы к серверу идут **только** через `frontend/src/api/client.ts` (`request`). Не вызывайте `fetch('/api…')` из компонентов и утилит.
 2. Серверные данные читаются через хуки `useWords` / `useCategories` / `useVerbs` (`hooks/useDictionary.ts`) поверх `api/queryCache.ts`. После изменения данных — `invalidateQueries(WORDS_KEY | CATEGORIES_KEY)`.
 3. Каждый админский эндпоинт защищён `requireAdmin`; изменяющие запросы проходят `requireSameOrigin` (CSRF, подключён глобально в `backend/src/api.ts`). Клиентские мутации — только через `client.ts` с `auth: true` для админских.
 4. Новый админский роутер подключайте в `backend/src/api.ts` **до** `words.routes` (иначе `/:id` перехватит путь).

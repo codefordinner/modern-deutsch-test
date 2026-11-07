@@ -9,6 +9,7 @@ import type { SRSRecord, SrsSyncData, SrsTrainer } from '../types';
 export const SRS_TRAINERS: readonly SrsTrainer[] = ['words', 'verbs', 'articles'];
 export const MIN_SYNC_KEY_LENGTH = 6;
 export const MAX_SYNC_KEY_LENGTH = 200;
+const MAX_CARDS_PER_TRAINER = 200_000;
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -53,10 +54,14 @@ export function sanitizeSyncData(raw: unknown): SrsSyncData {
 
     const source = srs[trainer];
     if (!isRecord(source)) continue;
+    let accepted = 0;
     for (const [key, value] of Object.entries(source)) {
+      if (accepted >= MAX_CARDS_PER_TRAINER) break;
       if (FORBIDDEN_KEYS.has(key) || key.length === 0 || key.length > 200) continue;
       const record = sanitizeRecord(value);
-      if (record) result.srs[trainer][key] = record;
+      if (!record) continue;
+      result.srs[trainer][key] = record;
+      accepted += 1;
     }
   }
   return result;

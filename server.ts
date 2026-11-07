@@ -54,7 +54,7 @@ async function startServer() {
 
     app.use(cors());
     // Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
-    app.use(express.json({ limit: '5mb' }));
+    app.use(express.json({ limit: '6mb' }));
 
     // Mount API router
     app.use('/api', apiRouter);

@@ -74,9 +74,6 @@ button, a, select, label, input, .mode-pill {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.app-footer {
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-}
 .toast-host,
 .update-banner {
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));

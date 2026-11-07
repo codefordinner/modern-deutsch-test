@@ -1205,23 +1205,6 @@
   color: var(--error);
 }
 
-/* ---- Footer ------------------------------------------------------------------------ */
-
-.app-footer {
-  margin-top: auto;
-  padding: 24px 16px;
-  border-top: 1px solid var(--border-color);
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: var(--bg-secondary);
-}
-
-.app-footer-sub {
-  margin-top: 4px;
-  font-size: 12px;
-}
-
 /* ---- Small screens ------------------------------------------------------------------ */
 
 @media (max-width: 640px) {

@@ -150,11 +150,8 @@
     background: var(--accent-light);
   }
 
-  /* Keep content, footer and floating messages clear of the bar. */
+  /* Keep content and floating messages clear of the bar. */
   body .app-container {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-  }
-  body .app-footer {
     padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
   body .toast-host,

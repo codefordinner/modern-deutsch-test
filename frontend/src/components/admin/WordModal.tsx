@@ -22,6 +22,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   const [partOfSpeech, setPartOfSpeech] = useState<PartOfSpeech | typeof AUTO>(AUTO);
   const [plural, setPlural] = useState('');
   const [feminine, setFeminine] = useState('');
+  const [femininePlural, setFemininePlural] = useState('');
   const [praeteritum, setPraeteritum] = useState('');
   const [partizip2, setPartizip2] = useState('');
   const [hilfsverb, setHilfsverb] = useState('haben');
@@ -44,6 +45,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       setPartOfSpeech(word.partOfSpeech ?? AUTO);
       setPlural(word.plural || '');
       setFeminine(word.feminine || '');
+      setFemininePlural(word.femininePlural || '');
       setPraeteritum(word.praeteritum || '');
       setPartizip2(word.partizip2 || '');
       setHilfsverb(word.hilfsverb || 'haben');
@@ -90,6 +92,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       partOfSpeech: partOfSpeech || null,
       plural: plural || null,
       feminine: feminine || null,
+      femininePlural: femininePlural || null,
       praeteritum: praeteritum || null,
       partizip2: partizip2 || null,
       hilfsverb: hilfsverb || null,
@@ -172,6 +175,11 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
               <label className="field-label" htmlFor="word-feminine">Женский род (профессии)</label>
               <input id="word-feminine" type="text" className="text-input w-full" placeholder="die Ärztin" value={feminine} onChange={(e) => setFeminine(e.target.value)} />
             </div>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="word-feminine-plural">Женский род, мн. число (die Ärztinnen)</label>
+            <input id="word-feminine-plural" type="text" className="text-input w-full" placeholder="die Ärztinnen" value={femininePlural} onChange={(e) => setFemininePlural(e.target.value)} />
           </div>
 
           <div className="form-section">

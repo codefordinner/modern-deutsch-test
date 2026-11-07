@@ -14,7 +14,7 @@ const analyticsLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'Слишком много событий. Попробуйте позже.' }),
 });
 const EVENT_TYPES = new Set(['visit', 'tab_switch', 'quiz_answer']);
-const TRAINER_TYPES = new Set(['numbers', 'words', 'articles', 'verbs', 'time', 'admin']);
+const TRAINER_TYPES = new Set(['numbers', 'words', 'articles', 'verbs', 'time', 'pictures', 'admin']);
 
 /**
  * "A day" in the statistics is a calendar day in ONE fixed time zone
