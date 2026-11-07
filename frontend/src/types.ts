@@ -22,7 +22,6 @@ export interface Word {
   partOfSpeech?: PartOfSpeech | null;
   plural?: string | null;
   feminine?: string | null;
-  femininePlural?: string | null;
   praeteritum?: string | null;
   partizip2?: string | null;
   /** Always 'haben' | 'sein' (the server normalises legacy 'hat' / 'ist'). */

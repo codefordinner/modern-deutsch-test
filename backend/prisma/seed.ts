@@ -22,7 +22,7 @@ const VERBS: VerbRow[] = [
   ['essen', 'есть, кушать', 'aß', 'gegessen', 'haben', 'esse', 'isst', 'isst', 'essen', 'esst', 'essen'],
 ];
 
-type NounRow = { de: string; ru: string; plural: string; feminine?: string; femininePlural?: string; cat: 'daily' | 'family' };
+type NounRow = { de: string; ru: string; plural: string; feminine?: string; cat: 'daily' | 'family' };
 
 const NOUNS: NounRow[] = [
   { de: 'das Haus', ru: 'дом', plural: 'die Häuser', cat: 'daily' },
@@ -33,7 +33,7 @@ const NOUNS: NounRow[] = [
   { de: 'die Mutter', ru: 'мама, мать', plural: 'die Mütter', cat: 'family' },
   { de: 'der Vater', ru: 'папа, отец', plural: 'die Väter', cat: 'family' },
   { de: 'das Kind', ru: 'ребёнок', plural: 'die Kinder', cat: 'family' },
-  { de: 'der Freund', ru: 'друг', plural: 'die Freunde', feminine: 'die Freundin', femininePlural: 'die Freundinnen', cat: 'family' },
+  { de: 'der Freund', ru: 'друг', plural: 'die Freunde', feminine: 'die Freundin', cat: 'family' },
 ];
 
 async function main() {

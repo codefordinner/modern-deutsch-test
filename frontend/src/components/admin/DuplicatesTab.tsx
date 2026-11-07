@@ -12,7 +12,7 @@ interface DuplicatesTabProps {
 }
 
 const FIELDS: (keyof Word)[] = [
-  'hint', 'partOfSpeech', 'plural', 'feminine', 'femininePlural', 'praeteritum', 'partizip2', 'hilfsverb',
+  'hint', 'partOfSpeech', 'plural', 'feminine', 'praeteritum', 'partizip2', 'hilfsverb',
   'praesensIch', 'praesensDu', 'praesensErSieEs', 'praesensWir', 'praesensIhr', 'praesensSie',
 ];
 

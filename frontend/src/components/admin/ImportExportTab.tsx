@@ -30,7 +30,7 @@ function buildAiPrompt(categories: Category[]): string {
 - "partOfSpeech" — ровно одно из: "noun", "verb", "adjective", "adverb", "other".
 - "hint" — короткая подсказка, чтобы различать омонимы: "замок (здание)". Только если нужно.
 - "plural" — множественное число с артиклем: "die Tische" (для существительных).
-- "feminine" — женская форма профессий/людей: "die Ärztin". "femininePlural" — её мн. число: "die Ärztinnen". Только если такая форма существует.
+- "feminine" — женская форма профессий/людей: "die Ärztin". Только если такая форма существует.
 - Только для глаголов:
   "praeteritum" — Präteritum, 3 л. ед. ч.: "ging";
   "partizip2" — Partizip II: "gegangen";
@@ -48,7 +48,7 @@ function buildAiPrompt(categories: Category[]): string {
 \`\`\`json
 [
   {"de": "der Tisch", "ru": "стол", "category": "Повседневные слова", "partOfSpeech": "noun", "plural": "die Tische"},
-  {"de": "der Arzt", "ru": "врач", "category": ["Профессии", "Семья и люди"], "partOfSpeech": "noun", "plural": "die Ärzte", "feminine": "die Ärztin", "femininePlural": "die Ärztinnen"},
+  {"de": "der Arzt", "ru": "врач", "category": ["Профессии", "Семья и люди"], "partOfSpeech": "noun", "plural": "die Ärzte", "feminine": "die Ärztin"},
   {"de": "gehen", "ru": "идти, ходить", "category": "Глаголы", "partOfSpeech": "verb", "praeteritum": "ging", "partizip2": "gegangen", "hilfsverb": "sein", "praesensIch": "gehe", "praesensDu": "gehst", "praesensErSieEs": "geht", "praesensIhr": "geht"}
 ]
 \`\`\`

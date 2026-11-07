@@ -35,7 +35,6 @@ model Word {
   partOfSpeech    String?
   plural          String?
   feminine        String?
-  femininePlural  String?
   praeteritum     String?
   partizip2       String?
   hilfsverb       String?

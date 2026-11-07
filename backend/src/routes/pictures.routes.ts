@@ -126,6 +126,11 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
 router.post('/prompt-test', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { pictureId, answer, severity } = req.body ?? {};
+    if (typeof answer !== 'string') return res.status(400).json({ error: 'Введите описание перед отправкой' });
+    if (answer.length > MAX_PICTURE_ANSWER_LENGTH) return res.status(400).json({ error: 'Описание не должно быть длиннее 10 000 символов' });
+    if (severity !== undefined && (typeof severity !== 'number' || !Number.isFinite(severity) || severity < 1 || severity > 5)) {
+      return res.status(400).json({ error: 'Некорректная жёсткость проверки' });
+    }
     const picture = await prisma.picture.findUnique({ where: { id: pictureId } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
     return res.json(await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer, severity }));

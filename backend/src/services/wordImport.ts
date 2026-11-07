@@ -20,7 +20,6 @@ export const TEXT_FIELDS = [
   'hint',
   'plural',
   'feminine',
-  'femininePlural',
   'praeteritum',
   'partizip2',
   'hilfsverb',

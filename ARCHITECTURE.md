@@ -39,7 +39,7 @@
 
 ## Модель данных
 - **Category** `{id, name, icon, color, isBuiltin}` — 1:N **Word** (каскадное удаление).
-- **Word** `{de, ru, hint, partOfSpeech, plural, feminine, femininePlural, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesens{Ich,Du,ErSieEs,Wir,Ihr,Sie}, categoryId}`.
+- **Word** `{de, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesens{Ich,Du,ErSieEs,Wir,Ihr,Sie}, categoryId}`.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). Ключ ИИ никогда не возвращается клиенту.
@@ -161,5 +161,5 @@
 - Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
 - Метаданные вкладок централизованы в `frontend/src/config/tabs.ts`; отдельные списки в Navbar, routing и аналитике не создаются.
-- Вкладка «Время» не ведёт счёт; компонент `time/TimeQuizCard.tsx` (режим с вводом ответа) нигде не используется.
+- Вкладка «Время» не ведёт счёт.
 - Аналитика хранит IP и User-Agent в открытом виде (GDPR).
