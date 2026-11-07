@@ -6,8 +6,9 @@ import { reportError } from '../utils/toast';
 interface SpeechRecognitionLike {
   lang: string;
   continuous: boolean;
+  interimResults: boolean;
   resultIndex?: number;
-  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+  results: ArrayLike<ArrayLike<{ transcript: string; isFinal?: boolean }>>;
   onresult: ((event: SpeechRecognitionLike) => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -31,6 +32,7 @@ export function PictureDescriptionTrainer() {
   const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const dictationBaseRef = useRef('');
 
   useEffect(() => {
     getPictures().then((items) => {
@@ -94,7 +96,21 @@ export function PictureDescriptionTrainer() {
     if (!Recognition) { reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна в этом браузере'); return; }
     if (speechState === 'listening') { recognitionRef.current?.stop(); return; }
     const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
-    recognition.onresult = (event) => { const text = Array.from(event.results).slice(event.resultIndex || 0).map((item) => item[0].transcript).join(''); setAnswer((current) => `${current}${current ? ' ' : ''}${text}`); };
+    recognition.interimResults = true;
+    dictationBaseRef.current = answer.trim();
+    recognition.onresult = (event) => {
+      let finalText = '';
+      let interimText = '';
+      for (let index = 0; index < event.results.length; index += 1) {
+        const result = event.results[index]?.[0];
+        if (!result) continue;
+        if (event.results[index]?.[0]?.isFinal) finalText += result.transcript;
+        else interimText += result.transcript;
+      }
+      const spokenText = `${finalText} ${interimText}`.trim();
+      const base = dictationBaseRef.current;
+      setAnswer(spokenText ? `${base}${base ? ' ' : ''}${spokenText}` : base);
+    };
     recognition.onend = () => { setSpeechState('idle'); recognitionRef.current = null; }; recognitionRef.current = recognition; setSpeechState('listening'); recognition.start();
   };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
