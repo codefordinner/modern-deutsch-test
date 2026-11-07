@@ -79,7 +79,10 @@ export async function readAISettings(): Promise<AISettingsPublic> {
     provider: 'gemini',
     hasApiKey: Boolean(stored?.apiKey),
     isDefault: !stored,
-    profiles: stored?.profiles ?? { [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT } },
+    profiles: stored?.profiles ?? {
+      [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT },
+      [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
+    },
   };
 }
 
