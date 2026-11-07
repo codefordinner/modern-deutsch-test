@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Upload } from 'lucide-react';
+import { Download, Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Upload, Volume2 } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
@@ -80,6 +80,12 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
             </span>
           </div>
         </label>
+
+        <div>
+          <label className="setting-toggle-title" htmlFor="audio-volume-input"><Volume2 size={14} /> Громкость озвучки: {Math.round(settings.audioVolume * 100)}%</label>
+          <input id="audio-volume-input" type="range" min={0} max={1} step={0.05} value={settings.audioVolume} onChange={(e) => updateSettings({ audioVolume: Number(e.target.value) })} />
+          <span className="setting-toggle-desc">Громкость воспроизведения немецких слов и фраз на этом устройстве.</span>
+        </div>
 
         <label className="setting-toggle">
           <input

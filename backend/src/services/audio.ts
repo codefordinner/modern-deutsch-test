@@ -1,27 +1,27 @@
 import crypto from 'crypto';
 import { prisma } from '../db';
+import { readAudioVoice, type AudioVoice } from './audioSettings';
 
 export const MAX_AUDIO_TEXT_LENGTH = 10_000;
 const DEFAULT_PIPER_URL = 'http://piper-tts:5000';
-const VOICE = process.env.PIPER_VOICE || 'de_DE-thorsten-medium';
 const inFlight = new Map<string, Promise<Buffer>>();
 
 export type AudioKind = 'word' | 'sentence';
 
-const normalizeText = (text: string): string => text.normalize('NFC').trim();
+export const normalizeAudioText = (text: string): string => text.replace(/[()\[\]\/]/g, ' ').normalize('NFC').trim();
 
-export function audioCacheKey(text: string, kind: AudioKind): string {
-  return crypto.createHash('sha256').update(`${kind}\0${VOICE}\0${normalizeText(text)}`).digest('hex');
+export function audioCacheKey(text: string, kind: AudioKind, voice: AudioVoice): string {
+  return crypto.createHash('sha256').update(`${kind}\0${voice}\0${normalizeAudioText(text)}`).digest('hex');
 }
 
-async function generateAudio(text: string): Promise<Buffer> {
+async function generateAudio(text: string, voice: AudioVoice): Promise<Buffer> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Number(process.env.PIPER_TIMEOUT_MS || 30_000));
   try {
     const response = await fetch(`${(process.env.PIPER_URL || DEFAULT_PIPER_URL).replace(/\/$/, '')}/synthesize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice: VOICE }),
+      body: JSON.stringify({ text, voice }),
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Piper returned HTTP ${response.status}`);
@@ -34,15 +34,16 @@ async function generateAudio(text: string): Promise<Buffer> {
 }
 
 export async function getOrCreateAudio(text: string, kind: AudioKind = 'word'): Promise<Buffer> {
-  const normalized = normalizeText(text);
+  const normalized = normalizeAudioText(text);
   if (!normalized || normalized.length > MAX_AUDIO_TEXT_LENGTH) throw new Error('Invalid audio text');
-  const cacheKey = audioCacheKey(normalized, kind);
+  const { voice } = await readAudioVoice();
+  const cacheKey = audioCacheKey(normalized, kind, voice);
   const cached = await prisma.audioCache.findUnique({ where: { cacheKey } });
   if (cached) return Buffer.from(cached.audio);
 
   const existing = inFlight.get(cacheKey);
   if (existing) return existing;
-  const pending = generateAudio(normalized).then(async (audio) => {
+  const pending = generateAudio(normalized, voice).then(async (audio) => {
     await prisma.audioCache.upsert({
       where: { cacheKey },
       create: { cacheKey, kind, text: normalized, audio, mimeType: 'audio/wav' },
@@ -65,10 +66,16 @@ export async function regenerateWordAudio(): Promise<{ total: number; generated:
   // voice/configuration has changed. Sentence audio remains untouched.
   await prisma.audioCache.deleteMany({ where: { kind: 'word' } });
   let generated = 0;
-  for (const word of words) {
-    await getOrCreateAudio(word.de, 'word');
-    generated++;
-  }
+  let next = 0;
+  const worker = async () => {
+    while (true) {
+      const index = next++;
+      if (index >= words.length) return;
+      await getOrCreateAudio(words[index].de, 'word');
+      generated++;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, words.length) }, worker));
   return { total: words.length, generated };
 }
 

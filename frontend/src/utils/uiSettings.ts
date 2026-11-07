@@ -42,6 +42,8 @@ export interface UISettings {
    * progress (see utils/srsSync.ts). Empty (default) = no sync, nothing leaves the device.
    */
   syncKey: string;
+  /** Playback volume for generated speech, from 0 to 1. */
+  audioVolume: number;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -55,6 +57,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   showCategoryHint: true,
   highlightArticles: true,
   syncKey: '',
+  audioVolume: 1,
 };
 
 export function getUISettings(): UISettings {
@@ -66,6 +69,8 @@ export function getUISettings(): UISettings {
     const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
     if (typeof merged.syncKey !== 'string') merged.syncKey = '';
     if (typeof merged.highlightArticles !== 'boolean') merged.highlightArticles = true;
+    if (typeof merged.audioVolume !== 'number' || !Number.isFinite(merged.audioVolume)) merged.audioVolume = 1;
+    merged.audioVolume = Math.min(1, Math.max(0, merged.audioVolume));
     return merged;
   } catch {
     return DEFAULT_UI_SETTINGS;

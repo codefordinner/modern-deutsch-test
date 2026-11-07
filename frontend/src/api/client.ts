@@ -45,9 +45,10 @@ interface RequestOptions {
   body?: unknown;
   /** An admin call: a 401 then means the session is gone and logs the admin out. */
   auth?: boolean;
+  responseType?: 'json' | 'blob';
 }
 
-async function request<T>(path: string, { method = 'GET', body, auth = false }: RequestOptions = {}): Promise<T> {
+async function request<T>(path: string, { method = 'GET', body, auth = false, responseType = 'json' }: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -68,11 +69,7 @@ async function request<T>(path: string, { method = 'GET', body, auth = false }: 
 
   // Error payloads look like { error: '…' }; tolerate non-JSON bodies (proxy error pages etc.).
   let data: unknown = null;
-  try {
-    data = await res.json();
-  } catch {
-    // leave null
-  }
+  try { data = !res.ok || responseType === 'json' ? await res.json() : await res.blob(); } catch { /* leave null */ }
 
   if (!res.ok) {
     if (res.status === 401 && auth) {
@@ -149,15 +146,7 @@ export function trackEvent(eventType: string, trainerType?: string, isCorrect?: 
 
 export async function getSpeechAudio(text: string, kind: 'word' | 'sentence' = 'word'): Promise<Blob> {
   const params = new URLSearchParams({ text, kind });
-  let response: Response;
-  try { response = await fetch(`/api/audio?${params.toString()}`, { credentials: 'same-origin' }); }
-  catch { throw new ApiError('Нет соединения с сервером', 0); }
-  if (!response.ok) {
-    let message = `Ошибка сервера (${response.status})`;
-    try { message = (await response.json()).error || message; } catch { /* non-JSON error */ }
-    throw new ApiError(message, response.status);
-  }
-  return response.blob();
+  return request<Blob>(`/audio?${params.toString()}`, { responseType: 'blob' });
 }
 
 export interface AudioCacheStats { total: number; words: number; sentences: number }
@@ -182,6 +171,11 @@ export const saveSrsWeights = (weights: number[]) =>
 
 /** Back to the built-in defaults. */
 export const resetSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'DELETE', auth: true });
+
+export interface AudioVoiceResponse { voice: string; isDefault: boolean }
+export const fetchAudioVoice = () => request<AudioVoiceResponse>('/settings/audio-voice');
+export const saveAudioVoice = (voice: string) => request<AudioVoiceResponse>('/settings/audio-voice', { method: 'PUT', body: { voice }, auth: true });
+export const resetAudioVoice = () => request<AudioVoiceResponse>('/settings/audio-voice', { method: 'DELETE', auth: true });
 
 // ---- SRS sync between devices (by a shared sync key) ----
 

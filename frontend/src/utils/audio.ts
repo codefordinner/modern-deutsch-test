@@ -1,26 +1,24 @@
 import { getSpeechAudio } from '../api/client';
+import { getUISettings } from './uiSettings';
 
-const urlCache = new Map<string, string>();
 let currentAudio: HTMLAudioElement | null = null;
 let requestId = 0;
 
 export async function speakGerman(text: string, kind: 'word' | 'sentence' = 'word'): Promise<void> {
-  const cleanText = text.replace(/[\(\)\[\]\/]/g, ' ').trim();
+  const cleanText = text.replace(/[\(\)\[\]\/]/g, ' ').normalize('NFC').trim();
   if (!cleanText || typeof window === 'undefined') return;
   const id = ++requestId;
   try {
     currentAudio?.pause();
-    const key = `${kind}:${cleanText}`;
-    let url = urlCache.get(key);
-    if (!url) {
-      const blob = await getSpeechAudio(cleanText, kind);
-      if (id !== requestId) return;
-      url = URL.createObjectURL(blob);
-      urlCache.set(key, url);
-    }
+    // The server keeps the durable cache. Avoid a second, unbounded browser
+    // cache so clearing/regenerating audio in the admin panel takes effect on
+    // the next click in an already-open tab too.
+    const blob = await getSpeechAudio(cleanText, kind);
     if (id !== requestId) return;
+    const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.volume = getUISettings().audioVolume;
     currentAudio = audio;
-    await audio.play();
+    try { await audio.play(); } finally { URL.revokeObjectURL(url); }
   } catch (error) { console.warn('Speech playback error:', error); }
 }

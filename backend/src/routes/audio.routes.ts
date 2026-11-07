@@ -1,8 +1,16 @@
 import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../middleware/auth.middleware';
+import rateLimit from 'express-rate-limit';
 import { audioCacheStats, clearAudioCache, getOrCreateAudio, MAX_AUDIO_TEXT_LENGTH, regenerateWordAudio } from '../services/audio';
 
 const router = Router();
+const audioLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Слишком много запросов озвучки. Подождите минуту.' },
+});
 
 router.get('/admin/stats', requireAdmin, async (_req, res) => {
   try { res.json(await audioCacheStats()); } catch { res.status(500).json({ error: 'Не удалось прочитать кэш озвучки' }); }
@@ -18,13 +26,15 @@ router.post('/admin/regenerate-words', requireAdmin, async (_req, res) => {
 
 // Keep this catch-all route after the admin routes: Express treats `/` as a
 // prefix inside a router, so putting it first would intercept `/admin/stats`.
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', audioLimiter, async (req: Request, res: Response) => {
   const text = typeof req.query.text === 'string' ? req.query.text : '';
   const kind = req.query.kind === 'sentence' ? 'sentence' : 'word';
   if (!text.trim() || text.length > MAX_AUDIO_TEXT_LENGTH) return res.status(400).json({ error: 'Некорректный текст для озвучки' });
   try {
     const audio = await getOrCreateAudio(text, kind);
-    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'public, max-age=31536000, immutable' }).send(audio);
+    // The audio is cached server-side. Do not let browsers keep an immutable
+    // copy after an administrator clears or regenerates the server cache.
+    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }).send(audio);
   } catch (error) {
     console.error('[audio] generation failed:', error);
     res.status(502).json({ error: 'Не удалось сгенерировать озвучку' });

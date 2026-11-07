@@ -40,9 +40,9 @@
 - **Word** `{de, ru, hint, partOfSpeech, plural, feminine, femininePlural, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesens{Ich,Du,ErSieEs,Wir,Ihr,Sie}, categoryId}`.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; колонки `browser`, `os`, `device` есть в схеме, но не заполняются.
-- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Сейчас один ключ: `srsBoxWeights` (5 весов ящиков). Нет строки → значения по умолчанию.
+- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights` (5 весов ящиков) и `audioVoice` (разрешённая модель Piper). Нет строки → значения по умолчанию.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
-- **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании.
+- **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
 
 ## Переменные окружения
@@ -71,8 +71,8 @@
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
-- **settings**: `GET /settings/srs-weights` (публичный) → `{weights: number[5], isDefault}`; `PUT` (админ) `{weights}` — ровно 5 чисел 0…1000, хотя бы одно > 0; `DELETE` (админ) — сброс к умолчанию (60/15/10/5/10). Валидация — `services/srsSettings.ts`.
-- **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем.
+- **settings**: `GET /settings/srs-weights` (публичный) → `{weights: number[5], isDefault}`; `PUT` (админ) `{weights}` — ровно 5 чисел 0…1000, хотя бы одно > 0; `DELETE` (админ) — сброс к умолчанию (60/15/10/5/10). `GET/PUT/DELETE /settings/audio-voice` читают и изменяют разрешённый голос Piper. Валидация — `services/srsSettings.ts` и `services/audioSettings.ts`.
+- **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
 - **Импорт** (`wordImport.ts`): JSON (в т. ч. в ```json```), либо текст «слово;перевод;plural;подсказка». Строки с ошибками пропускаются и отчитываются; `dryRun`; дубликаты по `duplicateKey`.
 - **Старт** (`backfillPartOfSpeech`): нормализует `hilfsverb`, затем заполняет `partOfSpeech`. Идемпотентно.
@@ -101,7 +101,7 @@
 | `srsSync.ts`, `srsSyncData.ts` | синхронизация SRS (ввод-вывод / чистое слияние) |
 | `studyPrefs.ts`, `uiSettings.ts`, `progressBackup.ts` | настройки обучения и интерфейса; экспорт/импорт прогресса |
 | `verbCards.ts`, `verbConjugation.ts`, `verbQuiz.ts`, `wordCards.ts`, `wordHint.ts`, `articles.ts`, `partOfSpeech.ts` | колоды карточек и правила тренажёров |
-| `random.ts`, `audio.ts`, `toast.ts`, `scrollGuard.ts` | служебное |
+| `random.ts`, `audio.ts`, `toast.ts`, `scrollGuard.ts` | служебное; аудио кэшируется на сервере, URL-файлы браузера живут только во время воспроизведения |
 | `analytics.ts` | **устарел и не используется** (дубликат `trackEvent` из `api/client.ts`) — удалить |
 
 ### SRS (Лейтнер)
@@ -122,7 +122,7 @@
 | `words_use_srs`, `verbs_use_srs`, `articles_use_srs` | SRS вкл/выкл | да |
 | `app_srs_reset_at` | когда тренажёры сбрасывались (для синхронизации) | да |
 | `app_scores` | счёт по тренажёрам | да |
-| `app_ui_settings` | панель умлаутов, ae/oe, фокус, клавиатура, подсказка категории, цвета артиклей, **ключ синхронизации** | да |
+| `app_ui_settings` | панель умлаутов, ae/oe, фокус, клавиатура, подсказка категории, цвета артиклей, громкость озвучки, **ключ синхронизации** | да |
 | `app_study_prefs` | dueOnly, dailyGoal | да |
 | `theme`, `verbs_praesens_submode` | тема, подрежим глаголов | да |
 | `words_settings` | настройки тренажёра слов (направление, категории, формы) | да |
