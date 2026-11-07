@@ -1,4 +1,8 @@
 :root {
+  /* Native form controls (selects, scrollbars, date/time) must render with
+     the dark scheme, otherwise their dropdown lists fall back to the OS
+     light appearance and show white text on a white background. */
+  color-scheme: dark;
   --bg-primary: #0e1015;
   --bg-secondary: #16181f;
   --bg-tertiary: #20232b;
@@ -27,6 +31,7 @@
 }
 
 html.light {
+  color-scheme: light;
   /* Redesigned for more visual hierarchy and contrast: previously
      --bg-primary/--bg-secondary/--accent-light were all near-white, so
      cards, active tabs and buttons barely stood out from the page and the

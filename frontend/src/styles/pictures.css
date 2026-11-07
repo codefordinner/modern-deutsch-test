@@ -76,6 +76,8 @@
 .picture-segment { padding: 2px 3px; border: 0; border-radius: 3px; font: inherit; color: inherit; cursor: pointer; }
 .picture-segment:hover, .picture-segment.is-selected { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 .picture-segment-note { padding: 10px 12px; color: var(--text-secondary); background: var(--bg-tertiary); border-left: 3px solid var(--accent-primary); border-radius: 6px; }
+.picture-segment-correction { display: block; margin-top: 8px; color: var(--text-primary); }
+.picture-segment-correction strong { color: var(--success); font-family: var(--mono); font-size: 15px; }
 .picture-segment--good { background: var(--success-light); color: var(--success); }
 .picture-segment--style { background: var(--warning-light); color: var(--warning); }
 .picture-segment--error { background: var(--error-light); color: var(--error); }

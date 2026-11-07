@@ -17,7 +17,7 @@ export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
 export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
 export interface PictureCheckResult {
-  segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string }>;
+  segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string; correction?: string }>;
   report: string;
   score: number;
   maxScore: 100;
@@ -37,7 +37,7 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
-export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель). score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
+export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; для каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для нейтральных/хороших сегментов correction опускай); severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель). score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
@@ -217,7 +217,7 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   if (input.answer.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('ANSWER_TOO_LONG');
   const match = /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,(.+)$/.exec(input.imageDataUrl);
   if (!match) throw new Error('INVALID_IMAGE');
-  const prompt = `${profile.prompt}\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;
+  const prompt = `${profile.prompt}\n\nДля каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для остальных опускай).\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;
   let response: Response;
   try {
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] }], generationConfig: { responseMimeType: 'application/json' } }), signal: AbortSignal.timeout(60_000) });
@@ -240,7 +240,8 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
     const severity = item.severity;
     if (typeof item.text !== 'string' || !item.text || !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))) throw new Error('INVALID_AI_RESPONSE');
     if (item.note !== undefined && (typeof item.note !== 'string' || item.note.length > 500)) throw new Error('INVALID_AI_RESPONSE');
-    return { text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note } : {}) };
+    if (item.correction !== undefined && (typeof item.correction !== 'string' || !item.correction.trim() || item.correction.length > 500)) throw new Error('INVALID_AI_RESPONSE');
+    return { text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note } : {}), ...(typeof item.correction === 'string' ? { correction: item.correction.trim() } : {}) };
   });
   const covered = segments.map((segment) => segment.text).join('');
   if (covered !== input.answer) throw new Error('INVALID_AI_RESPONSE');
