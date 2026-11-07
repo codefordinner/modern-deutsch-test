@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Image, Play, RotateCcw, Send, SkipForward } from 'lucide-react';
-import { getPictures, type Picture } from '../api/pictures';
-import { reportError, showToast } from '../utils/toast';
+import { checkPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
+import { reportError } from '../utils/toast';
 
 export function PictureDescriptionTrainer() {
   const [pictures, setPictures] = useState<Picture[]>([]);
@@ -10,6 +10,8 @@ export function PictureDescriptionTrainer() {
   const [elapsed, setElapsed] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [answer, setAnswer] = useState('');
+  const [result, setResult] = useState<PictureCheckResult | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     getPictures().then((items) => {
@@ -25,18 +27,23 @@ export function PictureDescriptionTrainer() {
   }, [startedAt]);
 
   const picture = useMemo(() => pictures.length ? pictures[index % pictures.length] : null, [pictures, index]);
-  const start = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); };
+  const start = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); };
   const skip = () => {
     if (pictures.length > 1) {
       let nextIndex = index;
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
       setIndex(nextIndex);
     }
-    setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer('');
+    setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null);
   };
   const finish = () => { setStartedAt(null); setIsFinished(true); };
-  const submit = () => showToast('Отправка ответа на сервер пока недоступна', 'info');
-  const restart = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); };
+  const submit = async () => {
+    setChecking(true);
+    try { setResult(await checkPictureAnswer(picture?.id ?? '', answer)); }
+    catch (error) { reportError(error, 'Не удалось проверить описание'); }
+    finally { setChecking(false); }
+  };
+  const restart = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
   if (!picture) return <div className="centered-message">Картинки пока не добавлены администратором.</div>;
@@ -54,11 +61,16 @@ export function PictureDescriptionTrainer() {
       {(startedAt !== null || isFinished) && <textarea id="picture-answer" className="picture-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки…" rows={7} />}
       <div className="picture-actions">
         {startedAt === null && !isFinished ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
-          <button className="btn-primary" onClick={submit}><Send size={17} /> Отправить ответ</button>
+          <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
           <button className="btn-secondary" onClick={restart}><RotateCcw size={17} /> Начать заново</button>
         </>}
         {startedAt !== null && <button className="btn-secondary" onClick={skip}><SkipForward size={17} /> Пропустить</button>}
       </div>
+      {result && <div className="picture-check-result" aria-live="polite">
+        <div className="picture-score">Оценка: <strong>{result.score} / {result.maxScore}</strong></div>
+        <div className="picture-report">{result.report}</div>
+        <div className="picture-marked-text">{result.segments.map((segment, segmentIndex) => <span key={`${segmentIndex}-${segment.text}`} className={`picture-segment picture-segment--${segment.severity}`} title={segment.note}>{segment.text}</span>)}</div>
+      </div>}
       <div className="picture-counter">Случайная картинка · {pictures.length} доступно</div>
     </section>
   );

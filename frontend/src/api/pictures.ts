@@ -15,3 +15,5 @@ export const createPicture = (data: { title?: string; description?: string; data
 export const updatePicture = (id: string, data: Partial<Pick<Picture, 'title' | 'description' | 'dataUrl' | 'isActive'>>) => request<Picture>(`/pictures/${id}`, { method: 'PUT', body: data, auth: true });
 export const deletePicture = (id: string) => request<{ success: boolean }>(`/pictures/${id}`, { method: 'DELETE', auth: true });
 export const generatePictureDescription = (id: string) => request<Picture>(`/pictures/${id}/ai-description`, { method: 'POST', auth: true });
+export interface PictureCheckResult { segments: Array<{ text: string; severity: 'neutral' | 'good' | 'style' | 'error' | 'lie'; note?: string }>; report: string; score: number; maxScore: number }
+export const checkPictureAnswer = (id: string, answer: string, severity = 3) => request<PictureCheckResult>(`/pictures/${id}/check-answer`, { method: 'POST', body: { answer, severity } });

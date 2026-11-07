@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
-import { generatePictureMetadata } from '../services/aiSettings';
+import { checkPictureAnswer, generatePictureMetadata } from '../services/aiSettings';
 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
@@ -62,6 +62,19 @@ router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Respo
     };
     const result = error instanceof Error ? messages[error.message] : undefined;
     return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось заполнить описание через ИИ' });
+  }
+});
+
+router.post('/:id/check-answer', async (req: Request, res: Response) => {
+  try {
+    const picture = await prisma.picture.findFirst({ where: { id: req.params.id, isActive: true } });
+    if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
+    const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity: req.body?.severity ?? 3 });
+    return res.json(result);
+  } catch (error) {
+    const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Проверка ИИ пока не настроена'], MISSING_MODEL: [503, 'Для проверки не выбрана модель Gemini'], EMPTY_ANSWER: [400, 'Введите описание перед отправкой'], INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный результат проверки'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
+    const result = error instanceof Error ? messages[error.message] : undefined;
+    return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось проверить описание' });
   }
 });
 

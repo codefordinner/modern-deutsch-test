@@ -45,11 +45,21 @@
 .picture-edit-form textarea { resize: vertical; min-height: 120px; font-size: 15px; line-height: 1.45; }
 .picture-ai-checkbox { display: flex; align-items: center; gap: 8px; }
 .picture-admin-description { color: var(--text-secondary); font-size: 13px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.picture-check-result { display: grid; gap: 12px; margin-top: 18px; padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; }
+.picture-score { font-size: 18px; }
+.picture-report { color: var(--text-secondary); white-space: pre-wrap; }
+.picture-marked-text { line-height: 1.8; white-space: pre-wrap; }
+.picture-segment { padding: 2px 3px; border-radius: 3px; }
+.picture-segment--good { background: var(--success-light); color: var(--success); }
+.picture-segment--style { background: var(--warning-light); color: var(--warning); }
+.picture-segment--error { background: var(--error-light); color: var(--error); }
+.picture-segment--lie { background: #7f1d1d; color: #fff; }
 .ai-settings-card { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px; }
 .ai-settings-card .settings-divider { display: grid; gap: 10px; }
 .ai-profile-title { margin: 0 0 4px; font-size: 17px; color: var(--text-primary); }
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
 .ai-prompt-input { resize: vertical; min-height: 180px; font-size: 15px; }
+.ai-profile-block { display: grid; gap: 10px; margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--border-color); }
 @media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } }
 @media (max-width: 600px) {
   .picture-upload { padding: 14px; }
