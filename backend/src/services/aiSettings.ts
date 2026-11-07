@@ -37,7 +37,7 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
-export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — до 5 коротких немецких выражений с русским переводом. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
+export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель). score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
@@ -256,6 +256,15 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   if (result.score !== score) throw new Error('INVALID_AI_RESPONSE');
   if (typeof result.correctedText !== 'string' || result.correctedText.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('INVALID_AI_RESPONSE');
   if (typeof result.level !== 'string' || !/^(?:A[12]|B[12]|C1)$/.test(result.level)) throw new Error('INVALID_AI_RESPONSE');
-  if (!Array.isArray(result.usefulExpressions) || result.usefulExpressions.length > 5 || result.usefulExpressions.some((item) => typeof item !== 'string' || item.length > 300)) throw new Error('INVALID_AI_RESPONSE');
-  return { segments, report: result.report, score, maxScore: 100, categories, correctedText: result.correctedText, level: result.level, usefulExpressions: result.usefulExpressions as string[] };
+  if (!Array.isArray(result.usefulExpressions) || result.usefulExpressions.length > 5 || result.usefulExpressions.some((item) => typeof item !== 'string' && (typeof item !== 'object' || item === null))) throw new Error('INVALID_AI_RESPONSE');
+  const usefulExpressions = result.usefulExpressions.map((item) => {
+    if (typeof item === 'string') return item.trim().slice(0, 300);
+    const object = item as Record<string, unknown>;
+    const german = typeof object.german === 'string' ? object.german.trim() : '';
+    const russian = typeof object.russian === 'string' ? object.russian.trim() : '';
+    const value = german && russian ? `${german} — ${russian}` : german || russian;
+    if (!value) throw new Error('INVALID_AI_RESPONSE');
+    return value.slice(0, 300);
+  });
+  return { segments, report: result.report, score, maxScore: 100, categories, correctedText: result.correctedText, level: result.level, usefulExpressions };
 }
