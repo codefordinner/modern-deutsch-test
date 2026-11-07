@@ -108,10 +108,31 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(stored.model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-    body: JSON.stringify({ contents: [{ parts: [
-      { text: 'Проанализируй изображение для тренажёра немецкого языка. Верни только JSON без Markdown: {"title":"краткое название на русском","description":"подробное описание изображения на русском для проверки ответа пользователя"}. Не выдумывай детали, которых не видно.' },
-      { inline_data: { mime_type: match[1], data: match[2] } },
-    ] }] }),
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: [
+          'Ты готовишь эталонные данные для тренажёра описания картинки.',
+          'Ответь только на русском языке.',
+          'Опиши только то, что непосредственно видно на изображении. Не угадывай личности, намерения, возраст, профессию, точное место, время или события, если это нельзя уверенно определить.',
+          'Название должно быть кратким и нейтральным: 3–8 слов.',
+          'Описание должно быть подробным, но фактическим: укажи общую сцену и место (только если видно), затем людей или животных, их видимые действия и положение, заметные предметы, цвета, фон и другие важные детали.',
+          'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
+          'Верни объект с ровно двумя строковыми полями: title и description.',
+        ].join(' ') },
+        { inline_data: { mime_type: match[1], data: match[2] } },
+      ] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING' },
+            description: { type: 'STRING' },
+          },
+          required: ['title', 'description'],
+        },
+      },
+    }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
