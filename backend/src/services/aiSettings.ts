@@ -38,6 +38,7 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
 export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — до 5 коротких немецких выражений с русским переводом. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
+export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -209,6 +210,7 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
   if (!profile?.model) throw new Error('MISSING_MODEL');
   if (typeof input.answer !== 'string' || !input.answer.trim()) throw new Error('EMPTY_ANSWER');
+  if (input.answer.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('ANSWER_TOO_LONG');
   const match = /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,(.+)$/.exec(input.imageDataUrl);
   if (!match) throw new Error('INVALID_IMAGE');
   const prompt = `${profile.prompt}\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;
@@ -221,12 +223,29 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   try { parsed = JSON.parse(text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()); } catch { throw new Error('INVALID_AI_RESPONSE'); }
   if (typeof parsed !== 'object' || parsed === null) throw new Error('INVALID_AI_RESPONSE');
   const result = parsed as Record<string, unknown>;
-  if (!Array.isArray(result.segments) || typeof result.report !== 'string' || typeof result.score !== 'number') throw new Error('INVALID_AI_RESPONSE');
-  const segments = result.segments.flatMap((segment) => { if (typeof segment !== 'object' || segment === null) return []; const item = segment as Record<string, unknown>; const severity = item.severity; if (typeof item.text !== 'string' || !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))) return []; return [{ text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note.slice(0, 500) } : {}) }]; });
+  if (!Array.isArray(result.segments) || typeof result.report !== 'string' || result.report.length > 5_000 || !Number.isInteger(result.score)) throw new Error('INVALID_AI_RESPONSE');
+  const segments = result.segments.map((segment) => {
+    if (typeof segment !== 'object' || segment === null) throw new Error('INVALID_AI_RESPONSE');
+    const item = segment as Record<string, unknown>;
+    const severity = item.severity;
+    if (typeof item.text !== 'string' || !item.text || !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))) throw new Error('INVALID_AI_RESPONSE');
+    if (item.note !== undefined && (typeof item.note !== 'string' || item.note.length > 500)) throw new Error('INVALID_AI_RESPONSE');
+    return { text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note } : {}) };
+  });
   const covered = segments.map((segment) => segment.text).join('');
   if (covered !== input.answer) throw new Error('INVALID_AI_RESPONSE');
-  const rawCategories = typeof result.categories === 'object' && result.categories !== null ? result.categories as Record<string, unknown> : {};
-  const category = (key: string) => Math.max(0, Math.min(25, Math.round(Number(rawCategories[key]) || 0)));
+  if (typeof result.categories !== 'object' || result.categories === null) throw new Error('INVALID_AI_RESPONSE');
+  const rawCategories = result.categories as Record<string, unknown>;
+  const category = (key: string) => {
+    const value = rawCategories[key];
+    if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > 25) throw new Error('INVALID_AI_RESPONSE');
+    return Number(value);
+  };
   const categories = { content: category('content'), grammar: category('grammar'), vocabulary: category('vocabulary'), fluency: category('fluency') };
-  return { segments, report: result.report.slice(0, 5000), score: categories.content + categories.grammar + categories.vocabulary + categories.fluency, maxScore: 100, categories, correctedText: typeof result.correctedText === 'string' ? result.correctedText.slice(0, 10_000) : input.answer, level: typeof result.level === 'string' ? result.level.slice(0, 20) : '—', usefulExpressions: Array.isArray(result.usefulExpressions) ? result.usefulExpressions.filter((item): item is string => typeof item === 'string').slice(0, 5) : [] };
+  const score = categories.content + categories.grammar + categories.vocabulary + categories.fluency;
+  if (result.score !== score) throw new Error('INVALID_AI_RESPONSE');
+  if (typeof result.correctedText !== 'string' || result.correctedText.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('INVALID_AI_RESPONSE');
+  if (typeof result.level !== 'string' || !/^(?:A[12]|B[12]|C1)$/.test(result.level)) throw new Error('INVALID_AI_RESPONSE');
+  if (!Array.isArray(result.usefulExpressions) || result.usefulExpressions.length > 5 || result.usefulExpressions.some((item) => typeof item !== 'string' || item.length > 300)) throw new Error('INVALID_AI_RESPONSE');
+  return { segments, report: result.report, score, maxScore: 100, categories, correctedText: result.correctedText, level: result.level, usefulExpressions: result.usefulExpressions as string[] };
 }
