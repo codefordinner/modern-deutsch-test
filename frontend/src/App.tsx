@@ -5,7 +5,7 @@ import { GeneralSettingsModal } from './components/GeneralSettingsModal';
 import { TrainerContent } from './components/routing/TrainerContent';
 import { ToastHost } from './components/ToastHost';
 import { UpdateBanner } from './components/UpdateBanner';
-import { trackEvent } from './api/client';
+import { trackEvent } from './api/analytics';
 import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';

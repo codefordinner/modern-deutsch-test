@@ -14,9 +14,10 @@ import { CategoryModal } from './admin/CategoryModal';
 import { ModeSwitch } from './ModeSwitch';
 import { ToolbarButton } from './ToolbarButton';
 import {
-  UNAUTHORIZED_EVENT, bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, checkSession, createCategory,
-  createWord, deleteCategory, deleteWord, logout, updateCategory, updateWord,
-} from '../api/client';
+  UNAUTHORIZED_EVENT,
+} from '../api/request';
+import { checkSession, logout } from '../api/auth';
+import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';

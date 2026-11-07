@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { AudioLines, Play, RefreshCw, Trash2 } from 'lucide-react';
-import { clearAudioCache, fetchAudioSettings, getAudioCacheStats, getAudioRegenerationJob, previewAudioSettings, regenerateWordAudio, resetAudioSettings, saveAudioSettings } from '../../api/client';
-import type { AudioCacheStats, AudioRegenerationJob, AudioSettings } from '../../api/client';
+import { clearAudioCache, getAudioCacheStats, getAudioRegenerationJob, previewAudioSettings, regenerateWordAudio } from '../../api/audio';
+import { fetchAudioSettings, resetAudioSettings, saveAudioSettings } from '../../api/settings';
+import type { AudioCacheStats, AudioRegenerationJob } from '../../api/audio';
+import type { AudioSettings } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
 const DEFAULTS: AudioSettings = { voice: 'de_DE-thorsten-medium', lengthScale: 1, noiseScale: 0.667, noiseWScale: 0.8, sentenceSilence: 0 };

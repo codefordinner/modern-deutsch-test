@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, Clock, Eye, Flame, Monitor, RefreshCw, Target, Users } from 'lucide-react';
-import { getErrorMessage, getStats } from '../../api/client';
+import { getErrorMessage } from '../../api/request';
+import { getStats } from '../../api/analytics';
 import { ModeSwitch } from '../ModeSwitch';
 import { ColumnChart, Heatmap } from './AnalyticsCharts';
 import type { ChartItem } from './AnalyticsCharts';

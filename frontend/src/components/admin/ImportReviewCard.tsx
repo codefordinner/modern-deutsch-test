@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, Eye, Trash2, Upload } from 'lucide-react';
-import { getErrorMessage, importWords, previewImport } from '../../api/client';
-import type { ImportPreview, ImportResult } from '../../api/client';
+import { importWords, previewImport } from '../../api/adminWords';
+import { getErrorMessage } from '../../api/request';
+import type { ImportPreview, ImportResult } from '../../api/adminWords';
 import { invalidateQueries } from '../../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY } from '../../hooks/useDictionary';
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';

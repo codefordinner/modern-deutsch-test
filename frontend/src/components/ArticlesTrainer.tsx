@@ -5,7 +5,7 @@ import { ArticlesCategoriesModal } from './articles/ArticlesCategoriesModal';
 import { FeedbackBox } from './FeedbackBox';
 import { SRSIdleCard } from './srs/SRSIdleCard';
 import { ToolbarButton } from './ToolbarButton';
-import { getErrorMessage } from '../api/client';
+import { getErrorMessage } from '../api/request';
 import { useCategories, useWords } from '../hooks/useDictionary';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useSRSProgress } from '../hooks/useSRSProgress';

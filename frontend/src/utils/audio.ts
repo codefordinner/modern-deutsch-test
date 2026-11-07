@@ -1,4 +1,4 @@
-import { getSpeechAudio } from '../api/client';
+import { getSpeechAudio } from '../api/audio';
 import { getUISettings } from './uiSettings';
 
 let currentAudio: HTMLAudioElement | null = null;

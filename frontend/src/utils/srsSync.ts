@@ -1,4 +1,5 @@
-import { syncSrs, getErrorMessage } from '../api/client';
+import { syncSrs } from '../api/srs';
+import { getErrorMessage } from '../api/request';
 import type { SrsSyncData, SrsTrainer } from '../types';
 import { emptySyncData, mergeSyncData, readSyncKey, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
 import { getUISettings } from './uiSettings';

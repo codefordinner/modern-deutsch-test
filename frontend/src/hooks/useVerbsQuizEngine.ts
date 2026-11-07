@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { getErrorMessage } from '../api/client';
+import { getErrorMessage } from '../api/request';
 import { useVerbs } from './useDictionary';
 import { oneOf, usePersistentState } from './usePersistentState';
 import { useSRSProgress } from './useSRSProgress';

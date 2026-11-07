@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Copy, RefreshCw } from 'lucide-react';
-import { getDuplicates, mergeDuplicates } from '../../api/client';
-import type { DuplicateGroup } from '../../api/client';
+import { getDuplicates, mergeDuplicates } from '../../api/adminWords';
+import type { DuplicateGroup } from '../../api/adminWords';
 import { reportError, showToast } from '../../utils/toast';
 import { formatCategories } from '../../utils/wordCategories';
 import type { Word } from '../../types';

@@ -1,4 +1,4 @@
-import { getErrorMessage } from '../api/client';
+import { getErrorMessage } from '../api/request';
 
 export type ToastKind = 'error' | 'success' | 'info';
 

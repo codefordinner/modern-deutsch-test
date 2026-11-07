@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Layers, RotateCcw, Save } from 'lucide-react';
-import { fetchSrsWeights, resetSrsWeights, saveSrsWeights } from '../../api/client';
-import type { SrsWeightsResponse } from '../../api/client';
+import { fetchSrsWeights, resetSrsWeights, saveSrsWeights } from '../../api/settings';
+import type { SrsWeightsResponse } from '../../api/settings';
 import { invalidateQueries, useQuery } from '../../api/queryCache';
 import { SRS_WEIGHTS_KEY } from '../../hooks/useSrsWeightsSync';
 import { DEFAULT_SRS_BOX_WEIGHTS, MAX_BOX_WEIGHT, sanitizeWeights, setSrsWeights } from '../../utils/srsWeights';

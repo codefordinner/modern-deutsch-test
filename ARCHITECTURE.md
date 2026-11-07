@@ -27,7 +27,7 @@
        │  ├─ config/tabs.ts   единый registry вкладок и их возможностей
        │  └─ components/routing/TrainerContent.tsx  выбор содержимого вкладки
       ├─ types.ts            общие типы
-      ├─ api/                client.ts (весь HTTP), queryCache.ts (кэш запросов)
+       ├─ api/                request.ts + доменные модули (auth, dictionary, adminWords, analytics, audio, settings, srs), client.ts (совместимый фасад), queryCache.ts
       ├─ hooks/              useDictionary, useSRSProgress, useSrsWeightsSync, useSrsSync, useScores, useHashRoute,
       │                      useUISettings, usePersistentState, useServiceWorkerUpdates, use{Words,Verbs}QuizEngine
       ├─ utils/              чистая логика (см. «Утилиты»)

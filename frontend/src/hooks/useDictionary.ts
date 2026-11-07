@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { getAllWords, getCategories } from '../api/client';
-import type { WordsQuery } from '../api/client';
+import { getAllWords, getCategories } from '../api/dictionary';
+import type { WordsQuery } from '../api/dictionary';
 import { useQuery } from '../api/queryCache';
 import type { Category, Word } from '../types';
 import { isVerb } from '../utils/partOfSpeech';

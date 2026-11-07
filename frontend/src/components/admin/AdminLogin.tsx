@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
-import { getErrorMessage, login } from '../../api/client';
+import { getErrorMessage } from '../../api/request';
+import { login } from '../../api/auth';
 
 interface AdminLoginProps {
   onLogin: () => void;

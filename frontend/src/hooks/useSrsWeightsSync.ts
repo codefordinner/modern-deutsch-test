@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { fetchSrsWeights } from '../api/client';
+import { fetchSrsWeights } from '../api/settings';
 import { useQuery } from '../api/queryCache';
 import { setSrsWeights } from '../utils/srsWeights';
 

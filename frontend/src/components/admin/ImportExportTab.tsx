@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, ClipboardCheck, Copy, Download, Sparkles, Upload } from 'lucide-react';
-import { exportWords, getErrorMessage, importWords } from '../../api/client';
-import type { ImportResult } from '../../api/client';
+import { exportWords, importWords } from '../../api/adminWords';
+import { getErrorMessage } from '../../api/request';
+import type { ImportResult } from '../../api/adminWords';
 import { invalidateQueries } from '../../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY } from '../../hooks/useDictionary';
 import { reportError, showToast } from '../../utils/toast';
