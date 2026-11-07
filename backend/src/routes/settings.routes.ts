@@ -17,7 +17,7 @@ import {
   writeAudioSettings,
   writeAudioVoice,
 } from '../services/audioSettings';
-import { checkAISettings, fetchGeminiModels, isGeminiModel, readAISettings, resetAISettings, writeAISettings } from '../services/aiSettings';
+import { checkAISettings, fetchGeminiModels, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
 
 const router = Router();
 
@@ -51,9 +51,12 @@ router.post('/ai/check', requireAdmin, async (_req, res) => {
   catch { res.status(500).json({ error: 'Не удалось проверить настройки ИИ' }); }
 });
 
-router.delete('/ai', requireAdmin, async (_req, res) => {
-  try { res.json(await resetAISettings()); }
-  catch { res.status(500).json({ error: 'Не удалось сбросить настройки ИИ' }); }
+router.delete('/ai/profile/:profileId', requireAdmin, async (req, res) => {
+  try { res.json(await resetAIProfile(req.params.profileId)); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'INVALID_PROFILE') return res.status(400).json({ error: 'Неизвестный профиль ИИ' });
+    res.status(500).json({ error: 'Не удалось сбросить промпт' });
+  }
 });
 
 router.get('/audio-voice', async (_req, res) => {

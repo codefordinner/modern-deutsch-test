@@ -1,4 +1,11 @@
-.picture-trainer { max-width: 900px; margin: 0 auto; }
+.picture-trainer {
+  /* The app container already provides the shared 1080px desktop layout.
+     Do not introduce a second, narrower column here: the picture stage and
+     the answer/checking area should use the same width as the other trainers. */
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
 .picture-trainer-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
 .picture-trainer-heading h2 { margin: 0 0 4px; }
 .picture-trainer-heading p { margin: 0; color: var(--text-secondary); }
@@ -42,15 +49,25 @@
 .picture-ai-checkbox input { flex: 0 0 auto; accent-color: var(--accent-primary); }
 .pictures-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 18px; align-items: start; }
 .picture-admin-card { min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
-.picture-admin-card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: var(--bg-tertiary); }
+.picture-admin-card.is-inactive { border-color: var(--warning); }
+.picture-admin-card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 8px; background: var(--bg-tertiary); }
 .picture-admin-card-footer { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: 8px; }
-.picture-admin-card-footer > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.picture-admin-card-footer > div { display: flex; flex: 0 0 auto; gap: 4px; }
+.picture-admin-card-title { display: grid; min-width: 0; gap: 3px; }
+.picture-admin-card-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.picture-admin-card-title small { color: var(--text-muted); font-size: 12px; }
+.picture-admin-card-tools { display: flex; flex: 0 0 auto; gap: 4px; }
 .picture-edit-form { display: grid; gap: 10px; min-width: 0; padding-top: 4px; border-top: 1px solid var(--border-color); }
 .picture-edit-form .text-input { width: 100%; min-width: 0; }
 .picture-edit-form textarea { resize: vertical; min-height: 120px; font-size: 15px; line-height: 1.45; }
+.picture-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.picture-edit-actions > button { flex: 1 1 180px; }
+.picture-status-button { width: 100%; }
 .picture-ai-checkbox { display: flex; align-items: center; gap: 8px; }
 .picture-admin-description { color: var(--text-secondary); font-size: 13px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.pictures-admin-message { min-height: 180px; }
+.pictures-admin-empty { display: grid; justify-items: center; gap: 6px; padding: 44px 20px; text-align: center; color: var(--text-secondary); border: 1px dashed var(--border-color); border-radius: 12px; }
+.pictures-admin-empty p { margin: 0; color: var(--text-primary); font-weight: 600; }
+.pictures-admin-empty span { color: var(--text-muted); }
 .picture-check-result { display: grid; gap: 12px; margin-top: 18px; padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; }
 .picture-score { font-size: 18px; }
 .picture-report { color: var(--text-secondary); white-space: pre-wrap; }
@@ -66,6 +83,9 @@
 .ai-settings-card .settings-divider { display: grid; gap: 10px; }
 .ai-profile-title { margin: 0 0 4px; font-size: 17px; color: var(--text-primary); }
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
+.ai-prompt-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-prompt-label .setting-toggle-title { margin: 0; }
+.ai-reset-prompt { flex: 0 0 auto; padding: 6px 10px; font-size: 12px; }
 .ai-prompt-input { resize: vertical; min-height: 180px; font-size: 15px; }
 .ai-profile-block { display: grid; gap: 10px; margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--border-color); }
 @media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } .picture-stage-timer { top: 8px; right: 8px; padding: 6px 9px; font-size: 19px; } }
@@ -74,4 +94,6 @@
   .pictures-admin-grid { grid-template-columns: 1fr; gap: 14px; }
   .picture-admin-card { padding: 10px; }
   .picture-admin-card img { aspect-ratio: 16 / 10; }
+  .ai-prompt-label { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .ai-reset-prompt { width: 100%; }
 }

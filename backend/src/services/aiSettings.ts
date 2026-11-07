@@ -98,9 +98,20 @@ export async function writeAISettings(input: { profileId: string; model: unknown
   return { provider: 'gemini', hasApiKey: true, isDefault: false, profiles: value.profiles };
 }
 
-export async function resetAISettings(): Promise<AISettingsPublic> {
-  await prisma.setting.deleteMany({ where: { key: AI_SETTINGS_KEY } });
-  return readAISettings();
+export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
+  if (profileId !== AI_PROFILE_PICTURE_DESCRIPTION && profileId !== AI_PROFILE_PICTURE_CHECK) throw new Error('INVALID_PROFILE');
+  const current = await readStored();
+  if (!current) return readAISettings();
+  const currentProfile = current.profiles[profileId];
+  const defaultPrompt = profileId === AI_PROFILE_PICTURE_DESCRIPTION ? DEFAULT_PICTURE_PROMPT : DEFAULT_PICTURE_CHECK_PROMPT;
+  const profile = {
+    model: currentProfile?.model ?? '',
+    prompt: defaultPrompt,
+    ...(profileId === AI_PROFILE_PICTURE_CHECK ? { severity: currentProfile?.severity ?? 3 } : {}),
+  };
+  const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
+  await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
+  return { provider: 'gemini', hasApiKey: true, isDefault: false, profiles: value.profiles };
 }
 
 async function readApiKey(): Promise<string | null> {
