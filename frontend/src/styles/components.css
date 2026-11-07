@@ -1266,3 +1266,5 @@
 .learning-summary-row { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; color: var(--text-secondary); }
 .learning-summary-row strong { color: var(--text-primary); font-size: .9rem; }
 .onboarding-content ol { padding-left: 1.4rem; margin-bottom: 0; }
+.audio-regeneration-status { margin: 1rem 0; padding: .85rem; border: 1px solid var(--border-color); border-radius: .5rem; }
+.audio-regeneration-meta { display: flex; justify-content: space-between; gap: 1rem; margin-top: .35rem; }

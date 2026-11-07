@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
-import { audioCacheStats, clearAudioCache, generateAudioPreview, getOrCreateAudio, MAX_AUDIO_TEXT_LENGTH, regenerateWordAudio } from '../services/audio';
+import { audioCacheStats, clearAudioCache, generateAudioPreview, getAudioRegenerationJob, getOrCreateAudio, MAX_AUDIO_TEXT_LENGTH, startAudioRegeneration } from '../services/audio';
 import { sanitizeAudioSettings } from '../services/audioSettings';
 
 const router = Router();
@@ -21,8 +21,12 @@ router.delete('/admin/cache', requireAdmin, async (_req, res) => {
   try { res.json({ count: await clearAudioCache() }); } catch { res.status(500).json({ error: 'Не удалось очистить кэш озвучки' }); }
 });
 
+router.get('/admin/regenerate-words', requireAdmin, async (_req, res) => {
+  try { res.json({ job: await getAudioRegenerationJob() }); } catch { res.status(500).json({ error: 'Не удалось прочитать состояние генерации' }); }
+});
+
 router.post('/admin/regenerate-words', requireAdmin, async (_req, res) => {
-  try { res.json(await regenerateWordAudio()); } catch { res.status(502).json({ error: 'Не удалось сгенерировать озвучку слов' }); }
+  try { res.status(202).json(await startAudioRegeneration()); } catch { res.status(502).json({ error: 'Не удалось запустить генерацию озвучки слов' }); }
 });
 
 router.post('/admin/preview', requireAdmin, async (req: Request, res: Response) => {

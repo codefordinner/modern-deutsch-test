@@ -97,6 +97,21 @@ model AudioCache {
   @@index([kind])
 }
 
+/// Durable status of the administrator's background word-audio regeneration.
+/// There is at most one active job; progress survives a browser refresh.
+model AudioRegenerationJob {
+  id        String   @id @default(cuid())
+  status    String   // running | completed | failed
+  total     Int      @default(0)
+  generated Int      @default(0)
+  durationMs Int     @default(0)
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, updatedAt])
+}
+
 /// SRS progress shared between a learner's devices through a sync key.
 /// `keyHash` = sha256 of the key (the key itself is never stored); `data` = JSON snapshot,
 /// see src/services/srsSync.ts.

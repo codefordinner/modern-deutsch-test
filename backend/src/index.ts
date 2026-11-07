@@ -3,6 +3,7 @@ import cors from 'cors';
 import apiRouter from './api';
 import { backfillPartOfSpeech } from './services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './services/backfillNormalizedKeys';
+import { resumeAudioRegeneration } from './services/audio';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,4 +27,5 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
   backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
+  resumeAudioRegeneration().catch((error) => console.error('[audio] regeneration resume failed:', error));
 });

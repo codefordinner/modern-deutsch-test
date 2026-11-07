@@ -42,7 +42,7 @@
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights` и `audioSettings` (модель Piper, скорость, вариативность и пауза). Старый `audioVoice` читается для совместимости.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
-- **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос.
+- **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
 
 ## Переменные окружения

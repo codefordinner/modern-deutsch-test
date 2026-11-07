@@ -131,7 +131,23 @@ export async function getSpeechAudio(text: string, kind: 'word' | 'sentence' = '
 export interface AudioCacheStats { total: number; words: number; sentences: number }
 export const getAudioCacheStats = () => request<AudioCacheStats>('/audio/admin/stats', { auth: true });
 export const clearAudioCache = () => request<{ count: number }>('/audio/admin/cache', { method: 'DELETE', auth: true });
-export const regenerateWordAudio = () => request<{ total: number; generated: number }>('/audio/admin/regenerate-words', { method: 'POST', auth: true });
+export interface AudioRegenerationJob {
+  id: string;
+  status: 'running' | 'completed' | 'failed';
+  total: number;
+  generated: number;
+  remaining: number;
+  durationMs: number;
+  averageMs: number | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export const getAudioRegenerationJob = async () => {
+  const result = await request<{ job: AudioRegenerationJob | null }>('/audio/admin/regenerate-words', { auth: true });
+  return result.job;
+};
+export const regenerateWordAudio = () => request<AudioRegenerationJob>('/audio/admin/regenerate-words', { method: 'POST', auth: true });
 
 // ---- SRS box weights (server-wide setting) ----
 
