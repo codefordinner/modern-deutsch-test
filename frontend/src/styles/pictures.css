@@ -18,6 +18,8 @@
 .picture-admin-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
 .picture-admin-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .picture-edit-form { display: grid; gap: 8px; }
+.picture-ai-checkbox { display: flex; align-items: center; gap: 8px; }
+.picture-admin-description { color: var(--text-secondary); font-size: 13px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
 .ai-settings-card { max-width: 760px; }
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
 @media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } }

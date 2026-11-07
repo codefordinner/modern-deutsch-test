@@ -4,6 +4,7 @@ import { prisma } from '../db';
 export const AI_SETTINGS_KEY = 'aiSettings';
 export type GeminiModel = string;
 export interface GeminiModelInfo { name: string; displayName: string; supportedGenerationMethods: string[] }
+export interface PictureMetadata { title: string; description: string }
 
 export interface AISettingsPublic {
   provider: 'gemini';
@@ -70,7 +71,8 @@ async function readApiKey(): Promise<string | null> {
 export async function fetchGeminiModels(apiKey?: string): Promise<GeminiModelInfo[]> {
   const key = apiKey ?? await readApiKey();
   if (!key) throw new Error('MISSING_API_KEY');
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+    headers: { 'x-goog-api-key': key },
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
@@ -94,4 +96,33 @@ export async function checkAISettings(): Promise<{ ok: boolean; message: string;
     const message = error instanceof Error && error.message === 'INVALID_API_KEY' ? 'Ключ Gemini недействителен или не имеет доступа.' : 'Не удалось получить список моделей Gemini.';
     return { ok: false, message, settings, models: [] };
   }
+}
+
+/** Generates editable Russian metadata for one picture. All Gemini calls stay in this module. */
+export async function generatePictureMetadata(dataUrl: string): Promise<PictureMetadata> {
+  const stored = await readStored();
+  if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
+  if (!stored.model) throw new Error('MISSING_MODEL');
+  const match = /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,(.+)$/.exec(dataUrl);
+  if (!match) throw new Error('INVALID_IMAGE');
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(stored.model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+    body: JSON.stringify({ contents: [{ parts: [
+      { text: 'Проанализируй изображение для тренажёра немецкого языка. Верни только JSON без Markdown: {"title":"краткое название на русском","description":"подробное описание изображения на русском для проверки ответа пользователя"}. Не выдумывай детали, которых не видно.' },
+      { inline_data: { mime_type: match[1], data: match[2] } },
+    ] }] }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
+  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+  if (typeof text !== 'string') throw new Error('INVALID_AI_RESPONSE');
+  const jsonText = text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+  let parsed: unknown;
+  try { parsed = JSON.parse(jsonText); } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  if (typeof parsed !== 'object' || parsed === null) throw new Error('INVALID_AI_RESPONSE');
+  const result = parsed as Record<string, unknown>;
+  if (typeof result.title !== 'string' || typeof result.description !== 'string' || !result.title.trim() || !result.description.trim()) throw new Error('INVALID_AI_RESPONSE');
+  return { title: result.title.trim().slice(0, 200), description: result.description.trim().slice(0, 5000) };
 }

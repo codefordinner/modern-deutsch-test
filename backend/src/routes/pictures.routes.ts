@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { generatePictureMetadata } from '../services/aiSettings';
 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
@@ -42,6 +43,26 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
     } }));
   } catch { return res.status(500).json({ error: 'Не удалось обновить картинку' }); }
+});
+
+router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const picture = await prisma.picture.findUnique({ where: { id: req.params.id } });
+    if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
+    const metadata = await generatePictureMetadata(picture.dataUrl);
+    const updated = await prisma.picture.update({ where: { id: picture.id }, data: metadata });
+    return res.json(updated);
+  } catch (error) {
+    const messages: Record<string, [number, string]> = {
+      MISSING_API_KEY: [400, 'Сначала настройте API-ключ Gemini'],
+      MISSING_MODEL: [400, 'Сначала выберите модель Gemini'],
+      INVALID_API_KEY: [400, 'Ключ Gemini недействителен'],
+      GEMINI_UNAVAILABLE: [502, 'Gemini не смог обработать изображение'],
+      INVALID_AI_RESPONSE: [502, 'Gemini вернул некорректный ответ'],
+    };
+    const result = error instanceof Error ? messages[error.message] : undefined;
+    return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось заполнить описание через ИИ' });
+  }
 });
 
 router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
