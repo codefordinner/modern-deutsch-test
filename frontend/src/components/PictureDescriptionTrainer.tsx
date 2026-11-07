@@ -126,7 +126,7 @@ export function PictureDescriptionTrainer() {
       </div>
       <label className="picture-mode-switch"><input type="checkbox" checked={isExamMode} onChange={(event) => setIsExamMode(event.target.checked)} /> Экзаменационный режим (90 секунд)</label>
        <div className={`picture-stage ${isRevealed ? 'is-visible' : ''}`}>
-         {isRevealed ? <img src={picture.dataUrl} alt={picture.title || 'Картинка для описания'} /> : <div className="picture-hidden"><span>Картинка пока скрыта</span><span>Нажмите «Показать картинку», чтобы начать описание.</span></div>}
+         {isRevealed ? <img src={picture.imageUrl} alt={picture.title || 'Картинка для описания'} decoding="async" /> : <div className="picture-hidden"><span>Картинка пока скрыта</span><span>Нажмите «Показать картинку», чтобы начать описание.</span></div>}
          <div className={`picture-stage-timer ${startedAt !== null || isFinished ? 'is-active' : ''}`} aria-live="polite">{formatTime(elapsed)}</div>
        </div>
       {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}

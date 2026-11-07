@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
-import { requireAdmin } from '../middleware/auth.middleware';
+import { isAdminRequest, requireAdmin } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
 import { checkPictureAnswer, generatePictureMetadata, MAX_PICTURE_ANSWER_LENGTH } from '../services/aiSettings';
 
@@ -16,15 +16,37 @@ const pictureCheckLimiter = rateLimit({
   message: { error: 'Слишком много проверок описания. Подождите минуту.' },
 });
 
+const META_SELECT = { id: true, title: true, description: true, isActive: true, createdAt: true, updatedAt: true } as const;
+const serializePicture = (picture: { id: string; title: string | null; description: string | null; isActive: boolean; createdAt: Date; updatedAt: Date }, includeDescription: boolean) => ({
+  id: picture.id, title: picture.title, ...(includeDescription ? { description: picture.description } : {}),
+  isActive: picture.isActive, createdAt: picture.createdAt, updatedAt: picture.updatedAt,
+  imageUrl: `/api/pictures/${picture.id}/image?v=${picture.updatedAt.getTime()}`,
+});
+
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    res.json(await prisma.picture.findMany({ where: { isActive: true }, orderBy: { createdAt: 'asc' } }));
+    const pictures = await prisma.picture.findMany({ where: { isActive: true }, select: META_SELECT, orderBy: { createdAt: 'asc' } });
+    res.setHeader('Cache-Control', 'no-cache');
+    res.json(pictures.map((picture) => serializePicture(picture, false)));
   } catch { res.status(500).json({ error: 'Не удалось загрузить картинки' }); }
 });
 
 router.get('/admin', requireAdmin, async (_req: Request, res: Response) => {
-  try { res.json(await prisma.picture.findMany({ orderBy: { createdAt: 'desc' } })); }
-  catch { res.status(500).json({ error: 'Не удалось загрузить картинки' }); }
+  try {
+    const pictures = await prisma.picture.findMany({ select: META_SELECT, orderBy: { createdAt: 'desc' } });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(pictures.map((picture) => serializePicture(picture, true)));
+  } catch { res.status(500).json({ error: 'Не удалось загрузить картинки' }); }
+});
+
+router.get('/:id/image', async (req: Request, res: Response) => {
+  try {
+    const picture = await prisma.picture.findUnique({ where: { id: req.params.id }, select: { dataUrl: true, isActive: true } });
+    if (!picture || (!picture.isActive && !isAdminRequest(req))) return res.status(404).json({ error: 'Картинка не найдена' });
+    const match = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/.exec(picture.dataUrl.slice(0, 80));
+    if (!match) return res.status(404).json({ error: 'Картинка не найдена' });
+    return res.set({ 'Content-Type': `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`, 'Cache-Control': picture.isActive ? 'public, max-age=31536000, immutable' : 'private, no-cache', 'X-Content-Type-Options': 'nosniff' }).send(Buffer.from(picture.dataUrl.slice(match[0].length), 'base64'));
+  } catch { return res.status(500).json({ error: 'Не удалось загрузить картинку' }); }
 });
 
 router.post('/', requireAdmin, async (req: Request, res: Response) => {
@@ -33,9 +55,11 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Загрузите корректное изображение JPEG, PNG, WebP или GIF размером до 5 МБ' });
   }
   try {
-    return res.status(201).json(await prisma.picture.create({
+    const created = await prisma.picture.create({
       data: { dataUrl, title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 200) : null, description: typeof description === 'string' && description.trim() ? description.trim().slice(0, 5000) : null, isActive: isActive !== false },
-    }));
+      select: META_SELECT,
+    });
+    return res.status(201).json(serializePicture(created, true));
   } catch { return res.status(500).json({ error: 'Не удалось сохранить картинку' }); }
 });
 
@@ -45,12 +69,13 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Некорректное изображение' });
   }
   try {
-    return res.json(await prisma.picture.update({ where: { id: req.params.id }, data: {
+    const updated = await prisma.picture.update({ where: { id: req.params.id }, data: {
       ...(dataUrl !== undefined ? { dataUrl } : {}),
       ...(title !== undefined ? { title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 200) : null } : {}),
       ...(description !== undefined ? { description: typeof description === 'string' && description.trim() ? description.trim().slice(0, 5000) : null } : {}),
       ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
-    } }));
+    }, select: META_SELECT });
+    return res.json(serializePicture(updated, true));
   } catch { return res.status(500).json({ error: 'Не удалось обновить картинку' }); }
 });
 
@@ -61,8 +86,8 @@ router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Respo
     const picture = await prisma.picture.findUnique({ where: { id: req.params.id } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
     const metadata = await generatePictureMetadata(picture.dataUrl);
-    const updated = await prisma.picture.update({ where: { id: picture.id }, data: metadata });
-    return res.json(updated);
+    const updated = await prisma.picture.update({ where: { id: picture.id }, data: metadata, select: META_SELECT });
+    return res.json(serializePicture(updated, true));
   } catch (error) {
     const messages: Record<string, [number, string]> = {
       MISSING_API_KEY: [400, 'Сначала настройте API-ключ Gemini'],

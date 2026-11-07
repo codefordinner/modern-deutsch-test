@@ -19,32 +19,18 @@ export function AISettingsTab() {
   const load = async () => {
     try {
       const result = await fetchAISettings(); setSettings(result); setModel(result.profiles[PICTURE_PROFILE]?.model ?? ''); setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? ''); setCheckModel(result.profiles[CHECK_PROFILE]?.model ?? ''); setCheckPrompt(result.profiles[CHECK_PROFILE]?.prompt ?? ''); setSeverity(result.profiles[CHECK_PROFILE]?.severity ?? 3);
-      if (result.hasApiKey) { const catalog = await fetchAIModels(); setModels(catalog.models); if (!result.profiles[PICTURE_PROFILE]?.model && catalog.models[0]) setModel(catalog.models[0].name); }
+      if (result.hasApiKey) { try { setModels((await fetchAIModels()).models); } catch { /* catalog is optional on load */ } }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { void load(); }, []);
   const save = async () => {
     setBusy(true);
     try {
-      const result = await saveAISettings(PICTURE_PROFILE, model, apiKey, prompt);
-      setSettings(result);
-      setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
+      const first = await saveAISettings(PICTURE_PROFILE, model, apiKey, prompt);
       setApiKey('');
-      const withCheckProfile = await saveAISettings(CHECK_PROFILE, checkModel, undefined, checkPrompt, severity);
-      setSettings(withCheckProfile);
-      // Loading the remote model catalog is a separate operation. A valid saved key
-      // must remain visible even if Gemini temporarily cannot return its catalog.
-      try {
-        const catalog = await fetchAIModels();
-        setModels(catalog.models);
-        if (!result.profiles[PICTURE_PROFILE]?.model && catalog.models[0]) {
-          const selected = await saveAISettings(PICTURE_PROFILE, catalog.models[0].name, undefined, result.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
-          setSettings(selected);
-          setModel(selected.profiles[PICTURE_PROFILE]?.model ?? catalog.models[0].name);
-        }
-      } catch (error) {
-        reportError(error, 'Ключ сохранён, но список моделей Gemini загрузить не удалось');
-      }
+      const second = await saveAISettings(CHECK_PROFILE, checkModel, undefined, checkPrompt, severity);
+      setSettings(second);
+      setPrompt(second.profiles[PICTURE_PROFILE]?.prompt ?? first.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
       showToast('Настройки ИИ сохранены', 'success');
     } catch (error) { reportError(error, 'Не удалось сохранить настройки ИИ'); }
     finally { setBusy(false); }

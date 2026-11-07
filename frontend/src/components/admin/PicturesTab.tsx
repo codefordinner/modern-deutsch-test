@@ -8,9 +8,36 @@ import { reportError, showToast } from '../../utils/toast';
 const MAX_DATA_URL_LENGTH = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = Math.floor(MAX_DATA_URL_LENGTH * 0.72);
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_SIDE = 1600;
+const KEEP_AS_IS_BYTES = 600 * 1024;
 const readFile = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать файл')); reader.readAsDataURL(file);
 });
+
+async function prepareImage(file: File): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+      if (scale === 1 && file.size <= KEEP_AS_IS_BYTES && file.type !== 'image/gif') return readFile(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Не удалось обработать изображение');
+      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const result = canvas.toDataURL('image/jpeg', 0.85);
+      if (result.length > MAX_DATA_URL_LENGTH) throw new Error('Изображение слишком большое даже после сжатия');
+      return result;
+    } finally { bitmap.close(); }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('слишком большое')) throw error;
+    const original = await readFile(file);
+    if (original.length <= MAX_DATA_URL_LENGTH) return original;
+    throw new Error(`Не удалось обработать «${file.name}»`, { cause: error });
+  }
+}
 
 export function PicturesTab() {
   const [pictures, setPictures] = useState<Picture[]>([]);
@@ -43,7 +70,7 @@ export function PicturesTab() {
     let added = 0;
     try {
       for (const file of files) {
-        const dataUrl = await readFile(file);
+        const dataUrl = await prepareImage(file);
         const picture = await createPicture({ dataUrl, isActive: true });
         added += 1;
         if (autoDescribe) await generatePictureDescription(picture.id);
@@ -123,7 +150,7 @@ export function PicturesTab() {
     {!loading && loadError && <div className="pictures-admin-empty"><p>Не удалось загрузить список картинок.</p><button type="button" className="btn-secondary" onClick={() => void load()}>Повторить</button></div>}
     {!loading && !loadError && pictures.length === 0 && <div className="pictures-admin-empty"><p>Картинки ещё не добавлены.</p><span>Загрузите изображения выше, чтобы они появились в тренажёре.</span></div>}
     {!loading && !loadError && pictures.length > 0 && <div className="pictures-admin-grid">{pictures.map((picture) => <div className={`card picture-admin-card ${picture.isActive ? '' : 'is-inactive'}`} key={picture.id}>
-      <img src={picture.dataUrl} alt={picture.title || 'Картинка'} />
+       <img src={picture.imageUrl} alt={picture.title || 'Картинка'} loading="lazy" decoding="async" />
       <div className="picture-admin-card-footer"><div className="picture-admin-card-title"><span>{picture.title || 'Без названия'}</span><small>{picture.isActive ? 'Показывается в тренажёре' : 'Скрыта из тренажёра'}</small></div><div className="picture-admin-card-tools"><button type="button" className="icon-btn" disabled={busy} aria-label="Редактировать картинку" onClick={() => openEdit(picture)}><Pencil size={16} /></button><button type="button" className="icon-btn icon-btn--danger" disabled={busy} aria-label="Удалить картинку" onClick={() => void remove(picture)}><Trash2 size={16} /></button></div></div>
       {picture.description && <p className="picture-admin-description">{picture.description}</p>}
       {editingId === picture.id && <div className="picture-edit-form">
