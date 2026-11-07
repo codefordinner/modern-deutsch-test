@@ -17,8 +17,33 @@ import {
   writeAudioSettings,
   writeAudioVoice,
 } from '../services/audioSettings';
+import { checkAISettings, GEMINI_MODELS, isGeminiModel, readAISettings, resetAISettings, writeAISettings } from '../services/aiSettings';
 
 const router = Router();
+
+router.get('/ai', requireAdmin, async (_req, res) => {
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ ...(await readAISettings()), models: GEMINI_MODELS }); }
+  catch { res.status(500).json({ error: 'Не удалось загрузить настройки ИИ' }); }
+});
+
+router.put('/ai', requireAdmin, async (req, res) => {
+  if (!isGeminiModel(req.body?.model)) return res.status(400).json({ error: 'Выбрана неизвестная модель Gemini' });
+  try { res.json(await writeAISettings({ model: req.body.model, apiKey: req.body.apiKey })); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'INVALID_API_KEY') return res.status(400).json({ error: 'Ключ Gemini должен содержать не менее 10 символов' });
+    res.status(500).json({ error: 'Не удалось сохранить настройки ИИ' });
+  }
+});
+
+router.post('/ai/check', requireAdmin, async (_req, res) => {
+  try { res.json(await checkAISettings()); }
+  catch { res.status(500).json({ error: 'Не удалось проверить настройки ИИ' }); }
+});
+
+router.delete('/ai', requireAdmin, async (_req, res) => {
+  try { res.json(await resetAISettings()); }
+  catch { res.status(500).json({ error: 'Не удалось сбросить настройки ИИ' }); }
+});
 
 router.get('/audio-voice', async (_req, res) => {
   try {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, LogOut, AudioLines, Images } from 'lucide-react';
+import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, LogOut, AudioLines, Images, Bot } from 'lucide-react';
 import { PicturesTab } from './admin/PicturesTab';
+import { AISettingsTab } from './admin/AISettingsTab';
 import { AdminLogin } from './admin/AdminLogin';
 import { WordsTab } from './admin/WordsTab';
 import { CategoriesTab } from './admin/CategoriesTab';
@@ -25,7 +26,7 @@ import { reportError, showToast } from '../utils/toast';
 import { wordInCategory } from '../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../types';
 
-type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'analytics';
+type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'ai' | 'analytics';
 
 export const AdminPanel: React.FC = () => {
   // The session cookie is HttpOnly (invisible to JS), so the client asks the
@@ -192,6 +193,7 @@ export const AdminPanel: React.FC = () => {
             { value: 'srs', label: 'Ящики SRS', icon: <Layers size={14} /> },
             { value: 'audio', label: 'Озвучка', icon: <AudioLines size={14} /> },
             { value: 'pictures', label: 'Картинки', icon: <Images size={14} /> },
+            { value: 'ai', label: 'ИИ', icon: <Bot size={14} /> },
             { value: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
           ]}
         />
@@ -228,6 +230,7 @@ export const AdminPanel: React.FC = () => {
       {tab === 'srs' && <SrsSettingsTab />}
       {tab === 'audio' && <AudioCacheTab />}
       {tab === 'pictures' && <PicturesTab />}
+      {tab === 'ai' && <AISettingsTab />}
       {tab === 'analytics' && <AnalyticsTab />}
 
       {isWordOpen && <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={handleSaveWord} />}
