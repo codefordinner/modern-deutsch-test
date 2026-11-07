@@ -16,7 +16,16 @@ export interface AISettingsPublic {
 export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
 export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
-export interface PictureCheckResult { segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string }>; report: string; score: number; maxScore: 100 }
+export interface PictureCheckResult {
+  segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string }>;
+  report: string;
+  score: number;
+  maxScore: 100;
+  categories: { content: number; grammar: number; vocabulary: number; fluency: number };
+  correctedText: string;
+  level: string;
+  usefulExpressions: string[];
+}
 interface StoredAISettings { provider: 'gemini'; apiKey: string; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number }> }
 const DEFAULT_MODEL = '';
 export const DEFAULT_PICTURE_PROMPT = [
@@ -28,7 +37,7 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
-export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и итоговая обратная связь могут быть на русском, но пользовательский текст нужно анализировать именно как немецкий. Сравни ответ с эталонным описанием и видимыми фактами на изображении. Проверь немецкую грамматику, артикли der/die/das, падежи, окончания, порядок слов, формы глаголов, лексику, орфографию и естественность формулировок. Отдельно укажи фактические ошибки или откровенную ложь относительно изображения. Не наказывай за допустимые немецкие синонимы, альтернативный порядок слов, другой естественный способ описания и отсутствие несущественных деталей. Все notes и report пиши на русском языке, но фрагменты segments.text должны в точности совпадать с исходным немецким текстом пользователя. Верни JSON: segments — исходный текст пользователя непрерывными фрагментами с severity neutral|good|style|error|lie и короткой русской note для проблемных фрагментов; report — итоговый отчёт на русском; score — целое число 0–100. Не переводи, не исправляй и не изменяй текст пользователя. Не добавляй фрагменты, которых в нём нет.';
+export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; severity: neutral|good|style|error|lie; note на русском. report на русском. correctedText — полный исправленный немецкий текст, если нужны исправления. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. level — примерный CEFR A1–C1. usefulExpressions — до 5 коротких немецких выражений с русским переводом. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -195,5 +204,10 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   const result = parsed as Record<string, unknown>;
   if (!Array.isArray(result.segments) || typeof result.report !== 'string' || typeof result.score !== 'number') throw new Error('INVALID_AI_RESPONSE');
   const segments = result.segments.flatMap((segment) => { if (typeof segment !== 'object' || segment === null) return []; const item = segment as Record<string, unknown>; const severity = item.severity; if (typeof item.text !== 'string' || !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))) return []; return [{ text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note.slice(0, 500) } : {}) }]; });
-  return { segments, report: result.report.slice(0, 5000), score: Math.max(0, Math.min(100, Math.round(result.score))), maxScore: 100 };
+  const covered = segments.map((segment) => segment.text).join('');
+  if (covered !== input.answer) throw new Error('INVALID_AI_RESPONSE');
+  const rawCategories = typeof result.categories === 'object' && result.categories !== null ? result.categories as Record<string, unknown> : {};
+  const category = (key: string) => Math.max(0, Math.min(25, Math.round(Number(rawCategories[key]) || 0)));
+  const categories = { content: category('content'), grammar: category('grammar'), vocabulary: category('vocabulary'), fluency: category('fluency') };
+  return { segments, report: result.report.slice(0, 5000), score: categories.content + categories.grammar + categories.vocabulary + categories.fluency, maxScore: 100, categories, correctedText: typeof result.correctedText === 'string' ? result.correctedText.slice(0, 10_000) : input.answer, level: typeof result.level === 'string' ? result.level.slice(0, 20) : '—', usefulExpressions: Array.isArray(result.usefulExpressions) ? result.usefulExpressions.filter((item): item is string => typeof item === 'string').slice(0, 5) : [] };
 }

@@ -78,6 +78,15 @@ router.post('/:id/check-answer', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/prompt-test', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { pictureId, answer, severity } = req.body ?? {};
+    const picture = await prisma.picture.findUnique({ where: { id: pictureId } });
+    if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
+    return res.json(await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer, severity }));
+  } catch { return res.status(502).json({ error: 'Не удалось протестировать промпт' }); }
+});
+
 router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try { await prisma.picture.delete({ where: { id: req.params.id } }); return res.json({ success: true }); }
   catch { return res.status(500).json({ error: 'Не удалось удалить картинку' }); }

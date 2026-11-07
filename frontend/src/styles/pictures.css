@@ -3,11 +3,17 @@
 .picture-trainer-heading h2 { margin: 0 0 4px; }
 .picture-trainer-heading p { margin: 0; color: var(--text-secondary); }
 .picture-timer { font: 700 28px var(--mono); color: var(--accent-primary); white-space: nowrap; }
-.picture-stage { min-height: 420px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); }
+.picture-stage { position: relative; min-height: 420px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); }
 .picture-stage img { display: block; width: 100%; max-height: 620px; object-fit: contain; }
+.picture-stage-timer { position: absolute; top: 14px; right: 14px; z-index: 1; padding: 8px 12px; font: 700 24px var(--mono); color: var(--text-muted); background: color-mix(in srgb, var(--bg-primary) 88%, transparent); border: 1px solid var(--border-color); border-radius: 9px; opacity: .8; }
+.picture-stage-timer.is-active { color: var(--accent-primary); border-color: var(--accent-primary); opacity: 1; box-shadow: var(--shadow-sm); }
 .picture-hidden { display: grid; gap: 12px; justify-items: center; color: var(--text-muted); }
 .picture-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .picture-counter { margin-top: 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.picture-mode-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--text-secondary); font-size: 14px; }
+.picture-mode-switch input { accent-color: var(--accent-primary); }
+.picture-categories { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.picture-corrected { padding: 12px; color: var(--text-primary); background: var(--bg-tertiary); border-radius: 8px; white-space: pre-wrap; }
 .picture-answer-label { display: block; margin-top: 18px; margin-bottom: 6px; font-weight: 600; }
 .picture-answer {
   width: 100%;
@@ -62,7 +68,7 @@
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
 .ai-prompt-input { resize: vertical; min-height: 180px; font-size: 15px; }
 .ai-profile-block { display: grid; gap: 10px; margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--border-color); }
-@media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } }
+@media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } .picture-stage-timer { top: 8px; right: 8px; padding: 6px 9px; font-size: 19px; } }
 @media (max-width: 600px) {
   .picture-upload { padding: 14px; }
   .pictures-admin-grid { grid-template-columns: 1fr; gap: 14px; }
