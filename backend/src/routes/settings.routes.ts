@@ -17,13 +17,22 @@ import {
   writeAudioSettings,
   writeAudioVoice,
 } from '../services/audioSettings';
-import { checkAISettings, GEMINI_MODELS, isGeminiModel, readAISettings, resetAISettings, writeAISettings } from '../services/aiSettings';
+import { checkAISettings, fetchGeminiModels, isGeminiModel, readAISettings, resetAISettings, writeAISettings } from '../services/aiSettings';
 
 const router = Router();
 
 router.get('/ai', requireAdmin, async (_req, res) => {
-  try { res.setHeader('Cache-Control', 'no-store'); res.json({ ...(await readAISettings()), models: GEMINI_MODELS }); }
+  try { res.setHeader('Cache-Control', 'no-store'); res.json(await readAISettings()); }
   catch { res.status(500).json({ error: 'Не удалось загрузить настройки ИИ' }); }
+});
+
+router.get('/ai/models', requireAdmin, async (_req, res) => {
+  try { res.setHeader('Cache-Control', 'no-store'); res.json({ models: await fetchGeminiModels() }); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'MISSING_API_KEY') return res.status(400).json({ error: 'Сначала сохраните ключ Gemini' });
+    if (error instanceof Error && error.message === 'INVALID_API_KEY') return res.status(400).json({ error: 'Ключ Gemini недействителен или не имеет доступа' });
+    return res.status(502).json({ error: 'Не удалось получить список моделей Gemini' });
+  }
 });
 
 router.put('/ai', requireAdmin, async (req, res) => {
