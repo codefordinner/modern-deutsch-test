@@ -39,7 +39,15 @@ export async function request<T>(path: string, { method = 'GET', body, auth = fa
   }
 
   let data: unknown = null;
-  try { data = !res.ok || responseType === 'json' ? await res.json() : await res.blob(); } catch { /* leave null */ }
+  try {
+    data = !res.ok || responseType === 'json' ? await res.json() : await res.blob();
+  } catch {
+    // Reverse proxies can return an HTML 502/504 page instead of the JSON
+    // error produced by our API. Never expose that page to the application.
+    if (!res.ok && (res.status === 502 || res.status === 504)) {
+      throw new ApiError('Сервер ИИ временно недоступен. Попробуйте ещё раз через минуту.', res.status);
+    }
+  }
 
   if (!res.ok) {
     if (res.status === 401 && auth) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));

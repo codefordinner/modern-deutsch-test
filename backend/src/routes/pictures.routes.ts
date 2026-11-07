@@ -88,7 +88,7 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
     const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity: req.body?.severity });
     return res.json(result);
   } catch (error) {
-    const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Проверка ИИ пока не настроена'], MISSING_MODEL: [503, 'Для проверки не выбрана модель Gemini'], EMPTY_ANSWER: [400, 'Введите описание перед отправкой'], ANSWER_TOO_LONG: [400, 'Описание не должно быть длиннее 10 000 символов'], INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный результат проверки'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
+    const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Проверка ИИ пока не настроена'], MISSING_MODEL: [503, 'Для проверки не выбрана модель Gemini'], EMPTY_ANSWER: [400, 'Введите описание перед отправкой'], ANSWER_TOO_LONG: [400, 'Описание не должно быть длиннее 10 000 символов'], AI_TIMEOUT: [504, 'ИИ не ответил вовремя. Попробуйте ещё раз.'], INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный результат проверки'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
     const result = error instanceof Error ? messages[error.message] : undefined;
     return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось проверить описание' });
   }
