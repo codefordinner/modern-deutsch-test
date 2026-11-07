@@ -19,6 +19,7 @@ export function PictureDescriptionTrainer() {
   const [index, setIndex] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [isRevealed, setIsRevealed] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<PictureCheckResult | null>(null);
@@ -52,14 +53,14 @@ export function PictureDescriptionTrainer() {
   useEffect(() => {
     try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId: picture?.id, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
   }, [answer, picture?.id]);
-  const start = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const start = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const skip = () => {
     if (pictures.length > 1) {
       let nextIndex = index;
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
       setIndex(nextIndex);
     }
-    setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null);
+    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null);
   };
   const finish = () => { setStartedAt(null); setIsFinished(true); };
   const submit = async () => {
@@ -68,7 +69,7 @@ export function PictureDescriptionTrainer() {
     catch (error) { reportError(error, 'Не удалось проверить описание'); }
     finally { setChecking(false); }
   };
-  const restart = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const restart = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const next = () => { skip(); };
   const toggleSpeech = () => {
     const speechWindow = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
@@ -89,14 +90,14 @@ export function PictureDescriptionTrainer() {
         <div><h2>Описание картинки</h2><p>Представьте, что вы сдаёте устную часть экзамена.</p></div>
       </div>
       <label className="picture-mode-switch"><input type="checkbox" checked={isExamMode} onChange={(event) => setIsExamMode(event.target.checked)} /> Экзаменационный режим (90 секунд)</label>
-      <div className="picture-stage is-visible">
-        <img src={picture.dataUrl} alt={picture.title || 'Картинка для описания'} />
-        <div className={`picture-stage-timer ${startedAt !== null || isFinished ? 'is-active' : ''}`} aria-live="polite">{formatTime(elapsed)}</div>
-      </div>
+       <div className={`picture-stage ${isRevealed ? 'is-visible' : ''}`}>
+         {isRevealed ? <img src={picture.dataUrl} alt={picture.title || 'Картинка для описания'} /> : <div className="picture-hidden"><span>Картинка пока скрыта</span><span>Нажмите «Показать картинку», чтобы начать описание.</span></div>}
+         <div className={`picture-stage-timer ${startedAt !== null || isFinished ? 'is-active' : ''}`} aria-live="polite">{formatTime(elapsed)}</div>
+       </div>
       {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
       {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} /><button type="button" className="btn-secondary" onClick={toggleSpeech}>{speechState === 'listening' ? 'Остановить диктовку' : 'Диктовать по-немецки'}</button></>}
       <div className="picture-actions">
-        {startedAt === null && !isFinished ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
+         {!isRevealed ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
           <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
           <button className="btn-secondary" onClick={restart}><RotateCcw size={17} /> Начать заново</button>
           <button className="btn-secondary" onClick={next}><SkipForward size={17} /> Следующая картинка</button>
