@@ -7,6 +7,9 @@ const DEFAULT_PIPER_URL = 'http://piper-tts:5000';
 const inFlight = new Map<string, Promise<Buffer>>();
 const AUDIO_DB_RETRIES = 6;
 const AUDIO_DB_RETRY_DELAY_MS = 250;
+const WORD_ATTEMPTS = 2;
+/** Сколько слов Piper синтезирует одновременно при массовой генерации (CPU-bound, 2 обычно достаточно). */
+const REGEN_CONCURRENCY = Math.max(1, Math.min(8, Number(process.env.AUDIO_REGEN_CONCURRENCY) || 2));
 
 // SQLite allows only one writer at a time. Piper generation can stay parallel,
 // but writing several (potentially large) WAV blobs and job updates in parallel
@@ -68,6 +71,11 @@ export async function generateAudioPreview(text: string, settings: AudioSettings
   }
 }
 
+/** Cheap existence check: does not load the WAV blob. */
+async function audioExists(cacheKey: string): Promise<boolean> {
+  return (await prisma.audioCache.findUnique({ where: { cacheKey }, select: { id: true } })) !== null;
+}
+
 export async function getOrCreateAudio(text: string, kind: AudioKind = 'word'): Promise<Buffer> {
   const normalized = normalizeAudioText(text);
   if (!normalized || normalized.length > MAX_AUDIO_TEXT_LENGTH) throw new Error('Invalid audio text');
@@ -90,28 +98,19 @@ export async function getOrCreateAudio(text: string, kind: AudioKind = 'word'): 
   return pending;
 }
 
+let activeRegeneration: Promise<void> | null = null;
+
+/**
+ * Clears the whole audio cache and the finished regeneration jobs, so the admin panel
+ * doesn't keep showing an old "failed" status. A job that is really running in this
+ * process is left alone.
+ */
 export async function clearAudioCache(): Promise<number> {
   const result = await withAudioDbWriteLock(() => prisma.audioCache.deleteMany());
+  await withAudioDbWriteLock(() =>
+    prisma.audioRegenerationJob.deleteMany({ where: activeRegeneration ? { status: { not: 'running' } } : {} })
+  );
   return result.count;
-}
-
-export async function regenerateWordAudio(): Promise<{ total: number; generated: number }> {
-  const words = await prisma.word.findMany({ select: { de: true } });
-  // This is an explicit admin refresh: do not reuse old word audio after the
-  // voice/configuration has changed. Sentence audio remains untouched.
-  await withAudioDbWriteLock(() => prisma.audioCache.deleteMany({ where: { kind: 'word' } }));
-  let generated = 0;
-  let next = 0;
-  const worker = async () => {
-    while (true) {
-      const index = next++;
-      if (index >= words.length) return;
-      await getOrCreateAudio(words[index].de, 'word');
-      generated++;
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(4, words.length) }, worker));
-  return { total: words.length, generated };
 }
 
 export type AudioRegenerationStatus = 'running' | 'completed' | 'failed';
@@ -128,8 +127,6 @@ export interface AudioRegenerationJob {
   updatedAt: string;
 }
 
-let activeRegeneration: Promise<void> | null = null;
-
 const serializeRegenerationJob = (job: {
   id: string; status: string; total: number; generated: number; durationMs: number; error: string | null; createdAt: Date; updatedAt: Date;
 }): AudioRegenerationJob => ({
@@ -145,39 +142,81 @@ const serializeRegenerationJob = (job: {
   updatedAt: job.updatedAt.toISOString(),
 });
 
-async function runRegeneration(jobId: string): Promise<void> {
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 300);
+
+async function generateWordWithRetry(text: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= WORD_ATTEMPTS; attempt++) {
+    try {
+      await getOrCreateAudio(text, 'word');
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * `fresh` = a new job: the old word audio is dropped first. A resumed job (after a restart)
+ * keeps what is already generated and only fills in the missing words.
+ * A single word that fails does NOT abort the job: it is counted and reported at the end.
+ */
+async function runRegeneration(jobId: string, fresh: boolean): Promise<void> {
   const words = await prisma.word.findMany({ select: { de: true } });
-  await withAudioDbWriteLock(() => prisma.audioCache.deleteMany({ where: { kind: 'word' } }));
+  const texts = [...new Set(words.map((w) => normalizeAudioText(w.de)).filter(Boolean))];
+  const { settings } = await readAudioSettings();
+
+  if (fresh) await withAudioDbWriteLock(() => prisma.audioCache.deleteMany({ where: { kind: 'word' } }));
   const startedAt = Date.now();
-  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { total: words.length, generated: 0, durationMs: 0, status: 'running', error: null } }));
+  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { total: texts.length, generated: 0, durationMs: 0, status: 'running', error: null } }));
 
   let next = 0;
   let generated = 0;
+  let failed = 0;
+  let firstError = '';
   let lastPersisted = 0;
+  // Progress is best effort: a failed progress write must never abort the job.
   const persistProgress = async (force = false) => {
     if (!force && generated - lastPersisted < 10) return;
-    const value = generated;
-    if (value <= lastPersisted && !force) return;
-    lastPersisted = value;
-    await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
-      where: { id: jobId },
-      data: { generated: value, durationMs: Math.max(0, Date.now() - startedAt) },
-    }));
+    lastPersisted = generated;
+    try {
+      await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
+        where: { id: jobId },
+        data: { generated, durationMs: Math.max(0, Date.now() - startedAt) },
+      }));
+    } catch (error) {
+      console.warn('[audio] progress update failed:', errorText(error));
+    }
   };
   const worker = async () => {
     while (true) {
       const index = next++;
-      if (index >= words.length) return;
-      await getOrCreateAudio(words[index].de, 'word');
+      if (index >= texts.length) return;
+      const text = texts[index];
+      try {
+        if (!(await audioExists(audioCacheKey(text, 'word', settings)))) await generateWordWithRetry(text);
+      } catch (error) {
+        failed++;
+        if (!firstError) firstError = `«${text}»: ${errorText(error)}`;
+        console.error('[audio] word failed:', text, errorText(error));
+      }
       generated++;
-      // SQLite has one writer. Persisting every completed word made four workers
-      // queue thousands of tiny writes and eventually hit the connector timeout.
       await persistProgress();
     }
   };
-  await Promise.all(Array.from({ length: Math.min(4, words.length || 1) }, worker));
-  await persistProgress(true);
-  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { status: 'completed', total: words.length } }));
+  await Promise.all(Array.from({ length: Math.min(REGEN_CONCURRENCY, texts.length || 1) }, worker));
+
+  await withAudioDbWriteLock(() => prisma.audioRegenerationJob.update({
+    where: { id: jobId },
+    data: {
+      status: 'completed',
+      total: texts.length,
+      generated,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      error: failed > 0 ? `Не удалось озвучить слов: ${failed}. Первая ошибка: ${firstError}` : null,
+    },
+  }));
 }
 
 export async function getAudioRegenerationJob(): Promise<AudioRegenerationJob | null> {
@@ -185,24 +224,28 @@ export async function getAudioRegenerationJob(): Promise<AudioRegenerationJob | 
   return job ? serializeRegenerationJob(job) : null;
 }
 
+function launch(jobId: string, fresh: boolean): void {
+  activeRegeneration = runRegeneration(jobId, fresh).catch(async (error) => {
+    console.error('[audio] regeneration failed:', error);
+    await withAudioDbWriteLock(() =>
+      prisma.audioRegenerationJob.update({ where: { id: jobId }, data: { status: 'failed', error: errorText(error) || 'Неизвестная ошибка генерации' } })
+    ).catch(() => {});
+  }).finally(() => { activeRegeneration = null; });
+}
+
 export async function startAudioRegeneration(): Promise<AudioRegenerationJob> {
   const existing = await prisma.audioRegenerationJob.findFirst({ where: { status: 'running' }, orderBy: { createdAt: 'desc' } });
   if (existing) {
-    if (!activeRegeneration) activeRegeneration = runRegeneration(existing.id).catch(async (error) => {
-      await prisma.audioRegenerationJob.update({ where: { id: existing.id }, data: { status: 'failed', error: 'Генерация была прервана и не завершилась автоматически' } }).catch(() => {});
-    }).finally(() => { activeRegeneration = null; });
+    if (!activeRegeneration) launch(existing.id, false);
     return serializeRegenerationJob(existing);
   }
 
   const job = await prisma.audioRegenerationJob.create({ data: { status: 'running' } });
-  activeRegeneration = runRegeneration(job.id).catch(async (error) => {
-    const message = error instanceof Error ? error.message.slice(0, 500) : 'Неизвестная ошибка генерации';
-    await prisma.audioRegenerationJob.update({ where: { id: job.id }, data: { status: 'failed', error: message } }).catch(() => {});
-  }).finally(() => { activeRegeneration = null; });
+  launch(job.id, true);
   return serializeRegenerationJob(job);
 }
 
-/** Resume a job after a backend restart; generated files are rebuilt safely. */
+/** Resume a job after a backend restart; already generated words are kept. */
 export async function resumeAudioRegeneration(): Promise<void> {
   const running = await prisma.audioRegenerationJob.findFirst({ where: { status: 'running' }, orderBy: { createdAt: 'desc' } });
   if (running) await startAudioRegeneration();

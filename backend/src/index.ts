@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import apiRouter from './api';
+import { tuneSqlite } from './db';
 import { backfillPartOfSpeech } from './services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './services/backfillNormalizedKeys';
 import { resumeAudioRegeneration } from './services/audio';
@@ -25,7 +26,12 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
-  backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
-  resumeAudioRegeneration().catch((error) => console.error('[audio] regeneration resume failed:', error));
+  // WAL + busy_timeout first, then the startup data fixes and the audio job.
+  tuneSqlite()
+    .catch((error) => console.error('[db] sqlite tuning failed:', error))
+    .then(() => {
+      backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
+      backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
+      resumeAudioRegeneration().catch((error) => console.error('[audio] regeneration resume failed:', error));
+    });
 });

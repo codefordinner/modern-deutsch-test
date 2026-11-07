@@ -72,6 +72,10 @@ export const AudioCacheTab: React.FC = () => {
     return `${Math.floor(seconds / 60)} мин ${Math.round(seconds % 60)} с`;
   };
   const progress = regeneration && regeneration.total > 0 ? Math.min(100, Math.round((regeneration.generated / regeneration.total) * 100)) : 0;
+  // Finished with a note (some words failed) is still "completed", just with a warning.
+  const finishedText = regeneration?.status === 'completed'
+    ? (regeneration.error ? 'Генерация завершена с предупреждениями' : 'Генерация завершена')
+    : 'Генерация завершилась с ошибкой';
 
   return <div className="card">
     <h3 className="card-title"><AudioLines size={20} /> Озвучка и кэш</h3>
@@ -83,7 +87,7 @@ export const AudioCacheTab: React.FC = () => {
         <div className="daily-goal-fill" style={{ width: `${progress}%` }} />
       </div>
       <div className="audio-regeneration-meta">
-        <span>{regeneration.status === 'running' ? `Готово: ${regeneration.generated} из ${regeneration.total}` : regeneration.status === 'completed' ? 'Генерация завершена' : 'Генерация завершилась с ошибкой'}</span>
+        <span>{regeneration.status === 'running' ? `Готово: ${regeneration.generated} из ${regeneration.total}` : finishedText}</span>
         <strong>{progress}%</strong>
       </div>
       <div className="muted-note">Осталось: {regeneration.remaining}. Общее время: {formatDuration(regeneration.durationMs)}{regeneration.averageMs !== null && ` · в среднем ${formatDuration(regeneration.averageMs)} на слово`}</div>
@@ -110,6 +114,6 @@ export const AudioCacheTab: React.FC = () => {
       <label className="setting-toggle-title" htmlFor="audio-preview-text">Проверить настройки</label>
       <div className="backup-actions"><input id="audio-preview-text" className="text-input w-full" value={sample} maxLength={10_000} onChange={(e) => setSample(e.target.value)} placeholder="Введите немецкое слово или фразу" /><button type="button" className="btn-primary" disabled={playing || !sample.trim()} onClick={() => void preview()}><Play size={14} /> {playing ? 'Воспроизведение…' : 'Прослушать'}</button></div>
     </div>
-    <div className="import-actions"><button type="button" className="btn-secondary" disabled={busy || regeneration?.status === 'running'} onClick={() => { if (confirm('Удалить весь кэш озвучки у всех слов и фраз?')) void runCache(clearAudioCache, 'Кэш озвучки очищен'); }}><Trash2 size={16} /> Очистить весь кэш</button><button type="button" className="btn-primary" disabled={busy || regeneration?.status === 'running'} onClick={() => void startRegeneration()}><RefreshCw size={16} /> {regeneration?.status === 'running' ? 'Генерация выполняется…' : 'Заново сгенерировать слова'}</button></div>
+    <div className="import-actions"><button type="button" className="btn-secondary" disabled={busy || regeneration?.status === 'running'} onClick={() => { if (confirm('Удалить весь кэш озвучки у всех слов и фраз?')) void runCache(async () => { await clearAudioCache(); setRegeneration(null); }, 'Кэш озвучки очищен'); }}><Trash2 size={16} /> Очистить весь кэш</button><button type="button" className="btn-primary" disabled={busy || regeneration?.status === 'running'} onClick={() => void startRegeneration()}><RefreshCw size={16} /> {regeneration?.status === 'running' ? 'Генерация выполняется…' : 'Заново сгенерировать слова'}</button></div>
   </div>;
 };
