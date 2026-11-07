@@ -54,15 +54,20 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const legacyPrompt = typeof raw.prompt === 'string' && raw.prompt.trim() ? raw.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_PROMPT;
   const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, { model: string; prompt: string; severity?: number }> : {};
   const pictureProfile = profiles[AI_PROFILE_PICTURE_DESCRIPTION];
+  const pictureModel = typeof pictureProfile?.model === 'string' && isGeminiModel(pictureProfile.model) ? pictureProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
+  const picturePrompt = typeof pictureProfile?.prompt === 'string' && pictureProfile.prompt.trim() ? pictureProfile.prompt.trim().slice(0, 10_000) : legacyPrompt;
+  const checkProfile = profiles[AI_PROFILE_PICTURE_CHECK];
+  const checkModel = typeof checkProfile?.model === 'string' && isGeminiModel(checkProfile.model) ? checkProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
+  const checkPrompt = typeof checkProfile?.prompt === 'string' && checkProfile.prompt.trim() ? checkProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_CHECK_PROMPT;
   return { provider: 'gemini', apiKey: raw.apiKey.trim(), profiles: {
     [AI_PROFILE_PICTURE_DESCRIPTION]: {
-      model: pictureProfile?.model || (typeof raw.model === 'string' ? raw.model : ''),
-      prompt: pictureProfile?.prompt || legacyPrompt,
+      model: pictureModel,
+      prompt: picturePrompt,
     },
     [AI_PROFILE_PICTURE_CHECK]: {
-      model: profiles[AI_PROFILE_PICTURE_CHECK]?.model || (typeof raw.model === 'string' ? raw.model : ''),
-      prompt: profiles[AI_PROFILE_PICTURE_CHECK]?.prompt || DEFAULT_PICTURE_CHECK_PROMPT,
-      severity: Math.max(1, Math.min(5, Math.round(Number(profiles[AI_PROFILE_PICTURE_CHECK]?.severity) || 3))),
+      model: checkModel,
+      prompt: checkPrompt,
+      severity: Math.max(1, Math.min(5, Math.round(Number(checkProfile?.severity) || 3))),
     },
   } };
 }
@@ -87,7 +92,7 @@ export async function readAISettings(): Promise<AISettingsPublic> {
 }
 
 export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown }): Promise<AISettingsPublic> {
-  if (!input.profileId || input.profileId.length > 100) throw new Error('INVALID_PROFILE');
+  if (input.profileId !== AI_PROFILE_PICTURE_DESCRIPTION && input.profileId !== AI_PROFILE_PICTURE_CHECK) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
@@ -198,12 +203,12 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
   return { title: result.title.trim().slice(0, 200), description: result.description.trim().slice(0, 5000) };
 }
 
-export async function checkPictureAnswer(input: { imageDataUrl: string; reference: string; answer: string; severity: number }): Promise<PictureCheckResult> {
+export async function checkPictureAnswer(input: { imageDataUrl: string; reference: string; answer: string; severity?: number }): Promise<PictureCheckResult> {
   const stored = await readStored();
   const profile = stored?.profiles[AI_PROFILE_PICTURE_CHECK];
   if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
   if (!profile?.model) throw new Error('MISSING_MODEL');
-  if (!input.answer.trim()) throw new Error('EMPTY_ANSWER');
+  if (typeof input.answer !== 'string' || !input.answer.trim()) throw new Error('EMPTY_ANSWER');
   const match = /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,(.+)$/.exec(input.imageDataUrl);
   if (!match) throw new Error('INVALID_IMAGE');
   const prompt = `${profile.prompt}\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;

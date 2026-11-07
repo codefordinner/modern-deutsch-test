@@ -16,7 +16,10 @@ interface SpeechRecognitionLike {
 
 export function PictureDescriptionTrainer() {
   const [pictures, setPictures] = useState<Picture[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [index, setIndex] = useState(0);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -32,8 +35,15 @@ export function PictureDescriptionTrainer() {
   useEffect(() => {
     getPictures().then((items) => {
       setPictures(items);
-      if (items.length > 1) setIndex(Math.floor(Math.random() * items.length));
-    }).catch((error) => reportError(error, 'Не удалось загрузить картинки'));
+      setLoadError(false);
+      let draft: { pictureId?: string; answer?: string } | null = null;
+      try { draft = JSON.parse(localStorage.getItem('picture_draft') || 'null') as { pictureId?: string; answer?: string } | null; } catch { /* storage unavailable */ }
+      const draftIndex = draft?.pictureId ? items.findIndex((item) => item.id === draft?.pictureId) : -1;
+      const nextIndex = draftIndex >= 0 ? draftIndex : items.length > 1 ? Math.floor(Math.random() * items.length) : 0;
+      setIndex(nextIndex);
+      if (draft?.pictureId && items[nextIndex]?.id === draft.pictureId && draft.answer) setAnswer(draft.answer);
+      setDraftLoaded(true);
+    }).catch((error) => { setLoadError(true); reportError(error, 'Не удалось загрузить картинки'); }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -47,14 +57,20 @@ export function PictureDescriptionTrainer() {
   }, [elapsed, isExamMode, startedAt]);
 
   const picture = pictures.length ? pictures[index % pictures.length] : null;
+  const pictureId = picture?.id;
   useEffect(() => {
-    try { const draft = JSON.parse(localStorage.getItem('picture_draft') || 'null') as { answer?: string } | null; if (draft?.answer) setAnswer(draft.answer); } catch { /* storage unavailable */ }
-  }, []);
-  useEffect(() => {
-    try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId: picture?.id, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
-  }, [answer, picture?.id]);
+    if (!draftLoaded || !pictureId) return;
+    try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
+  }, [answer, draftLoaded, pictureId]);
+  useEffect(() => () => { recognitionRef.current?.stop(); }, []);
+  const stopSpeech = () => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setSpeechState('idle');
+  };
   const start = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const skip = () => {
+    stopSpeech();
     if (pictures.length > 1) {
       let nextIndex = index;
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
@@ -62,14 +78,15 @@ export function PictureDescriptionTrainer() {
     }
     setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null);
   };
-  const finish = () => { setStartedAt(null); setIsFinished(true); };
+  const finish = () => { stopSpeech(); setStartedAt(null); setIsFinished(true); };
   const submit = async () => {
+    if (checking || !picture || !answer.trim()) return;
     setChecking(true);
     try { setResult(await checkPictureAnswer(picture?.id ?? '', answer)); try { localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ } }
     catch (error) { reportError(error, 'Не удалось проверить описание'); }
     finally { setChecking(false); }
   };
-  const restart = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const restart = () => { stopSpeech(); setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const next = () => { skip(); };
   const toggleSpeech = () => {
     const speechWindow = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
@@ -82,6 +99,8 @@ export function PictureDescriptionTrainer() {
   };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
+  if (loading) return <div className="centered-message">Загрузка картинок…</div>;
+  if (loadError) return <div className="centered-message">Не удалось загрузить картинки. Обновите страницу и попробуйте ещё раз.</div>;
   if (!picture) return <div className="centered-message">Картинки пока не добавлены администратором.</div>;
 
   return (
@@ -98,9 +117,9 @@ export function PictureDescriptionTrainer() {
       {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} /><button type="button" className="btn-secondary" onClick={toggleSpeech}>{speechState === 'listening' ? 'Остановить диктовку' : 'Диктовать по-немецки'}</button></>}
       <div className="picture-actions">
          {!isRevealed ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
-          <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
-          <button className="btn-secondary" onClick={restart}><RotateCcw size={17} /> Начать заново</button>
-          <button className="btn-secondary" onClick={next}><SkipForward size={17} /> Следующая картинка</button>
+           <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
+           <button className="btn-secondary" disabled={checking} onClick={restart}><RotateCcw size={17} /> Начать заново</button>
+           <button className="btn-secondary" disabled={checking} onClick={next}><SkipForward size={17} /> Следующая картинка</button>
         </>}
         {startedAt !== null && <button className="btn-secondary" onClick={skip}><SkipForward size={17} /> Пропустить</button>}
       </div>
@@ -112,7 +131,7 @@ export function PictureDescriptionTrainer() {
         {selectedSegment !== null && result.segments[selectedSegment]?.note && <div className="picture-segment-note">{result.segments[selectedSegment].note}</div>}
         {result.correctedText && result.correctedText !== answer && <div className="picture-corrected"><strong>Исправленный вариант:</strong><br />{result.correctedText}</div>}
         {result.usefulExpressions.length > 0 && <details><summary>Полезные выражения</summary><ul>{result.usefulExpressions.map((item) => <li key={item}>{item}</li>)}</ul></details>}
-        <button className="btn-secondary" onClick={next}><SkipForward size={17} /> Следующая картинка</button>
+         <button className="btn-secondary" disabled={checking} onClick={next}><SkipForward size={17} /> Следующая картинка</button>
       </div>}
       <div className="picture-counter">Случайная картинка · {pictures.length} доступно</div>
     </section>

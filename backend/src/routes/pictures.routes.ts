@@ -1,11 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import rateLimit from 'express-rate-limit';
 import { checkPictureAnswer, generatePictureMetadata } from '../services/aiSettings';
 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const MAX_DATA_URL_LENGTH = 5 * 1024 * 1024;
+const pictureCheckLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Слишком много проверок описания. Подождите минуту.' },
+});
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -65,11 +73,12 @@ router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.post('/:id/check-answer', async (req: Request, res: Response) => {
+router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: Response) => {
   try {
     const picture = await prisma.picture.findFirst({ where: { id: req.params.id, isActive: true } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
-    const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity: req.body?.severity ?? 3 });
+    if (typeof req.body?.answer !== 'string') return res.status(400).json({ error: 'Введите описание перед отправкой' });
+    const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity: req.body?.severity });
     return res.json(result);
   } catch (error) {
     const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Проверка ИИ пока не настроена'], MISSING_MODEL: [503, 'Для проверки не выбрана модель Gemini'], EMPTY_ANSWER: [400, 'Введите описание перед отправкой'], INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный результат проверки'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
