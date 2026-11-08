@@ -1,28 +1,17 @@
-import express from 'express';
-import cors from 'cors';
-import apiRouter from './api';
+import { createApp } from './app';
 import { tuneSqlite } from './db';
 import { backfillPartOfSpeech } from './services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './services/backfillNormalizedKeys';
 import { resumeAudioRegeneration } from './services/audio';
 
-const app = express();
 const PORT = process.env.PORT || 3001;
 
-// The container runs behind nginx: trust its X-Forwarded-For so per-IP limits (login) see the real client.
-// Set TRUST_PROXY=0 when the backend is exposed directly.
+// The container runs behind nginx: trust its X-Forwarded-For so per-IP limits
+// (login) see the real client. Set TRUST_PROXY=0 when the backend is exposed directly.
 const trustProxy = Number(process.env.TRUST_PROXY ?? 1);
+
+const app = createApp();
 if (trustProxy > 0) app.set('trust proxy', trustProxy);
-
-app.use(cors());
-// Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
-app.use(express.json({ limit: '6mb' }));
-
-app.use('/api', apiRouter);
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is running!' });
-});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

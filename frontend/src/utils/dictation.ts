@@ -38,7 +38,6 @@ const PUNCTUATION_WORDS = new Map<string, string>([
   ['kommer', ','],
   ['punkt', '.'],
   ['punct', '.'],
-  ['punkte', '.'],
   ['doppelpunkt', ':'],
   ['fragezeichen', '?'],
   ['fragzeichen', '?'],

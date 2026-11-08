@@ -234,15 +234,27 @@ function launch(jobId: string, fresh: boolean): void {
 }
 
 export async function startAudioRegeneration(): Promise<AudioRegenerationJob> {
-  const existing = await prisma.audioRegenerationJob.findFirst({ where: { status: 'running' }, orderBy: { createdAt: 'desc' } });
-  if (existing) {
-    if (!activeRegeneration) launch(existing.id, false);
-    return serializeRegenerationJob(existing);
-  }
+  return withRegenerationLock(async () => {
+    const existing = await prisma.audioRegenerationJob.findFirst({ where: { status: 'running' }, orderBy: { createdAt: 'desc' } });
+    if (existing) {
+      if (!activeRegeneration) launch(existing.id, false);
+      return serializeRegenerationJob(existing);
+    }
 
-  const job = await prisma.audioRegenerationJob.create({ data: { status: 'running' } });
-  launch(job.id, true);
-  return serializeRegenerationJob(job);
+    const job = await prisma.audioRegenerationJob.create({ data: { status: 'running' } });
+    launch(job.id, true);
+    return serializeRegenerationJob(job);
+  });
+}
+
+// A double-click on "regenerate" must not create two jobs / two run loops. The
+// findFirst→create sequence above is not atomic, so serialise it per process.
+let regenerationLock: Promise<void> = Promise.resolve();
+function withRegenerationLock<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = regenerationLock;
+  let release!: () => void;
+  regenerationLock = new Promise<void>((resolve) => { release = resolve; });
+  return previous.then(operation).finally(release);
 }
 
 /** Resume a job after a backend restart; already generated words are kept. */

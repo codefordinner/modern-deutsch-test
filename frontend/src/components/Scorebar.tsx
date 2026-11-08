@@ -9,7 +9,7 @@ interface ScorebarProps {
 }
 
 export const Scorebar: React.FC<ScorebarProps> = ({ score, onReset, trainerName }) => {
-  const accuracy = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 100;
+  const accuracy = score.total > 0 ? `${Math.round((score.correct / score.total) * 100)}%` : '—';
 
   return (
     <div className="score-bar" id="scorebar">
@@ -34,7 +34,7 @@ export const Scorebar: React.FC<ScorebarProps> = ({ score, onReset, trainerName 
           <span className="stat-label">
             <Target size={12} color="var(--accent-primary)" /> Точность
           </span>
-          <span className="stat-value">{accuracy}%</span>
+          <span className="stat-value">{accuracy}</span>
         </div>
 
         <div className="stat-item">

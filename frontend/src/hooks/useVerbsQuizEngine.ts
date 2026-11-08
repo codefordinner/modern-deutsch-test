@@ -144,7 +144,11 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     if (feedback) { nextQuestion(); return; }
     if (!card || card.kind !== 'stammformen') return;
     // Hilfsverb always has a value ("haben" by default), so only the two text fields can be "empty".
-    if (!cleanText(praeteritumInput) && !cleanText(partizip2Input)) return;
+    // An all-empty submit is not an answer — but show why instead of doing nothing.
+    if (!cleanText(praeteritumInput) && !cleanText(partizip2Input)) {
+      setFeedback({ isCorrect: false, message: 'Введите Präteritum и Partizip II' });
+      return;
+    }
     const verb = card.verb;
     const options = currentMatchOptions();
     const expectedHilfsverb = verb.hilfsverb || 'haben';

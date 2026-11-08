@@ -13,6 +13,12 @@ const audioLimiter = rateLimit({
   message: { error: 'Слишком много запросов озвучки. Подождите минуту.' },
 });
 
+// The public endpoint is cheap for a real learner (a word or short phrase) but an
+// unlimited length lets anyone synthesize arbitrary 10k-char strings and bloat the
+// SQLite cache. Keep the public ceiling short; the admin preview keeps its own,
+// larger limit (MAX_AUDIO_TEXT_LENGTH).
+const MAX_PUBLIC_AUDIO_TEXT_LENGTH = 200;
+
 router.get('/admin/stats', requireAdmin, async (_req, res) => {
   try { res.json(await audioCacheStats()); } catch { res.status(500).json({ error: 'Не удалось прочитать кэш озвучки' }); }
 });
@@ -48,7 +54,9 @@ router.post('/admin/preview', requireAdmin, async (req: Request, res: Response) 
 router.get('/', audioLimiter, async (req: Request, res: Response) => {
   const text = typeof req.query.text === 'string' ? req.query.text : '';
   const kind = req.query.kind === 'sentence' ? 'sentence' : 'word';
-  if (!text.trim() || text.length > MAX_AUDIO_TEXT_LENGTH) return res.status(400).json({ error: 'Некорректный текст для озвучки' });
+  if (!text.trim() || text.length > MAX_PUBLIC_AUDIO_TEXT_LENGTH) {
+    return res.status(400).json({ error: 'Текст для озвучки должен быть не длиннее 200 символов' });
+  }
   try {
     const audio = await getOrCreateAudio(text, kind);
     // The audio is cached server-side. Do not let browsers keep an immutable

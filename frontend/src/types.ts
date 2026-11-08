@@ -25,7 +25,7 @@ export interface Word {
   praeteritum?: string | null;
   partizip2?: string | null;
   /** Always 'haben' | 'sein' (the server normalises legacy 'hat' / 'ist'). */
-  hilfsverb?: string | null;
+  hilfsverb?: 'haben' | 'sein' | null;
   praesensIch?: string | null;
   praesensDu?: string | null;
   praesensErSieEs?: string | null;

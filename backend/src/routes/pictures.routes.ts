@@ -3,6 +3,7 @@ import { prisma } from '../db';
 import { isAdminRequest, requireAdmin } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
 import { checkPictureAnswer, generatePictureMetadata, MAX_PICTURE_ANSWER_LENGTH } from '../services/aiSettings';
+import { registerAiUsage } from '../services/aiUsage';
 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
@@ -114,6 +115,9 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
     if (severity !== undefined && (typeof severity !== 'number' || !Number.isFinite(severity) || severity < 1 || severity > 5)) {
       return res.status(400).json({ error: 'Некорректная жёсткость проверки' });
     }
+    // Spending guard: this endpoint bills Gemini, so cap total daily usage regardless of IP.
+    const usage = await registerAiUsage();
+    if (!usage.allowed) return res.status(429).json({ error: 'Дневной лимит проверок ИИ исчерпан. Попробуйте завтра.' });
     const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity });
     return res.json(result);
   } catch (error) {

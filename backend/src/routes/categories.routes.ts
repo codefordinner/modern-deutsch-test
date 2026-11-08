@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { isPrismaError } from '../middleware/errorHandler';
+import { validate } from '../middleware/validate';
+import { createCategorySchema, updateCategorySchema } from '../validation';
 
 const router = Router();
 const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -23,10 +26,9 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/', requireAdmin, async (req: Request, res: Response) => {
+router.post('/', requireAdmin, validate(createCategorySchema), async (req: Request, res: Response) => {
   try {
-    const { name, icon, color, isBuiltin } = req.body;
-    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'Название категории обязательно' });
+    const { name, icon, color, isBuiltin } = req.body as import('../validation').CreateCategoryBody;
     const normalizedName = normalizeCategoryName(name);
     if (await prisma.category.findFirst({ where: { normalizedName } })) {
       return res.status(409).json({ error: 'Категория с таким названием уже существует' });
@@ -43,14 +45,15 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     });
     res.status(201).json(category);
   } catch (error) {
+    if (isPrismaError(error, 'P2002')) return res.status(409).json({ error: 'Категория с таким названием уже существует' });
     res.status(500).json({ error: 'Не удалось создать категорию' });
   }
 });
 
-router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, validate(updateCategorySchema), async (req: Request, res: Response) => {
   try {
-    const { name, icon, color } = req.body;
-    if (name !== undefined && (typeof name !== 'string' || !name.trim())) return res.status(400).json({ error: 'Название категории некорректно' });
+    const { name, icon, color } = req.body as import('../validation').UpdateCategoryBody;
+    if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'Название категории некорректно' });
     if (typeof name === 'string') {
       const normalizedName = normalizeCategoryName(name);
       if (await prisma.category.findFirst({ where: { normalizedName, NOT: { id: req.params.id } } })) {
@@ -67,6 +70,8 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     });
     res.json(category);
   } catch (error) {
+    if (isPrismaError(error, 'P2025')) return res.status(404).json({ error: 'Категория не найдена' });
+    if (isPrismaError(error, 'P2002')) return res.status(409).json({ error: 'Категория с таким названием уже существует' });
     res.status(500).json({ error: 'Не удалось обновить категорию' });
   }
 });
@@ -75,7 +80,8 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const cat = await prisma.category.findUnique({ where: { id } });
-    if (cat?.isBuiltin) {
+    if (!cat) return res.status(404).json({ error: 'Категория не найдена' });
+    if (cat.isBuiltin) {
       return res.status(400).json({ error: 'Встроенную категорию нельзя удалить' });
     }
 
@@ -100,6 +106,7 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
     await prisma.$transaction([...rescue, prisma.category.delete({ where: { id } })]);
     res.json({ success: true, message: 'Category deleted' });
   } catch (error) {
+    if (isPrismaError(error, 'P2025')) return res.status(404).json({ error: 'Категория не найдена' });
     res.status(500).json({ error: 'Не удалось удалить категорию' });
   }
 });

@@ -24,7 +24,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   const [feminine, setFeminine] = useState('');
   const [praeteritum, setPraeteritum] = useState('');
   const [partizip2, setPartizip2] = useState('');
-  const [hilfsverb, setHilfsverb] = useState('haben');
+  const [hilfsverb, setHilfsverb] = useState<'haben' | 'sein'>('haben');
   const [praesensIch, setPraesensIch] = useState('');
   const [praesensDu, setPraesensDu] = useState('');
   const [praesensErSieEs, setPraesensErSieEs] = useState('');
@@ -46,7 +46,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       setFeminine(word.feminine || '');
       setPraeteritum(word.praeteritum || '');
       setPartizip2(word.partizip2 || '');
-      setHilfsverb(word.hilfsverb || 'haben');
+      setHilfsverb(word.hilfsverb === 'sein' ? 'sein' : 'haben');
       setPraesensIch(word.praesensIch || '');
       setPraesensDu(word.praesensDu || '');
       setPraesensErSieEs(word.praesensErSieEs || '');
@@ -187,7 +187,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
               </div>
               <div>
                 <label className="field-label field-label--sm" htmlFor="word-hilfsverb">Вспомогательный</label>
-                <select id="word-hilfsverb" className="text-input w-full" value={hilfsverb} onChange={(e) => setHilfsverb(e.target.value)}>
+                <select id="word-hilfsverb" className="text-input w-full" value={hilfsverb} onChange={(e) => setHilfsverb(e.target.value === 'sein' ? 'sein' : 'haben')}>
                   <option value="haben">haben</option>
                   <option value="sein">sein</option>
                 </select>

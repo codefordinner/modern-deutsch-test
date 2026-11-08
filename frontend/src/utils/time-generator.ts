@@ -68,13 +68,13 @@ export function getGermanTime(hours: number, minutes: number): GermanTimeOutput 
   } else if (minutes === 10) {
     colloquial = `zehn nach ${curWord}`;
   } else if (minutes >= 11 && minutes <= 14) {
-    colloquial = `kurz vor Viertel nach ${curWord}`;
-    kurzVariant = `kurz vor Viertel nach ${curWord}`;
+    // Standard colloquial is a plain "N nach" ("vierzehn nach …"), not an
+    // invented "kurz vor Viertel nach".
+    colloquial = `${twoDigitToGerman(minutes)} nach ${curWord}`;
   } else if (minutes === 15) {
     colloquial = `Viertel nach ${curWord}`;
   } else if (minutes >= 16 && minutes <= 19) {
-    colloquial = `kurz nach Viertel nach ${curWord}`;
-    kurzVariant = `kurz nach Viertel nach ${curWord}`;
+    colloquial = `${twoDigitToGerman(minutes)} nach ${curWord}`;
   } else if (minutes === 20) {
     colloquial = `zwanzig nach ${curWord}`;
   } else if (minutes >= 21 && minutes <= 24) {
@@ -98,13 +98,11 @@ export function getGermanTime(hours: number, minutes: number): GermanTimeOutput 
   } else if (minutes === 40) {
     colloquial = `zwanzig vor ${nextWord}`;
   } else if (minutes >= 41 && minutes <= 44) {
-    colloquial = `kurz vor Viertel vor ${nextWord}`;
-    kurzVariant = `kurz vor Viertel vor ${nextWord}`;
+    colloquial = `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`;
   } else if (minutes === 45) {
     colloquial = `Viertel vor ${nextWord}`;
   } else if (minutes >= 46 && minutes <= 49) {
-    colloquial = `kurz nach Viertel vor ${nextWord}`;
-    kurzVariant = `kurz nach Viertel vor ${nextWord}`;
+    colloquial = `${twoDigitToGerman(60 - minutes)} vor ${nextWord}`;
   } else if (minutes === 50) {
     colloquial = `zehn vor ${nextWord}`;
   } else if (minutes >= 51 && minutes <= 54) {

@@ -93,7 +93,9 @@ router.post('/ai/word-fill', requireAdmin, wordFillLimiter, async (req, res) => 
   }
 });
 
-router.get('/audio-voice', async (_req, res) => {
+// Audio settings are Piper configuration owned by the admin; the public audio
+// endpoint applies them server-side, so learners never need to read them.
+router.get('/audio-voice', requireAdmin, async (_req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
     res.json(await readAudioVoice());
@@ -102,7 +104,7 @@ router.get('/audio-voice', async (_req, res) => {
   }
 });
 
-router.get('/audio-settings', async (_req, res) => {
+router.get('/audio-settings', requireAdmin, async (_req, res) => {
   try { res.setHeader('Cache-Control', 'no-store'); res.json(await readAudioSettings()); }
   catch { res.status(500).json({ error: 'Не удалось загрузить настройки озвучки' }); }
 });

@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { isPrismaError } from '../middleware/errorHandler';
+import { validate } from '../middleware/validate';
+import { createWordSchema, updateWordSchema } from '../validation';
 import { isPartOfSpeech, readPartOfSpeech } from '../services/partOfSpeech';
 import type { PartOfSpeech } from '../services/partOfSpeech';
 import {
@@ -67,55 +70,42 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', requireAdmin, async (req: Request, res: Response) => {
+router.post('/', requireAdmin, validate(createWordSchema), async (req: Request, res: Response) => {
   try {
-    const {
-      de,
-      ru,
-      hint,
-      plural,
-      feminine,
-      praeteritum,
-      partizip2,
-      hilfsverb,
-      praesensIch,
-      praesensDu,
-      praesensErSieEs,
-      praesensWir,
-      praesensIhr,
-      praesensSie,
-    } = req.body;
-    const categoryIds = readCategoryIds(req.body);
-    if (typeof de !== 'string' || typeof ru !== 'string' || !de.trim() || !ru.trim() || !categoryIds) {
+    const body = req.body as import('../validation').CreateWordBody;
+    const categoryIds = readCategoryIds(body);
+    if (!body.de || !body.ru || !categoryIds) {
       return res.status(400).json({ error: 'Нужно заполнить немецкое слово, перевод и категорию' });
     }
-    if (await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(de) } })) {
+    if (await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(body.de) } })) {
       return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
     }
     if (!(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
 
-    const pos = readPartOfSpeech(req.body, { keepIfMissing: false });
+    const [primaryId, ...extraIds] = categoryIds;
+    const primaryCategory = await prisma.category.findUnique({ where: { id: primaryId }, select: { name: true } });
+
+    const pos = readPartOfSpeech({ ...body, categoryName: primaryCategory?.name }, { keepIfMissing: false });
     if (!pos.ok) return res.status(400).json({ error: pos.error });
 
-    const [primaryId, ...extraIds] = categoryIds;
     const word = await prisma.word.create({
       data: {
-        de: de.trim(),
-        normalizedDe: duplicateKey(de),
-        ru,
-        hint,
+        de: body.de.trim(),
+        normalizedDe: duplicateKey(body.de),
+        ru: body.ru,
+        hint: body.hint || null,
         partOfSpeech: pos.value,
-        plural,
-        feminine,
-        praeteritum,
-        partizip2,
-        hilfsverb,
-        praesensIch,
-        praesensDu,
-        praesensErSieEs,
-        praesensWir,
-        praesensIhr,
-        praesensSie,
+        plural: body.plural || null,
+        feminine: body.feminine || null,
+        praeteritum: body.praeteritum || null,
+        partizip2: body.partizip2 || null,
+        hilfsverb: body.hilfsverb || null,
+        praesensIch: body.praesensIch || null,
+        praesensDu: body.praesensDu || null,
+        praesensErSieEs: body.praesensErSieEs || null,
+        praesensWir: body.praesensWir || null,
+        praesensIhr: body.praesensIhr || null,
+        praesensSie: body.praesensSie || null,
         category: { connect: { id: primaryId } },
         extraCategories: { connect: extraIds.map((id) => ({ id })) },
       },
@@ -123,58 +113,55 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
     });
     res.status(201).json(serializeWord(word));
   } catch (error) {
+    if (isPrismaError(error, 'P2002')) return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
+    console.error('[words] create failed:', error);
     res.status(500).json({ error: 'Не удалось создать слово' });
   }
 });
 
-router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, validate(updateWordSchema), async (req: Request, res: Response) => {
   try {
-    const {
-      de,
-      ru,
-      hint,
-      plural,
-      feminine,
-      praeteritum,
-      partizip2,
-      hilfsverb,
-      praesensIch,
-      praesensDu,
-      praesensErSieEs,
-      praesensWir,
-      praesensIhr,
-      praesensSie,
-    } = req.body;
+    const body = req.body as import('../validation').UpdateWordBody;
 
-    const pos = readPartOfSpeech(req.body, { keepIfMissing: true });
+    const pos = readPartOfSpeech(body, { keepIfMissing: true });
     if (!pos.ok) return res.status(400).json({ error: pos.error });
 
     // No categories in the body = leave the word's categories as they are.
-    const categoryIds = readCategoryIds(req.body);
+    const categoryIds = readCategoryIds(body);
     if (categoryIds && !(await allCategoriesExist(categoryIds))) return res.status(400).json({ error: 'Категория не найдена' });
-    if (typeof de === 'string') {
-      const duplicate = await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(de), NOT: { id: req.params.id } } });
+    if (typeof body.de === 'string') {
+      const duplicate = await prisma.word.findFirst({ where: { normalizedDe: duplicateKey(body.de), NOT: { id: req.params.id } } });
       if (duplicate) return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
+    }
+
+    // For "partOfSpeech: null (auto)" the guess needs the word's category name.
+    let inferredPos = pos.value;
+    if (pos.value === null) {
+      const existing = await prisma.word.findUnique({ where: { id: req.params.id }, select: { category: { select: { name: true } }, de: true, praeteritum: true, partizip2: true } });
+      if (!existing) return res.status(404).json({ error: 'Слово не найдено' });
+      const inferred = readPartOfSpeech({ ...body, categoryName: existing.category.name }, { keepIfMissing: false });
+      if (!inferred.ok) return res.status(400).json({ error: inferred.error });
+      inferredPos = inferred.value;
     }
 
     const word = await prisma.word.update({
       where: { id: req.params.id },
       data: {
-        ...(typeof de === 'string' && { de: de.trim(), normalizedDe: duplicateKey(de) }),
-        ru,
-        hint,
-        partOfSpeech: pos.value,
-        plural,
-        feminine,
-        praeteritum,
-        partizip2,
-        hilfsverb,
-        praesensIch,
-        praesensDu,
-        praesensErSieEs,
-        praesensWir,
-        praesensIhr,
-        praesensSie,
+        ...(typeof body.de === 'string' && { de: body.de.trim(), normalizedDe: duplicateKey(body.de) }),
+        ...(body.ru !== undefined && { ru: body.ru }),
+        ...(body.hint !== undefined && { hint: body.hint || null }),
+        ...(inferredPos !== undefined && { partOfSpeech: inferredPos }),
+        ...(body.plural !== undefined && { plural: body.plural || null }),
+        ...(body.feminine !== undefined && { feminine: body.feminine || null }),
+        ...(body.praeteritum !== undefined && { praeteritum: body.praeteritum || null }),
+        ...(body.partizip2 !== undefined && { partizip2: body.partizip2 || null }),
+        ...(body.hilfsverb !== undefined && { hilfsverb: body.hilfsverb || null }),
+        ...(body.praesensIch !== undefined && { praesensIch: body.praesensIch || null }),
+        ...(body.praesensDu !== undefined && { praesensDu: body.praesensDu || null }),
+        ...(body.praesensErSieEs !== undefined && { praesensErSieEs: body.praesensErSieEs || null }),
+        ...(body.praesensWir !== undefined && { praesensWir: body.praesensWir || null }),
+        ...(body.praesensIhr !== undefined && { praesensIhr: body.praesensIhr || null }),
+        ...(body.praesensSie !== undefined && { praesensSie: body.praesensSie || null }),
         ...(categoryIds && {
           category: { connect: { id: categoryIds[0] } },
           extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) },
@@ -184,6 +171,9 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     });
     res.json(serializeWord(word));
   } catch (error) {
+    if (isPrismaError(error, 'P2025')) return res.status(404).json({ error: 'Слово не найдено' });
+    if (isPrismaError(error, 'P2002')) return res.status(409).json({ error: 'Слово с такой немецкой формой уже существует' });
+    console.error('[words] update failed:', error);
     res.status(500).json({ error: 'Не удалось обновить слово' });
   }
 });
@@ -193,6 +183,7 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
     await prisma.word.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Word deleted' });
   } catch (error) {
+    if (isPrismaError(error, 'P2025')) return res.status(404).json({ error: 'Слово не найдено' });
     res.status(500).json({ error: 'Не удалось удалить слово' });
   }
 });

@@ -1,10 +1,9 @@
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
-import apiRouter from './backend/src/api';
+import { createApp } from './backend/src/app';
 import { tuneSqlite } from './backend/src/db';
 import { backfillPartOfSpeech } from './backend/src/services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './backend/src/services/backfillNormalizedKeys';
@@ -45,31 +44,12 @@ async function startServer() {
   try {
     ensureDatabase();
 
-    const app = express();
+    const app = createApp();
     const PORT = 3000;
 
     // Set TRUST_PROXY=1 when running behind a reverse proxy, so per-IP limits (login) see the real client IP.
     const trustProxy = Number(process.env.TRUST_PROXY ?? 0);
     if (trustProxy > 0) app.set('trust proxy', trustProxy);
-
-    app.use(cors());
-    // Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
-    app.use(express.json({ limit: '6mb' }));
-
-    // Mount API router
-    app.use('/api', apiRouter);
-
-    // API Health Check
-    app.get('/api/health', (req, res) => {
-      res.json({ status: 'ok', message: 'Backend is running!' });
-    });
-
-    // Graceful API error handler
-    app.use('/api', (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.error('[api error]:', err);
-      if (res.headersSent) return next(err);
-      res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-    });
 
     // Serve Vite Dev Server or Production Static Build
     if (process.env.NODE_ENV !== 'production') {
