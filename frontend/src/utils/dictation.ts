@@ -48,6 +48,10 @@ const PUNCTUATION_WORDS = new Map<string, string>([
   ['strichpunkt', ';'],
   ['bindestrich', '-'],
   ['gedankenstrich', '–'],
+  ['pause', ','],
+  ['pumpt', '.'],
+  ['punkt.', '.'],
+  ['komma,', ','],
 ]);
 
 const SENTENCE_END = new Set(['.', '!', '?']);
@@ -64,8 +68,32 @@ export function addDictationPunctuation(text: string, capitalizeFirst = true): s
   let capitalizeNext = capitalizeFirst;
 
   for (const raw of text.split(/\s+/)) {
-    // Strip any engine artifacts (commas/periods the engine glued to a word).
-    const cleaned = raw.replace(/[^\p{L}\p{N}'-]/gu, '');
+    // Keep punctuation emitted by the engine and handle punctuation words glued
+    // to neighbouring words (e.g. "HundPunkt" on some mobile recognizers).
+    if (/^[,.;:!?]+$/u.test(raw)) {
+      out = `${out.replace(/\s+$/, '')}${raw} `;
+      if (/[.!?]/u.test(raw)) capitalizeNext = true;
+      continue;
+    }
+    const token = raw;
+    const prefixMarks = token.match(/^[,.;:!?]+/u)?.[0] ?? '';
+    const suffixMarks = token.match(/[,.;:!?]+$/u)?.[0] ?? '';
+    let cleaned = token.replace(/^[,.;:!?]+|[,.;:!?]+$/gu, '');
+    if (prefixMarks) out = `${out.replace(/\s+$/, '')}${prefixMarks} `;
+    const glued = [...PUNCTUATION_WORDS.keys()].sort((a, b) => b.length - a.length)
+      .find((word) => cleaned.toLowerCase().endsWith(word) && cleaned.length > word.length);
+    if (glued) {
+      cleaned = cleaned.slice(0, -glued.length);
+      out += `${cleaned} `;
+      const punctuation = PUNCTUATION_WORDS.get(glued)!;
+      out = `${out.replace(/\s+$/, '')}${punctuation} `;
+      if (SENTENCE_END.has(punctuation)) capitalizeNext = true;
+      cleaned = '';
+    }
+    if (suffixMarks) out = `${out.replace(/\s+$/, '')}${suffixMarks} `;
+    if (suffixMarks && /[.!?]/u.test(suffixMarks)) capitalizeNext = true;
+    // Strip other recognition artifacts while preserving the punctuation above.
+    cleaned = cleaned.replace(/[^\p{L}\p{N}'-]/gu, '');
     if (!cleaned) continue;
 
     const punctuation = PUNCTUATION_WORDS.get(cleaned.toLowerCase().replace(/'/g, ''));

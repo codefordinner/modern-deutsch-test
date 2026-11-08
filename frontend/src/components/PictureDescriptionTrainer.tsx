@@ -49,6 +49,7 @@ export function PictureDescriptionTrainer() {
   const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const speechSessionRef = useRef(0);
   const dictationBaseRef = useRef('');
 
   useEffect(() => {
@@ -83,6 +84,7 @@ export function PictureDescriptionTrainer() {
   }, [answer, draftLoaded, pictureId]);
   useEffect(() => () => { recognitionRef.current?.stop(); }, []);
   const stopSpeech = () => {
+    speechSessionRef.current += 1;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     setSpeechState('idle');
@@ -119,18 +121,22 @@ export function PictureDescriptionTrainer() {
       reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна: этот браузер не поддерживает распознавание речи (например, Firefox). Воспользуйтесь Chrome, Edge или Safari.');
       return;
     }
-    if (speechState === 'listening') { recognitionRef.current?.stop(); return; }
+    if (speechState === 'listening') { stopSpeech(); return; }
     const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
     recognition.interimResults = true;
+    const session = ++speechSessionRef.current;
+    recognitionRef.current = recognition;
+    setSpeechState('listening');
     dictationBaseRef.current = answer.trim();
     recognition.onresult = (event) => {
+      if (session !== speechSessionRef.current) return;
       let finalText = '';
       let interimText = '';
       for (let index = 0; index < event.results.length; index += 1) {
         const result = event.results[index]?.[0];
         if (!result) continue;
-        if (result.isFinal) finalText += result.transcript;
-        else interimText += result.transcript;
+        if (result.isFinal) finalText += `${finalText ? ' ' : ''}${result.transcript.trim()}`;
+        else interimText += `${interimText ? ' ' : ''}${result.transcript.trim()}`;
       }
       // Assemble the recognised speech (spoken punctuation -> real marks) and
       // append it to what the learner had already typed before dictating.
@@ -140,18 +146,26 @@ export function PictureDescriptionTrainer() {
       // right after a sentence end; otherwise keep it lowercase as a mid-sentence.
       const capitalizeFirst = !base || /[.!?]\s*$/.test(base);
       const spokenText = addDictationPunctuation(raw, capitalizeFirst);
-      setAnswer(spokenText ? `${base}${base ? ' ' : ''}${spokenText}` : base);
+      const separator = base && spokenText && /^[,.;:!?]/u.test(spokenText) ? '' : base ? ' ' : '';
+      setAnswer(spokenText ? `${base}${separator}${spokenText}` : base);
     };
     recognition.onerror = (event) => {
+      if (session !== speechSessionRef.current) return;
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         reportError(new Error(event.error), 'Нет доступа к микрофону. Разрешите доступ к микрофону в настройках браузера.');
+      } else if (event.error === 'audio-capture' || event.error === 'no-speech') {
+        reportError(new Error(event.error), event.error === 'audio-capture' ? 'Не удалось включить микрофон.' : 'Речь не распознана. Попробуйте ещё раз.');
       }
     };
-    recognition.onend = () => { setSpeechState('idle'); recognitionRef.current = null; };
-    recognition.onstart = () => { recognitionRef.current = recognition; setSpeechState('listening'); };
+    recognition.onend = () => {
+      if (session !== speechSessionRef.current) return;
+      setSpeechState('idle');
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+    };
+    recognition.onstart = () => { if (session === speechSessionRef.current) setSpeechState('listening'); };
     try { recognition.start(); }
     catch (error) {
-      recognitionRef.current = null;
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
       setSpeechState('idle');
       reportError(error, 'Не удалось запустить диктовку. Проверьте доступ к микрофону.');
     }
