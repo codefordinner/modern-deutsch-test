@@ -80,6 +80,12 @@ export function addDictationPunctuation(text: string, capitalizeFirst = true): s
     const suffixMarks = token.match(/[,.;:!?]+$/u)?.[0] ?? '';
     let cleaned = token.replace(/^[,.;:!?]+|[,.;:!?]+$/gu, '');
     if (prefixMarks) out = `${out.replace(/\s+$/, '')}${prefixMarks} `;
+    const exactPunctuation = PUNCTUATION_WORDS.get(cleaned.toLowerCase().replace(/'/g, ''));
+    if (exactPunctuation) {
+      out = `${out.replace(/\s+$/, '')}${exactPunctuation} `;
+      if (SENTENCE_END.has(exactPunctuation)) capitalizeNext = true;
+      continue;
+    }
     const glued = [...PUNCTUATION_WORDS.keys()].sort((a, b) => b.length - a.length)
       .find((word) => cleaned.toLowerCase().endsWith(word) && cleaned.length > word.length);
     if (glued) {
