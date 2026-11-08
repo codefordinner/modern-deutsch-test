@@ -50,6 +50,8 @@ export function PictureDescriptionTrainer() {
   const [isExamMode, setIsExamMode] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const speechSessionRef = useRef(0);
+  const recognitionEndedRef = useRef<Promise<void> | null>(null);
+  const resolveRecognitionEndedRef = useRef<(() => void) | null>(null);
   const dictationBaseRef = useRef('');
 
   useEffect(() => {
@@ -86,7 +88,6 @@ export function PictureDescriptionTrainer() {
   const stopSpeech = () => {
     speechSessionRef.current += 1;
     recognitionRef.current?.stop();
-    recognitionRef.current = null;
     setSpeechState('idle');
   };
   const start = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
@@ -122,10 +123,24 @@ export function PictureDescriptionTrainer() {
       return;
     }
     if (speechState === 'listening') { stopSpeech(); return; }
+    void startSpeech(Recognition);
+  };
+  const startSpeech = async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
+    const session = ++speechSessionRef.current;
+    const previousRecognition = recognitionRef.current;
+    if (previousRecognition) {
+      previousRecognition.stop();
+      const ended = recognitionEndedRef.current;
+      if (ended) {
+        await Promise.race([ended, new Promise<void>((resolve) => window.setTimeout(resolve, 1500))]);
+      }
+      if (session !== speechSessionRef.current) return;
+      if (recognitionRef.current === previousRecognition) recognitionRef.current = null;
+    }
     const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
     recognition.interimResults = true;
-    const session = ++speechSessionRef.current;
     recognitionRef.current = recognition;
+    recognitionEndedRef.current = new Promise<void>((resolve) => { resolveRecognitionEndedRef.current = resolve; });
     setSpeechState('listening');
     dictationBaseRef.current = answer.trim();
     recognition.onresult = (event) => {
@@ -158,9 +173,11 @@ export function PictureDescriptionTrainer() {
       }
     };
     recognition.onend = () => {
-      if (session !== speechSessionRef.current) return;
-      setSpeechState('idle');
       if (recognitionRef.current === recognition) recognitionRef.current = null;
+      resolveRecognitionEndedRef.current?.();
+      resolveRecognitionEndedRef.current = null;
+      recognitionEndedRef.current = null;
+      if (session === speechSessionRef.current) setSpeechState('idle');
     };
     recognition.onstart = () => { if (session === speechSessionRef.current) setSpeechState('listening'); };
     try { recognition.start(); }
