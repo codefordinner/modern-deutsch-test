@@ -7,6 +7,7 @@ import { WordsTab } from './admin/WordsTab';
 import { CategoriesTab } from './admin/CategoriesTab';
 import { ImportExportTab } from './admin/ImportExportTab';
 import { ImportReviewCard } from './admin/ImportReviewCard';
+import { WordFillCard } from './admin/WordFillCard';
 import { DuplicatesTab } from './admin/DuplicatesTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
 import { SrsSettingsTab } from './admin/SrsSettingsTab';
@@ -222,8 +223,14 @@ export const AdminPanel: React.FC = () => {
       )}
       {tab === 'import' && (
         <div className="import-stack">
-          <ImportExportTab categories={categories} onRefresh={refreshAll} />
-          <ImportReviewCard categories={categories} onRefresh={refreshAll} />
+          <WordFillCard categories={categories} onRefresh={refreshAll} />
+          <details className="import-manual">
+            <summary>Ручной импорт / экспорт (JSON и текст)</summary>
+            <div className="import-stack">
+              <ImportExportTab categories={categories} onRefresh={refreshAll} />
+              <ImportReviewCard categories={categories} onRefresh={refreshAll} />
+            </div>
+          </details>
         </div>
       )}
       {tab === 'duplicates' && <DuplicatesTab onChanged={refreshAll} />}

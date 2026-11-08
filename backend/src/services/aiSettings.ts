@@ -15,6 +15,7 @@ export interface AISettingsPublic {
 
 export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
 export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
+export const AI_PROFILE_WORD_FILL = 'wordFill';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
 export interface PictureCheckResult {
   segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string; correction?: string }>;
@@ -38,7 +39,32 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
 export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Проверяй факты по самому изображению, а не только по эталону (эталон может быть неполным). Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; для каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для нейтральных/хороших сегментов correction опускай); severity: neutral|good|style|error|lie. note на русском: называй правило и/или давай правильный пример (например, «здесь Dativ, верно: dem Mann»), а не общие слова. Одну и ту же ошибку, повторённую несколько раз (например, неверный артикль в каждой фразе), штрафуй один раз и отметь в report, что она повторяется. report на русском, доброжелательно и конкретно: сначала что удалось, затем что исправить с примерами, без общих фраз. correctedText — полный исправленный немецкий текст, если нужны исправления; если в ответе нет знаков препинания (пользователь диктовал голосом), расставь в correctedText запятые и точки по смыслу, не меняя при этом слова и их порядок без необходимости. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. Оценивай по эталону уровня B1: баллы должны отражать полноту, сложность и длину ответа, а не только отсутствие ошибок. Не давай баллы «впустую» — если пользователь написал 2–3 коротких простых предложения без ошибок, это всё равно низкий балл за content и fluency (ответ не раскрывает картинку), поэтому суммарный балл должен быть заметно ниже 60. Если описание настолько общее, что подходит к любой картинке и не называет ни одной конкретной детали, — снизь content и укажи это в report. level — примерный CEFR A1–C1; согласуй level с оценками и сложностью ответа: короткий простой безошибочный текст — не выше A2, развёрнутый ответ с разнообразной лексикой и сложными конструкциями — B1 и выше. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель); подбирай выражения под эту картинку и уровень ученика, которые реально улучшили бы именно этот ответ. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
+export const DEFAULT_WORD_FILL_PROMPT = [
+  'Ты наполняешь словарь тренажёра немецкого языка. Ниже — список слов (немецкие, русские или вперемешку).',
+  'Преврати его в JSON и верни ТОЛЬКО JSON — одним блоком кода, без пояснений до и после.',
+  'Формат: массив объектов, один объект на слово.',
+  'Поля: "de" (обязательно) — немецкое слово, существительные всегда с артиклем ("der Tisch"); "ru" (обязательно) — перевод на русский;',
+  '"category" — название категории (выбирай из предложенных; если ничего не подходит — короткое новое название; если подходит несколько — массив, первая основная);',
+  '"partOfSpeech" — ровно одно из "noun", "verb", "adjective", "adverb", "other";',
+  '"hint" — короткая подсказка для различения омонимов, только если нужно;',
+  '"plural" — множественное число с артиклем ("die Tische"); "feminine" — женская форма ("die Ärztin"), только если существует;',
+  'для глаголов: "praeteritum", "partizip2", "hilfsverb" (строго "haben" или "sein"), а также "praesensIch", "praesensDu", "praesensErSieEs", "praesensIhr" для сильных глаголов и глаголов с изменением корня.',
+  'Правила: не добавляй других полей; не выдумывай формы — если не уверен, пропусти поле;',
+  'не меняй написание слов из списка, кроме добавления артикля и исправления явных опечаток;',
+  'не пиши одно слово дважды — если оно в нескольких категориях, это одна запись с массивом "category";',
+  'ответ должен быть валидным JSON (двойные кавычки, без комментариев, без запятой после последнего элемента).',
+  'Обязательно верни ответ строго в таком виде:',
+  '```json',
+  '[',
+  '  {"de": "der Tisch", "ru": "стол", "category": "Повседневные слова", "partOfSpeech": "noun", "plural": "die Tische"},',
+  '  {"de": "der Arzt", "ru": "врач", "category": ["Профессии", "Семья и люди"], "partOfSpeech": "noun", "plural": "die Ärzte", "feminine": "die Ärztin"},',
+  '  {"de": "gehen", "ru": "идти, ходить", "category": "Глаголы", "partOfSpeech": "verb", "praeteritum": "ging", "partizip2": "gegangen", "hilfsverb": "sein", "praesensIch": "gehe", "praesensDu": "gehst", "praesensErSieEs": "geht", "praesensIhr": "geht"}',
+  ']',
+  '```',
+].join(' ');
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
+export const MAX_WORD_FILL_CHARS = 50_000;
+export const MAX_WORD_FILL_WORDS = 1000;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -60,6 +86,9 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const checkProfile = profiles[AI_PROFILE_PICTURE_CHECK];
   const checkModel = typeof checkProfile?.model === 'string' && isGeminiModel(checkProfile.model) ? checkProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const checkPrompt = typeof checkProfile?.prompt === 'string' && checkProfile.prompt.trim() ? checkProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_CHECK_PROMPT;
+  const wordFillProfile = profiles[AI_PROFILE_WORD_FILL];
+  const wordFillModel = typeof wordFillProfile?.model === 'string' && isGeminiModel(wordFillProfile.model) ? wordFillProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
+  const wordFillPrompt = typeof wordFillProfile?.prompt === 'string' && wordFillProfile.prompt.trim() ? wordFillProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_FILL_PROMPT;
   return { provider: 'gemini', apiKey: raw.apiKey.trim(), profiles: {
     [AI_PROFILE_PICTURE_DESCRIPTION]: {
       model: pictureModel,
@@ -69,6 +98,10 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
       model: checkModel,
       prompt: checkPrompt,
       severity: Math.max(1, Math.min(5, Math.round(Number(checkProfile?.severity) || 3))),
+    },
+    [AI_PROFILE_WORD_FILL]: {
+      model: wordFillModel,
+      prompt: wordFillPrompt,
     },
   } };
 }
@@ -88,18 +121,20 @@ export async function readAISettings(): Promise<AISettingsPublic> {
     profiles: stored?.profiles ?? {
       [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT },
       [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
+      [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
     },
   };
 }
 
 export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown }): Promise<AISettingsPublic> {
-  if (input.profileId !== AI_PROFILE_PICTURE_DESCRIPTION && input.profileId !== AI_PROFILE_PICTURE_CHECK) throw new Error('INVALID_PROFILE');
+  if (input.profileId !== AI_PROFILE_PICTURE_DESCRIPTION && input.profileId !== AI_PROFILE_PICTURE_CHECK && input.profileId !== AI_PROFILE_WORD_FILL) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
   const currentProfile = current?.profiles[input.profileId];
-  const prompt = input.prompt === undefined ? currentProfile?.prompt ?? DEFAULT_PICTURE_PROMPT : input.prompt;
+  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
   if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
   const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}) };
   const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), profiles: { ...(current?.profiles ?? {}), [input.profileId]: profile } };
@@ -108,11 +143,11 @@ export async function writeAISettings(input: { profileId: string; model: unknown
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
-  if (profileId !== AI_PROFILE_PICTURE_DESCRIPTION && profileId !== AI_PROFILE_PICTURE_CHECK) throw new Error('INVALID_PROFILE');
+  if (profileId !== AI_PROFILE_PICTURE_DESCRIPTION && profileId !== AI_PROFILE_PICTURE_CHECK && profileId !== AI_PROFILE_WORD_FILL) throw new Error('INVALID_PROFILE');
   const current = await readStored();
   if (!current) return readAISettings();
   const currentProfile = current.profiles[profileId];
-  const defaultPrompt = profileId === AI_PROFILE_PICTURE_DESCRIPTION ? DEFAULT_PICTURE_PROMPT : DEFAULT_PICTURE_CHECK_PROMPT;
+  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
   const profile = {
     model: currentProfile?.model ?? '',
     prompt: defaultPrompt,
@@ -268,4 +303,53 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
     return value.slice(0, 300);
   });
   return { segments, report: result.report, score, maxScore: 100, categories, correctedText: result.correctedText, level: result.level, usefulExpressions };
+}
+
+/**
+ * Turns a raw word list into structured word entries via Gemini (the `wordFill`
+ * profile). Returns the generated JSON text plus the word count, or an error code.
+ */
+export async function generateWordFill(input: { words: string; categories: string[]; defaultCategory?: string }): Promise<{ json: string; count: number }> {
+  const stored = await readStored();
+  if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
+  const profile = stored.profiles[AI_PROFILE_WORD_FILL];
+  if (!profile?.model) throw new Error('MISSING_MODEL');
+
+  const text = input.words.trim();
+  if (!text) throw new Error('EMPTY_WORDS');
+  if (text.length > MAX_WORD_FILL_CHARS) throw new Error('WORDS_TOO_LONG');
+
+  const categoryLine = input.categories.length > 0
+    ? input.categories.map((c) => `«${c}»`).join(', ')
+    : input.defaultCategory
+      ? `«${input.defaultCategory}»`
+      : '(категорий пока нет — придумай короткие подходящие названия)';
+
+  const prompt = `${profile.prompt}\n\nДоступные категории: ${categoryLine}.${input.defaultCategory ? ` Если в слове не указана категория — используй «${input.defaultCategory}».` : ''}\n\nСписок слов:\n${text}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
+    throw error;
+  }
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
+
+  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+  if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
+
+  const json = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
+  let parsed: unknown;
+  try { parsed = JSON.parse(json); } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('INVALID_AI_RESPONSE');
+  if (parsed.length > MAX_WORD_FILL_WORDS) throw new Error('WORDS_TOO_MANY');
+
+  return { json, count: parsed.length };
 }

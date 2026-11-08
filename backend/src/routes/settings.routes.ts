@@ -17,9 +17,18 @@ import {
   writeAudioSettings,
   writeAudioVoice,
 } from '../services/audioSettings';
-import { checkAISettings, fetchGeminiModels, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
+import { checkAISettings, fetchGeminiModels, generateWordFill, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
+
+const wordFillLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Слишком много запросов к ИИ. Подождите минуту.' },
+});
 
 router.get('/ai', requireAdmin, async (_req, res) => {
   try { res.setHeader('Cache-Control', 'no-store'); res.json(await readAISettings()); }
@@ -56,6 +65,31 @@ router.delete('/ai/profile/:profileId', requireAdmin, async (req, res) => {
   catch (error) {
     if (error instanceof Error && error.message === 'INVALID_PROFILE') return res.status(400).json({ error: 'Неизвестный профиль ИИ' });
     res.status(500).json({ error: 'Не удалось сбросить промпт' });
+  }
+});
+
+router.post('/ai/word-fill', requireAdmin, wordFillLimiter, async (req, res) => {
+  try {
+    const words = req.body?.words;
+    const categories = Array.isArray(req.body?.categories) ? req.body.categories.filter((c: unknown): c is string => typeof c === 'string' && Boolean(c.trim())) : [];
+    const defaultCategory = typeof req.body?.defaultCategory === 'string' ? req.body.defaultCategory.trim() : undefined;
+    if (typeof words !== 'string') return res.status(400).json({ error: 'Введите список слов' });
+    const result = await generateWordFill({ words, categories, defaultCategory });
+    res.json(result);
+  } catch (error) {
+    const messages: Record<string, [number, string]> = {
+      MISSING_API_KEY: [503, 'ИИ пока не настроен: сохраните ключ Gemini и выберите модель'],
+      MISSING_MODEL: [503, 'Для заполнения слов не выбрана модель Gemini'],
+      EMPTY_WORDS: [400, 'Введите список слов'],
+      WORDS_TOO_LONG: [400, 'Слишком длинный список слов'],
+      WORDS_TOO_MANY: [400, 'Слишком много слов за раз (максимум 1000)'],
+      AI_TIMEOUT: [504, 'ИИ не ответил вовремя. Попробуйте ещё раз.'],
+      INVALID_API_KEY: [400, 'Ключ Gemini недействителен'],
+      INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный ответ — попробуйте ещё раз'],
+      GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'],
+    };
+    const result = error instanceof Error ? messages[error.message] : undefined;
+    return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось заполнить слова через ИИ' });
   }
 });
 

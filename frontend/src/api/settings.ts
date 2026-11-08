@@ -25,3 +25,5 @@ export const saveAISettings = (profileId: string, model: string, apiKey: string 
 export const checkAISettings = () => request<AICheckResponse & { models: AIModel[] }>('/settings/ai/check', { method: 'POST', auth: true });
 export const resetAIPrompt = (profileId: string) => request<AISettingsResponse>(`/settings/ai/profile/${encodeURIComponent(profileId)}`, { method: 'DELETE', auth: true });
 export const saveAIProfile = (profileId: string, model: string, prompt: string) => saveAISettings(profileId, model, undefined, prompt);
+export interface WordFillResult { json: string; count: number }
+export const fillWordsViaAI = (words: string, categories: string[], defaultCategory?: string) => request<WordFillResult>('/settings/ai/word-fill', { method: 'POST', body: { words, categories, defaultCategory }, auth: true });

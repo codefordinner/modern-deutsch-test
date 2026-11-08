@@ -5,52 +5,126 @@ import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
 const CHECK_PROFILE = 'pictureAnswerCheck';
+const WORD_FILL_PROFILE = 'wordFill';
+
+interface ProfileEditors {
+  model: string;
+  prompt: string;
+  severity: number;
+}
 
 export function AISettingsTab() {
   const [settings, setSettings] = useState<AISettingsResponse | null>(null);
-  const [model, setModel] = useState('');
   const [models, setModels] = useState<AIModel[]>([]);
   const [apiKey, setApiKey] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [checkModel, setCheckModel] = useState('');
-  const [checkPrompt, setCheckPrompt] = useState('');
-  const [severity, setSeverity] = useState(3);
   const [busy, setBusy] = useState(false);
+  const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
+    [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [CHECK_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [WORD_FILL_PROFILE]: { model: '', prompt: '', severity: 3 },
+  });
+
+  const setProfile = (id: string, patch: Partial<ProfileEditors>) =>
+    setProfiles((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
   const load = async () => {
     try {
-      const result = await fetchAISettings(); setSettings(result); setModel(result.profiles[PICTURE_PROFILE]?.model ?? ''); setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? ''); setCheckModel(result.profiles[CHECK_PROFILE]?.model ?? ''); setCheckPrompt(result.profiles[CHECK_PROFILE]?.prompt ?? ''); setSeverity(result.profiles[CHECK_PROFILE]?.severity ?? 3);
+      const result = await fetchAISettings();
+      setSettings(result);
+      const next: Record<string, ProfileEditors> = {};
+      for (const id of [PICTURE_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE]) {
+        next[id] = {
+          model: result.profiles[id]?.model ?? '',
+          prompt: result.profiles[id]?.prompt ?? '',
+          severity: result.profiles[id]?.severity ?? 3,
+        };
+      }
+      setProfiles(next);
       if (result.hasApiKey) { try { setModels((await fetchAIModels()).models); } catch { /* catalog is optional on load */ } }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { void load(); }, []);
+
   const save = async () => {
     setBusy(true);
     try {
-      const first = await saveAISettings(PICTURE_PROFILE, model, apiKey, prompt);
+      // Save the API key once (with the first profile), then each profile separately.
+      let last: AISettingsResponse | null = null;
+      for (const [id, editor] of Object.entries(profiles)) {
+        const hasSeverity = id === CHECK_PROFILE;
+        last = await saveAISettings(
+          id,
+          editor.model,
+          last ? undefined : apiKey,
+          editor.prompt,
+          hasSeverity ? editor.severity : undefined
+        );
+      }
       setApiKey('');
-      const second = await saveAISettings(CHECK_PROFILE, checkModel, undefined, checkPrompt, severity);
-      setSettings(second);
-      setPrompt(second.profiles[PICTURE_PROFILE]?.prompt ?? first.profiles[PICTURE_PROFILE]?.prompt ?? prompt);
+      setSettings(last);
       showToast('Настройки ИИ сохранены', 'success');
     } catch (error) { reportError(error, 'Не удалось сохранить настройки ИИ'); }
     finally { setBusy(false); }
   };
-  const resetPrompt = async (profileId: string, label: string) => { if (!confirm(`Сбросить промпт «${label}» к исходному тексту?`)) return; setBusy(true); try { const result = await resetAIPrompt(profileId); setSettings(result); setPrompt(result.profiles[PICTURE_PROFILE]?.prompt ?? prompt); setCheckPrompt(result.profiles[CHECK_PROFILE]?.prompt ?? checkPrompt); showToast(`Промпт «${label}» сброшен`, 'success'); } catch (error) { reportError(error, 'Не удалось сбросить промпт'); } finally { setBusy(false); } };
-  const check = async () => { setBusy(true); try { const result = await checkAISettings(); setModels(result.models); showToast(result.message, result.ok ? 'success' : 'error'); } catch (error) { reportError(error, 'Не удалось проверить настройки ИИ'); } finally { setBusy(false); } };
+
+  const resetPrompt = async (profileId: string, label: string) => {
+    if (!confirm(`Сбросить промпт «${label}» к исходному тексту?`)) return;
+    setBusy(true);
+    try {
+      const result = await resetAIPrompt(profileId);
+      setSettings(result);
+      setProfile(profileId, { prompt: result.profiles[profileId]?.prompt ?? '' });
+      showToast(`Промпт «${label}» сброшен`, 'success');
+    } catch (error) { reportError(error, 'Не удалось сбросить промпт'); }
+    finally { setBusy(false); }
+  };
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const result = await checkAISettings();
+      setModels(result.models);
+      showToast(result.message, result.ok ? 'success' : 'error');
+    } catch (error) { reportError(error, 'Не удалось проверить настройки ИИ'); }
+    finally { setBusy(false); }
+  };
+
+  const profileBlock = (id: string, title: string, label: string, showSeverity: boolean) => (
+    <div className="ai-profile-block">
+      <h4 className="ai-profile-title">{title}</h4>
+      <label className="setting-toggle-title" htmlFor={`ai-model-${id}`}>Модель для этого профиля</label>
+      <select id={`ai-model-${id}`} className="text-input" value={profiles[id].model} onChange={(event) => setProfile(id, { model: event.target.value })} disabled={!models.length}>
+        <option value="">{models.length ? 'Выберите модель' : 'Сначала проверьте ключ'}</option>
+        {models.map((item) => <option key={item.name} value={item.name}>{item.displayName} ({item.name})</option>)}
+      </select>
+      <div className="ai-prompt-label">
+        <label className="setting-toggle-title" htmlFor={`ai-prompt-${id}`}>{label}</label>
+        <button type="button" className="btn-secondary ai-reset-prompt" disabled={busy} onClick={() => void resetPrompt(id, label)}><RotateCcw size={14} /> Сбросить промпт</button>
+      </div>
+      <textarea id={`ai-prompt-${id}`} className="text-input ai-prompt-input" value={profiles[id].prompt} maxLength={10000} rows={9} onChange={(event) => setProfile(id, { prompt: event.target.value })} placeholder="Инструкция для Gemini" />
+      {showSeverity && (
+        <label className="setting-toggle-title" htmlFor="ai-severity">Жёсткость проверки: {profiles[id].severity} из 5</label>
+      )}
+      {showSeverity && <input id="ai-severity" type="range" min="1" max="5" step="1" value={profiles[id].severity} onChange={(event) => setProfile(id, { severity: Number(event.target.value) })} />}
+    </div>
+  );
+
   return <div className="card ai-settings-card">
     <h3 className="card-title"><Bot size={20} /> Модуль ИИ</h3>
     <p className="card-note">Провайдер — Google Gemini. Для каждого профиля можно выбрать свою модель и инструкцию. Новые профили можно добавить без изменения AI API.</p>
     <div className="settings-divider">
-      <h4 className="ai-profile-title">Профиль: описание картинок</h4>
-      <label className="setting-toggle-title" htmlFor="ai-model">Модель для этого профиля</label>
-      <select id="ai-model" className="text-input" value={model} onChange={(event) => setModel(event.target.value)} disabled={!models.length}><option value="">{models.length ? 'Выберите модель' : 'Сначала проверьте ключ'}</option>{models.map((item) => <option key={item.name} value={item.name}>{item.displayName} ({item.name})</option>)}</select>
       <label className="setting-toggle-title" htmlFor="ai-api-key">API-ключ Gemini</label>
       <input id="ai-api-key" className="text-input" type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.hasApiKey ? 'Ключ сохранён — введите новый для замены' : 'Введите API-ключ'} />
       <div className="ai-key-status"><ShieldCheck size={16} /> {settings?.hasApiKey ? 'Ключ сохранён на сервере' : 'Ключ не задан'}</div>
-       <div className="ai-prompt-label"><label className="setting-toggle-title" htmlFor="ai-picture-prompt">Промпт для описания картинок</label><button type="button" className="btn-secondary ai-reset-prompt" disabled={busy} onClick={() => void resetPrompt(PICTURE_PROFILE, 'описание картинок')}><RotateCcw size={14} /> Сбросить промпт</button></div>
-       <textarea id="ai-picture-prompt" className="text-input ai-prompt-input" value={prompt} maxLength={10000} rows={9} onChange={(event) => setPrompt(event.target.value)} placeholder="Инструкция для Gemini" />
-       <div className="ai-profile-block"><h4 className="ai-profile-title">Профиль: проверка ответа пользователя</h4><label className="setting-toggle-title" htmlFor="ai-check-model">Модель для проверки</label><select id="ai-check-model" className="text-input" value={checkModel} onChange={(event) => setCheckModel(event.target.value)} disabled={!models.length}><option value="">Выберите модель</option>{models.map((item) => <option key={item.name} value={item.name}>{item.displayName} ({item.name})</option>)}</select><div className="ai-prompt-label"><label className="setting-toggle-title" htmlFor="ai-check-prompt">Промпт проверки</label><button type="button" className="btn-secondary ai-reset-prompt" disabled={busy} onClick={() => void resetPrompt(CHECK_PROFILE, 'проверка ответа')}><RotateCcw size={14} /> Сбросить промпт</button></div><textarea id="ai-check-prompt" className="text-input ai-prompt-input" value={checkPrompt} maxLength={10000} rows={9} onChange={(event) => setCheckPrompt(event.target.value)} placeholder="Инструкция проверки ответа" /><label className="setting-toggle-title" htmlFor="ai-severity">Жёсткость проверки: {severity} из 5</label><input id="ai-severity" type="range" min="1" max="5" step="1" value={severity} onChange={(event) => setSeverity(Number(event.target.value))} /></div>
-       <div className="backup-actions"><button type="button" className="btn-primary" disabled={busy || (!apiKey && !settings?.hasApiKey)} onClick={() => void save()}><Save size={15} /> Сохранить</button><button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button></div>
+
+      {profileBlock(PICTURE_PROFILE, 'Профиль: описание картинок', 'Промпт для описания картинок', false)}
+      {profileBlock(CHECK_PROFILE, 'Профиль: проверка ответа пользователя', 'Промпт проверки ответа', true)}
+      {profileBlock(WORD_FILL_PROFILE, 'Профиль: заполнение слов', 'Промпт заполнения слов', false)}
+
+      <div className="backup-actions">
+        <button type="button" className="btn-primary" disabled={busy || (!apiKey && !settings?.hasApiKey)} onClick={() => void save()}><Save size={15} /> Сохранить</button>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button>
+      </div>
     </div>
   </div>;
 }
