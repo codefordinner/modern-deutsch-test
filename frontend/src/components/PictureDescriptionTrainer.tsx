@@ -51,7 +51,6 @@ export function PictureDescriptionTrainer() {
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const speechSessionRef = useRef(0);
   const recognitionEndedRef = useRef<Promise<void> | null>(null);
-  const resolveRecognitionEndedRef = useRef<(() => void) | null>(null);
   const dictationBaseRef = useRef('');
 
   useEffect(() => {
@@ -140,7 +139,9 @@ export function PictureDescriptionTrainer() {
     const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
-    recognitionEndedRef.current = new Promise<void>((resolve) => { resolveRecognitionEndedRef.current = resolve; });
+    let resolveEnded!: () => void;
+    const ended = new Promise<void>((resolve) => { resolveEnded = resolve; });
+    recognitionEndedRef.current = ended;
     setSpeechState('listening');
     dictationBaseRef.current = answer.trim();
     recognition.onresult = (event) => {
@@ -173,10 +174,13 @@ export function PictureDescriptionTrainer() {
       }
     };
     recognition.onend = () => {
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
-      resolveRecognitionEndedRef.current?.();
-      resolveRecognitionEndedRef.current = null;
-      recognitionEndedRef.current = null;
+      resolveEnded();
+      // An older recognition instance can finish after a new one has started.
+      // Only let the current instance clear the shared lifecycle references.
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null;
+        if (recognitionEndedRef.current === ended) recognitionEndedRef.current = null;
+      }
       if (session === speechSessionRef.current) setSpeechState('idle');
     };
     recognition.onstart = () => { if (session === speechSessionRef.current) setSpeechState('listening'); };
@@ -204,7 +208,7 @@ export function PictureDescriptionTrainer() {
          <div className={`picture-stage-timer ${startedAt !== null || isFinished ? 'is-active' : ''}`} aria-live="polite">{formatTime(elapsed)}</div>
        </div>
       {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
-       {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div><div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div><button type="button" className="btn-secondary" onClick={toggleSpeech}>{speechState === 'listening' ? 'Остановить диктовку' : 'Диктовать по-немецки'}</button></>}
+        {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div><div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div>{speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} />)}</span></div>}<button type="button" className="btn-secondary" onClick={toggleSpeech}>{speechState === 'listening' ? 'Остановить диктовку' : 'Диктовать по-немецки'}</button></>}
       <div className="picture-actions">
          {!isRevealed ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
            <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
