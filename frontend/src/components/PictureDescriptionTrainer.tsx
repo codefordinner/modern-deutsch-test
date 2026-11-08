@@ -1,18 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Play, RotateCcw, Send, SkipForward } from 'lucide-react';
 import { checkPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
+import { ApiError } from '../api/request';
 import { reportError } from '../utils/toast';
+import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictation';
 
-interface SpeechRecognitionLike {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  resultIndex?: number;
-  results: ArrayLike<ArrayLike<{ transcript: string; isFinal?: boolean }>>;
-  onresult: ((event: SpeechRecognitionLike) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
+/**
+ * Runs the picture-answer check with a short retry for transient failures.
+ * The check goes through Gemini (up to ~60s), so on a flaky mobile connection a
+ * single lost request meant the learner's answer was simply gone. Retrying the
+ * same request makes those drops recover without bothering the learner.
+ */
+const CHECK_ATTEMPTS = 3;
+const CHECK_RETRY_DELAY_MS = 700;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+async function checkPictureAnswerWithRetry(id: string, answer: string): Promise<PictureCheckResult> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= CHECK_ATTEMPTS; attempt += 1) {
+    try {
+      return await checkPictureAnswer(id, answer);
+    } catch (error) {
+      lastError = error;
+      // Never retry a rejection we know the user caused (validation) — only
+      // network drops, timeouts and server-side hiccups are worth another try.
+      const retryable = error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
+      if (!retryable || attempt === CHECK_ATTEMPTS) break;
+      await new Promise((resolve) => setTimeout(resolve, CHECK_RETRY_DELAY_MS * attempt));
+    }
+  }
+  throw lastError;
 }
 
 export function PictureDescriptionTrainer() {
@@ -84,16 +101,24 @@ export function PictureDescriptionTrainer() {
   const submit = async () => {
     if (checking || !picture || !answer.trim()) return;
     setChecking(true);
-    try { setResult(await checkPictureAnswer(picture?.id ?? '', answer)); try { localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ } }
+    try {
+      // Mobile networks drop requests from time to time: retry transient failures
+      // instead of silently eating the learner's answer once in every few checks.
+      const result = await checkPictureAnswerWithRetry(picture.id, answer);
+      setResult(result);
+      try { localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
+    }
     catch (error) { reportError(error, 'Не удалось проверить описание'); }
     finally { setChecking(false); }
   };
   const restart = () => { stopSpeech(); setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const next = () => { skip(); };
   const toggleSpeech = () => {
-    const speechWindow = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
-    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!Recognition) { reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна в этом браузере'); return; }
+    const Recognition = getSpeechRecognition();
+    if (!Recognition) {
+      reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна: этот браузер не поддерживает распознавание речи (например, Firefox). Воспользуйтесь Chrome, Edge или Safari.');
+      return;
+    }
     if (speechState === 'listening') { recognitionRef.current?.stop(); return; }
     const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
     recognition.interimResults = true;
@@ -104,14 +129,32 @@ export function PictureDescriptionTrainer() {
       for (let index = 0; index < event.results.length; index += 1) {
         const result = event.results[index]?.[0];
         if (!result) continue;
-        if (event.results[index]?.[0]?.isFinal) finalText += result.transcript;
+        if (result.isFinal) finalText += result.transcript;
         else interimText += result.transcript;
       }
-      const spokenText = `${finalText} ${interimText}`.trim();
+      // Assemble the recognised speech (spoken punctuation -> real marks) and
+      // append it to what the learner had already typed before dictating.
+      const raw = `${finalText} ${interimText}`.trim();
       const base = dictationBaseRef.current;
+      // Capitalise the first dictated word only at the start of a new answer or
+      // right after a sentence end; otherwise keep it lowercase as a mid-sentence.
+      const capitalizeFirst = !base || /[.!?]\s*$/.test(base);
+      const spokenText = addDictationPunctuation(raw, capitalizeFirst);
       setAnswer(spokenText ? `${base}${base ? ' ' : ''}${spokenText}` : base);
     };
-    recognition.onend = () => { setSpeechState('idle'); recognitionRef.current = null; }; recognitionRef.current = recognition; setSpeechState('listening'); recognition.start();
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        reportError(new Error(event.error), 'Нет доступа к микрофону. Разрешите доступ к микрофону в настройках браузера.');
+      }
+    };
+    recognition.onend = () => { setSpeechState('idle'); recognitionRef.current = null; };
+    recognition.onstart = () => { recognitionRef.current = recognition; setSpeechState('listening'); };
+    try { recognition.start(); }
+    catch (error) {
+      recognitionRef.current = null;
+      setSpeechState('idle');
+      reportError(error, 'Не удалось запустить диктовку. Проверьте доступ к микрофону.');
+    }
   };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
