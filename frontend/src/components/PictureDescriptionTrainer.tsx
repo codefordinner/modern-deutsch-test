@@ -52,6 +52,7 @@ export function PictureDescriptionTrainer() {
   const speechSessionRef = useRef(0);
   const recognitionEndedRef = useRef<Promise<void> | null>(null);
   const dictationBaseRef = useRef('');
+  const answerRef = useRef(answer);
 
   useEffect(() => {
     getPictures().then((items) => {
@@ -79,6 +80,9 @@ export function PictureDescriptionTrainer() {
 
   const picture = pictures.length ? pictures[index % pictures.length] : null;
   const pictureId = picture?.id;
+  useEffect(() => {
+    answerRef.current = answer;
+  }, [answer]);
   useEffect(() => {
     if (!draftLoaded || !pictureId) return;
     try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
@@ -143,7 +147,7 @@ export function PictureDescriptionTrainer() {
     const ended = new Promise<void>((resolve) => { resolveEnded = resolve; });
     recognitionEndedRef.current = ended;
     setSpeechState('listening');
-    dictationBaseRef.current = answer.trim();
+    dictationBaseRef.current = answerRef.current.trim();
     recognition.onresult = (event) => {
       if (session !== speechSessionRef.current) return;
       let finalText = '';
@@ -163,7 +167,9 @@ export function PictureDescriptionTrainer() {
       const capitalizeFirst = !base || /[.!?]\s*$/.test(base);
       const spokenText = addDictationPunctuation(raw, capitalizeFirst);
       const separator = base && spokenText && /^[,.;:!?]/u.test(spokenText) ? '' : base ? ' ' : '';
-      setAnswer(spokenText ? `${base}${separator}${spokenText}` : base);
+      const newAnswer = spokenText ? `${base}${separator}${spokenText}` : base;
+      setAnswer(newAnswer);
+      answerRef.current = newAnswer;
     };
     recognition.onerror = (event) => {
       if (session !== speechSessionRef.current) return;
