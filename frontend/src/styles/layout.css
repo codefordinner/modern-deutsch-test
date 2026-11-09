@@ -27,8 +27,20 @@
   min-width: 0;
   justify-content: center;
   gap: 4px;
-  overflow: visible; /* was `auto` → showed a scrollbar on desktop */
+  overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 0;
+}
+
+/* Keep the full-label desktop navigation inside its flex column. Without a
+   shrinkable inner row, the tab buttons can paint over the actions when the
+   header reaches its max-width (for example in a maximized window). */
+.app-header .nav-tabs {
+  scrollbar-width: thin;
+}
+
+.app-header .nav-tabs > .nav-tab-btn {
+  flex: 0 0 auto;
 }
 
 .app-header .nav-tab-btn {
