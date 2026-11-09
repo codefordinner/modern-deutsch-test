@@ -21,28 +21,28 @@
 .picture-mode-switch input { accent-color: var(--accent-primary); }
 .picture-categories { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
 .picture-corrected { padding: 12px; color: var(--text-primary); background: var(--bg-tertiary); border-radius: 8px; white-space: pre-wrap; }
-.picture-answer-label { display: block; margin-top: 18px; margin-bottom: 6px; font-weight: 600; }
+.picture-answer-label { display: block; margin-top: 22px; margin-bottom: 8px; font-size: 15px; font-weight: 650; }
 .picture-answer {
   width: 100%;
   min-height: 150px;
-  padding: 12px 14px;
+  padding: 16px 18px;
   resize: vertical;
   font: inherit;
   font-size: 16px;
   line-height: 1.5;
   color: var(--text-primary);
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.picture-answer:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-light); }
+.picture-answer:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-light); background: var(--bg-primary); }
 .picture-answer::placeholder { color: var(--text-muted); opacity: 1; }
-.picture-answer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 5px; color: var(--text-muted); font-size: 12px; }
+.picture-answer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; color: var(--text-muted); font-size: 12px; }
 .picture-dictation-hint { margin-top: 8px; color: var(--text-secondary); font-size: 13px; }
-.picture-listening-indicator { display: inline-flex; align-items: center; gap: 9px; width: fit-content; margin: 12px 0 2px; padding: 8px 12px; color: var(--error); background: var(--error-light); border: 1px solid color-mix(in srgb, var(--error) 28%, transparent); border-radius: 999px; font-size: 14px; font-weight: 600; animation: picture-listening-appear .2s ease-out; }
-.picture-listening-dot { width: 9px; height: 9px; flex: 0 0 auto; background: var(--error); border-radius: 50%; animation: picture-listening-pulse 1.4s ease-in-out infinite; }
+.picture-listening-indicator { display: inline-flex; align-items: center; gap: 9px; width: fit-content; margin: 12px 0 2px; padding: 8px 12px; color: var(--accent-primary); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 9px; font-size: 14px; font-weight: 600; }
+.picture-listening-dot { width: 8px; height: 8px; flex: 0 0 auto; background: var(--accent-primary); border-radius: 50%; }
 .picture-speech-wave { display: inline-flex; align-items: center; gap: 2px; height: 18px; margin-left: 2px; }
 .picture-speech-wave i { display: block; width: 3px; height: 4px; background: currentColor; border-radius: 3px; transition: height 0.08s ease-out; }
 @keyframes picture-listening-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
@@ -84,9 +84,9 @@
 .pictures-admin-empty { display: grid; justify-items: center; gap: 6px; padding: 44px 20px; text-align: center; color: var(--text-secondary); border: 1px dashed var(--border-color); border-radius: 12px; }
 .pictures-admin-empty p { margin: 0; color: var(--text-primary); font-weight: 600; }
 .pictures-admin-empty span { color: var(--text-muted); }
-.picture-check-result { display: grid; gap: 12px; margin-top: 18px; padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; }
+.picture-check-result { display: grid; gap: 14px; margin-top: 20px; padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-sm); }
 .picture-score { font-size: 18px; }
-.picture-report { color: var(--text-secondary); white-space: pre-wrap; }
+.picture-report { padding: 14px 16px; color: var(--text-secondary); background: var(--bg-tertiary); border-left: 3px solid var(--accent-primary); border-radius: 0 8px 8px 0; line-height: 1.65; white-space: pre-wrap; }
 .picture-marked-text { line-height: 1.8; white-space: pre-wrap; }
 .picture-segment { padding: 2px 3px; border: 0; border-radius: 3px; font: inherit; color: inherit; cursor: pointer; }
 .picture-segment:hover, .picture-segment.is-selected { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
