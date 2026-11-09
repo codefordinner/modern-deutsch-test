@@ -75,7 +75,7 @@ export function parseBackup(text: string): ProgressBackup {
 
   const backup = parsed as Partial<ProgressBackup> | null;
   if (!backup || backup.app !== BACKUP_APP || typeof backup.data !== 'object' || backup.data === null) {
-    throw new Error('Это не файл прогресса Deutsch Trainer');
+    throw new Error('Это не файл прогресса Sprachfunke');
   }
   if (typeof backup.version !== 'number' || backup.version > BACKUP_VERSION) {
     throw new Error('Файл создан более новой версией приложения');

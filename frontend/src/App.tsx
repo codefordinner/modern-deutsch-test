@@ -81,7 +81,7 @@ export function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    document.title = `${getTabDefinition(activeTab).pageTitle} — Deutsch Trainer`;
+    document.title = `${getTabDefinition(activeTab).pageTitle} — Sprachfunke`;
   }, [activeTab]);
 
   const handleAnswer = (isCorrect: boolean) => {

@@ -1,6 +1,6 @@
 {
-  "name": "Deutsch Trainer",
-  "short_name": "Deutsch",
+  "name": "Sprachfunke",
+  "short_name": "Sprachfunke",
   "description": "Тренажёр немецкого языка: числа, слова, артикли, глаголы, время",
   "lang": "ru",
   "start_url": "/",

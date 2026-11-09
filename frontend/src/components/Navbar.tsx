@@ -31,10 +31,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       <header className="app-header">
         <a className="sr-only" href="#main">Перейти к содержимому</a>
         <div className="header-inner">
-          <a className="brand-area" href={tabHref('numbers')} aria-label="Deutsch Trainer — на главную">
-            <img className="brand-logo" src="/icons/deutsch-trainer-logo.svg" alt="" aria-hidden="true" />
+          <a className="brand-area" href={tabHref('numbers')} aria-label="Sprachfunke — на главную">
+            <img className="brand-logo" src="/icons/sprachfunke-logo.svg" alt="" aria-hidden="true" />
             <div className="brand-text">
-              <h1 className="brand-title">Deutsch Trainer</h1>
+              <h1 className="brand-title">Sprachfunke</h1>
               <div className="brand-sub">Умный тренажёр немецкого языка</div>
             </div>
           </a>
