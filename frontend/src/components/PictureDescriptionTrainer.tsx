@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Play, RotateCcw, Send, SkipForward } from 'lucide-react';
+import { Check, RotateCcw, Send, SkipForward } from 'lucide-react';
 import { checkPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
 import { ApiError } from '../api/request';
 import { reportError } from '../utils/toast';
@@ -48,11 +48,18 @@ export function PictureDescriptionTrainer() {
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
   const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
+  const [inputMode, setInputMode] = useState<'text' | 'voice' | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const speechSessionRef = useRef(0);
   const recognitionEndedRef = useRef<Promise<void> | null>(null);
   const dictationBaseRef = useRef('');
   const answerRef = useRef(answer);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
+  const voiceActiveRef = useRef(false);
+  const waveBarRefs = useRef<HTMLElement[]>([]);
 
   useEffect(() => {
     getPictures().then((items) => {
@@ -87,13 +94,68 @@ export function PictureDescriptionTrainer() {
     if (!draftLoaded || !pictureId) return;
     try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
   }, [answer, draftLoaded, pictureId]);
-  useEffect(() => () => { recognitionRef.current?.stop(); }, []);
+  const stopAudioVisualizer = () => {
+    voiceActiveRef.current = false;
+    if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    analyserRef.current?.disconnect();
+    analyserRef.current = null;
+    audioContextRef.current?.close().catch(() => undefined);
+    audioContextRef.current = null;
+    waveBarRefs.current.forEach((bar) => { bar.style.height = '4px'; });
+  };
+  const startAudioVisualizer = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextConstructor) { stream.getTracks().forEach((track) => track.stop()); return; }
+      const context = new AudioContextConstructor();
+      microphoneStreamRef.current = stream;
+      voiceActiveRef.current = true;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.72;
+      context.createMediaStreamSource(stream).connect(analyser);
+      audioContextRef.current = context;
+      analyserRef.current = analyser;
+      const values = new Uint8Array(analyser.frequencyBinCount);
+      const animate = () => {
+        analyser.getByteFrequencyData(values);
+        const bars = waveBarRefs.current;
+        const step = Math.max(1, Math.floor(values.length / bars.length));
+        bars.forEach((bar, index) => {
+          const value = values[Math.min(values.length - 1, index * step)] ?? 0;
+          bar.style.height = `${4 + (value / 255) * 14}px`;
+        });
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animate();
+    } catch {
+      // Speech recognition can still work when microphone visualisation is unavailable.
+    }
+  };
+  useEffect(() => () => { recognitionRef.current?.stop(); stopAudioVisualizer(); }, []);
   const stopSpeech = () => {
     speechSessionRef.current += 1;
     recognitionRef.current?.stop();
+    stopAudioVisualizer();
     setSpeechState('idle');
   };
-  const start = () => { setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const resetDescription = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const start = (mode: 'text' | 'voice') => {
+    setIsRevealed(true);
+    setInputMode(mode);
+    resetDescription();
+    if (mode === 'voice') {
+      void startAudioVisualizer();
+      const Recognition = getSpeechRecognition();
+      if (Recognition) void startSpeech(Recognition);
+      else reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна: этот браузер не поддерживает распознавание речи.');
+    }
+  };
   const skip = () => {
     stopSpeech();
     if (pictures.length > 1) {
@@ -101,7 +163,7 @@ export function PictureDescriptionTrainer() {
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
       setIndex(nextIndex);
     }
-    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null);
+    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
   };
   const finish = () => { stopSpeech(); setStartedAt(null); setIsFinished(true); };
   const submit = async () => {
@@ -117,17 +179,8 @@ export function PictureDescriptionTrainer() {
     catch (error) { reportError(error, 'Не удалось проверить описание'); }
     finally { setChecking(false); }
   };
-  const restart = () => { stopSpeech(); setIsRevealed(true); setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  const restart = () => { stopSpeech(); setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null); };
   const next = () => { skip(); };
-  const toggleSpeech = () => {
-    const Recognition = getSpeechRecognition();
-    if (!Recognition) {
-      reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна: этот браузер не поддерживает распознавание речи (например, Firefox). Воспользуйтесь Chrome, Edge или Safari.');
-      return;
-    }
-    if (speechState === 'listening') { stopSpeech(); return; }
-    void startSpeech(Recognition);
-  };
   const startSpeech = async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
     const session = ++speechSessionRef.current;
     const previousRecognition = recognitionRef.current;
@@ -210,13 +263,17 @@ export function PictureDescriptionTrainer() {
       </div>
       <label className="picture-mode-switch"><input type="checkbox" checked={isExamMode} onChange={(event) => setIsExamMode(event.target.checked)} /> Экзаменационный режим (90 секунд)</label>
        <div className={`picture-stage ${isRevealed ? 'is-visible' : ''}`}>
-         {isRevealed ? <img src={picture.imageUrl} alt={picture.title || 'Картинка для описания'} decoding="async" /> : <div className="picture-hidden"><span>Картинка пока скрыта</span><span>Нажмите «Показать картинку», чтобы начать описание.</span></div>}
+         {isRevealed ? <img src={picture.imageUrl} alt={picture.title || 'Картинка для описания'} decoding="async" /> : <div className="picture-hidden"><span>Картинка пока скрыта</span><span>Выберите режим ввода, чтобы начать описание.</span></div>}
          <div className={`picture-stage-timer ${startedAt !== null || isFinished ? 'is-active' : ''}`} aria-live="polite">{formatTime(elapsed)}</div>
        </div>
+      {!isRevealed && <div className="picture-input-mode-selector">
+        <button className="picture-mode-button" onClick={() => start('text')}><span className="picture-mode-icon">✍️</span><span className="picture-mode-title">Текстом</span><span className="picture-mode-desc">Вводить описание с клавиатуры</span></button>
+        <button className="picture-mode-button" onClick={() => start('voice')}><span className="picture-mode-icon">🎤</span><span className="picture-mode-title">Голосом</span><span className="picture-mode-desc">Диктовать описание с микрофона</span></button>
+      </div>}
       {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
-        {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div><div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div>{speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} />)}</span></div>}<button type="button" className="btn-secondary" onClick={toggleSpeech}>{speechState === 'listening' ? 'Остановить диктовку' : 'Диктовать по-немецки'}</button></>}
+        {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={inputMode === 'voice' && speechState === 'listening'} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{inputMode === 'voice' && <div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
       <div className="picture-actions">
-         {!isRevealed ? <button className="btn-primary" onClick={start}><Play size={17} /> Показать картинку</button> : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
+         {!isRevealed ? null : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
            <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
            <button className="btn-secondary" disabled={checking} onClick={restart}><RotateCcw size={17} /> Начать заново</button>
            <button className="btn-secondary" disabled={checking} onClick={next}><SkipForward size={17} /> Следующая картинка</button>
