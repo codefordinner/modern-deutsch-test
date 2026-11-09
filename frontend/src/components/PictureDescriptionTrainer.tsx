@@ -49,6 +49,7 @@ export function PictureDescriptionTrainer() {
   const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'voice' | null>(null);
+  const [resumeMode, setResumeMode] = useState<'text' | 'voice' | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const speechSessionRef = useRef(0);
   const recognitionEndedRef = useRef<Promise<void> | null>(null);
@@ -67,10 +68,17 @@ export function PictureDescriptionTrainer() {
       setLoadError(false);
       let draft: { pictureId?: string; answer?: string } | null = null;
       try { draft = JSON.parse(localStorage.getItem('picture_draft') || 'null') as { pictureId?: string; answer?: string } | null; } catch { /* storage unavailable */ }
+      let pendingNext: { pictureId?: string; mode?: 'text' | 'voice' } | null = null;
+      try {
+        pendingNext = JSON.parse(sessionStorage.getItem('picture_next') || 'null') as { pictureId?: string; mode?: 'text' | 'voice' } | null;
+        sessionStorage.removeItem('picture_next');
+      } catch { /* storage unavailable */ }
+      const pendingIndex = pendingNext?.pictureId ? items.findIndex((item) => item.id === pendingNext?.pictureId) : -1;
       const draftIndex = draft?.pictureId ? items.findIndex((item) => item.id === draft?.pictureId) : -1;
-      const nextIndex = draftIndex >= 0 ? draftIndex : items.length > 1 ? Math.floor(Math.random() * items.length) : 0;
+      const nextIndex = pendingIndex >= 0 ? pendingIndex : draftIndex >= 0 ? draftIndex : items.length > 1 ? Math.floor(Math.random() * items.length) : 0;
       setIndex(nextIndex);
       if (draft?.pictureId && items[nextIndex]?.id === draft.pictureId && draft.answer) setAnswer(draft.answer);
+      if (pendingIndex >= 0 && (pendingNext?.mode === 'text' || pendingNext?.mode === 'voice')) setResumeMode(pendingNext.mode);
       setDraftLoaded(true);
     }).catch((error) => { setLoadError(true); reportError(error, 'Не удалось загрузить картинки'); }).finally(() => setLoading(false));
   }, []);
@@ -156,6 +164,11 @@ export function PictureDescriptionTrainer() {
       else reportError(new Error('Диктовка не поддерживается'), 'Диктовка недоступна: этот браузер не поддерживает распознавание речи.');
     }
   };
+  useEffect(() => {
+    if (!resumeMode || loading) return;
+    start(resumeMode);
+    setResumeMode(null);
+  }, [loading, resumeMode, start]);
   const skip = () => {
     stopSpeech();
     if (pictures.length > 1) {
@@ -180,7 +193,17 @@ export function PictureDescriptionTrainer() {
     finally { setChecking(false); }
   };
   const restart = () => { stopSpeech(); setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null); };
-  const next = () => { skip(); };
+  const next = () => {
+    if (!pictures.length || !picture) return;
+    let nextIndex = index;
+    if (pictures.length > 1) {
+      while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
+    }
+    try {
+      sessionStorage.setItem('picture_next', JSON.stringify({ pictureId: pictures[nextIndex].id, mode: inputMode }));
+    } catch { /* storage unavailable */ }
+    window.location.reload();
+  };
   const startSpeech = async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
     const session = ++speechSessionRef.current;
     const previousRecognition = recognitionRef.current;
