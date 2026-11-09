@@ -371,7 +371,7 @@ export async function generateWordFill(input: { words: string; categories: strin
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(240_000),
     });
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
