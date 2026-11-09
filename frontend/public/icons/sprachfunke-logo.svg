@@ -1,39 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Sprachfunke</title>
-  <desc id="desc">Речевой пузырь и карточка для изучения немецкого языка</desc>
-  <defs>
-    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#171126"/>
-      <stop offset="1" stop-color="#0d1018"/>
-    </linearGradient>
-    <linearGradient id="violet" x1="101" y1="90" x2="416" y2="418" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#c084ff"/>
-      <stop offset=".48" stop-color="#863bff"/>
-      <stop offset="1" stop-color="#ef43c8"/>
-    </linearGradient>
-    <linearGradient id="paper" x1="155" y1="127" x2="359" y2="375" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff"/>
-      <stop offset="1" stop-color="#e9e1ff"/>
-    </linearGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="14" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <linearGradient id="spark" x1="328" y1="75" x2="377" y2="125" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffe27a"/>
-      <stop offset=".5" stop-color="#ff9ee9"/>
-      <stop offset="1" stop-color="#ef43c8"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <path d="M104 163c0-38 31-69 69-69h166c38 0 69 31 69 69v127c0 38-31 69-69 69H232l-68 62c-11 10-28 2-28-13v-49c-19-10-32-30-32-53V163Z" fill="#863bff" opacity=".22" filter="url(#glow)"/>
-  <path d="M104 156c0-35 28-63 63-63h178c35 0 63 28 63 63v128c0 35-28 63-63 63H226l-61 55c-9 8-23 2-23-11v-47c-22-9-38-31-38-57V156Z" fill="url(#violet)"/>
-  <path d="M152 152c0-14 11-25 25-25h61v176h-61c-14 0-25-11-25-25V152Z" fill="url(#paper)"/>
-  <path d="M238 127h62c14 0 25 11 25 25v126c0 14-11 25-25 25h-62V127Z" fill="#d9c5ff"/>
-  <path d="M238 127v176" stroke="#863bff" stroke-width="9" stroke-linecap="round"/>
-  <path d="M176 181h35M176 215h35M176 249h24" stroke="#863bff" stroke-width="11" stroke-linecap="round"/>
-  <path d="m271 186 12 12 22-25" stroke="#6f21e8" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M271 231h30" stroke="#6f21e8" stroke-width="11" stroke-linecap="round"/>
-  <path d="M354 67c4 17 9 22 26 26-17 4-22 9-26 26-4-17-9-22-26-26 17-4 22-9 26-26Z" fill="url(#spark)"/>
-  <path d="M394 91c2 8 4 10 12 12-8 2-10 4-12 12-2-8-4-10-12-12 8-2 10-4 12-12Z" fill="#ffe27a" opacity=".9"/>
+  <desc id="desc">Фиолетовый речевой пузырь с искрой</desc>
+  <rect width="512" height="512" rx="116" fill="#171126"/>
+  <path d="M96 174c0-52 42-94 94-94h132c52 0 94 42 94 94v112c0 52-42 94-94 94H232l-72 66c-14 13-36 3-36-16v-54c-17-16-28-39-28-64V174Z" fill="#863bff"/>
+  <path d="m274 112-86 150h62l-26 138 100-176h-66l16-112Z" fill="#fff"/>
+  <circle cx="386" cy="100" r="24" fill="#ffe27a"/>
 </svg>
