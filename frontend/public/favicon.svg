@@ -2,6 +2,6 @@
   <title id="title">Sprachfunke</title>
   <rect width="512" height="512" rx="116" fill="#171126"/>
   <path d="M96 174c0-52 42-94 94-94h132c52 0 94 42 94 94v112c0 52-42 94-94 94H232l-72 66c-14 13-36 3-36-16v-54c-17-16-28-39-28-64V174Z" fill="#863bff"/>
-  <path d="m274 112-86 150h62l-26 138 100-176h-66l16-112Z" fill="#fff"/>
+  <path d="m274 126-70 128h54l-20 102 80-144h-54l10-86Z" fill="#fff"/>
   <circle cx="386" cy="100" r="24" fill="#ffe27a"/>
 </svg>
