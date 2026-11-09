@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, RotateCcw, Send, SkipForward } from 'lucide-react';
 import { checkPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
 import { ApiError } from '../api/request';
@@ -42,6 +42,7 @@ export function PictureDescriptionTrainer() {
   const [elapsed, setElapsed] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<PictureCheckResult | null>(null);
   const [checking, setChecking] = useState(false);
@@ -88,11 +89,6 @@ export function PictureDescriptionTrainer() {
     const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [startedAt]);
-  useEffect(() => {
-    if (!isExamMode || startedAt === null || elapsed < 90) return;
-    setStartedAt(null); setIsFinished(true);
-  }, [elapsed, isExamMode, startedAt]);
-
   const picture = pictures.length ? pictures[index % pictures.length] : null;
   const pictureId = picture?.id;
   useEffect(() => {
@@ -102,7 +98,7 @@ export function PictureDescriptionTrainer() {
     if (!draftLoaded || !pictureId) return;
     try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
   }, [answer, draftLoaded, pictureId]);
-  const stopAudioVisualizer = () => {
+  const stopAudioVisualizer = useCallback(() => {
     voiceActiveRef.current = false;
     if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
     animationFrameRef.current = null;
@@ -113,7 +109,7 @@ export function PictureDescriptionTrainer() {
     audioContextRef.current?.close().catch(() => undefined);
     audioContextRef.current = null;
     waveBarRefs.current.forEach((bar) => { bar.style.height = '4px'; });
-  };
+  }, []);
   const startAudioVisualizer = async () => {
     if (!navigator.mediaDevices?.getUserMedia) return;
     try {
@@ -145,14 +141,19 @@ export function PictureDescriptionTrainer() {
       // Speech recognition can still work when microphone visualisation is unavailable.
     }
   };
-  useEffect(() => () => { recognitionRef.current?.stop(); stopAudioVisualizer(); }, []);
-  const stopSpeech = () => {
+  useEffect(() => () => { recognitionRef.current?.stop(); stopAudioVisualizer(); }, [stopAudioVisualizer]);
+  const stopSpeech = useCallback(() => {
     speechSessionRef.current += 1;
     recognitionRef.current?.stop();
     stopAudioVisualizer();
     setSpeechState('idle');
-  };
-  const resetDescription = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
+  }, [stopAudioVisualizer]);
+  useEffect(() => {
+    if (!isExamMode || startedAt === null || elapsed < 90) return;
+    stopSpeech();
+    setStartedAt(null); setIsFinished(true); setHasTimedOut(true);
+  }, [elapsed, isExamMode, startedAt, stopSpeech]);
+  const resetDescription = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const start = (mode: 'text' | 'voice') => {
     setIsRevealed(true);
     setInputMode(mode);
@@ -176,9 +177,9 @@ export function PictureDescriptionTrainer() {
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
       setIndex(nextIndex);
     }
-    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
+    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
   };
-  const finish = () => { stopSpeech(); setStartedAt(null); setIsFinished(true); };
+  const finish = () => { stopSpeech(); setStartedAt(null); setIsFinished(true); setHasTimedOut(false); };
   const submit = async () => {
     if (checking || !picture || !answer.trim()) return;
     setChecking(true);
@@ -192,7 +193,7 @@ export function PictureDescriptionTrainer() {
     catch (error) { reportError(error, 'Не удалось проверить описание'); }
     finally { setChecking(false); }
   };
-  const restart = () => { stopSpeech(); setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null); };
+  const restart = () => { stopSpeech(); setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null); };
   const next = () => {
     if (!pictures.length || !picture) return;
     let nextIndex = index;
@@ -293,7 +294,8 @@ export function PictureDescriptionTrainer() {
         <button className="picture-mode-button" onClick={() => start('text')}><span className="picture-mode-icon">✍️</span><span className="picture-mode-title">Текстом</span><span className="picture-mode-desc">Вводить описание с клавиатуры</span></button>
         <button className="picture-mode-button" onClick={() => start('voice')}><span className="picture-mode-icon">🎤</span><span className="picture-mode-title">Голосом</span><span className="picture-mode-desc">Диктовать описание с микрофона</span></button>
       </div>}
-      {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
+       {hasTimedOut && !result && <div className="picture-timeout-message" role="alert">Время вышло. Проверьте описание и отправьте ответ.</div>}
+       {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
         {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={inputMode === 'voice' && speechState === 'listening'} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{inputMode === 'voice' && <div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
       <div className="picture-actions">
          {!isRevealed ? null : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>

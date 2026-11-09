@@ -22,6 +22,7 @@
 .picture-categories { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
 .picture-corrected { padding: 12px; color: var(--text-primary); background: var(--bg-tertiary); border-radius: 8px; white-space: pre-wrap; }
 .picture-answer-label { display: block; margin-top: 22px; margin-bottom: 8px; font-size: 15px; font-weight: 650; }
+.picture-timeout-message { margin-top: 18px; padding: 11px 14px; color: var(--warning); background: var(--warning-light); border: 1px solid var(--warning); border-radius: 9px; font-weight: 650; }
 .picture-answer {
   width: 100%;
   min-height: 150px;
