@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, RotateCcw, Send, SkipForward } from 'lucide-react';
-import { checkPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
+import { checkPictureAnswer, formatPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
 import { ApiError } from '../api/request';
 import { reportError } from '../utils/toast';
 import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictation';
@@ -12,7 +12,7 @@ import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictatio
  * same request makes those drops recover without bothering the learner.
  */
 const CHECK_ATTEMPTS = 3;
-const CHECK_RETRY_DELAY_MS = 700;
+const CHECK_RETRY_DELAY_MS = 1200;
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 async function checkPictureAnswerWithRetry(id: string, answer: string): Promise<PictureCheckResult> {
@@ -32,6 +32,20 @@ async function checkPictureAnswerWithRetry(id: string, answer: string): Promise<
   throw lastError;
 }
 
+async function formatPictureAnswerWithRetry(id: string, answer: string): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try { return (await formatPictureAnswer(id, answer)).answer; }
+    catch (error) {
+      lastError = error;
+      const retryable = error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
+      if (!retryable || attempt === 3) break;
+      await new Promise((resolve) => setTimeout(resolve, 900 * attempt));
+    }
+  }
+  throw lastError;
+}
+
 export function PictureDescriptionTrainer() {
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +60,7 @@ export function PictureDescriptionTrainer() {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<PictureCheckResult | null>(null);
   const [checking, setChecking] = useState(false);
+  const [formatting, setFormatting] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
   const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
@@ -179,7 +194,15 @@ export function PictureDescriptionTrainer() {
     }
     setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
   };
-  const finish = () => { stopSpeech(); setStartedAt(null); setIsFinished(true); setHasTimedOut(false); };
+  const finish = () => {
+    stopSpeech(); setStartedAt(null); setIsFinished(true); setHasTimedOut(false);
+    if (inputMode !== 'voice' || !answer.trim()) return;
+    setFormatting(true);
+    void formatPictureAnswerWithRetry(picture?.id ?? '', answer)
+      .then((formatted) => { setAnswer(formatted); answerRef.current = formatted; })
+      .catch((error) => { reportError(error, 'Не удалось расставить знаки препинания. Текст можно исправить вручную.'); })
+      .finally(() => setFormatting(false));
+  };
   const submit = async () => {
     if (checking || !picture || !answer.trim()) return;
     setChecking(true);
@@ -296,12 +319,12 @@ export function PictureDescriptionTrainer() {
       </div>}
        {hasTimedOut && !result && <div className="picture-timeout-message" role="alert">Время вышло. Проверьте описание и отправьте ответ.</div>}
        {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
-        {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={inputMode === 'voice' && speechState === 'listening'} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{inputMode === 'voice' && <div className="picture-dictation-hint">При диктовке говорите «Punkt» (точка) и «Komma» (запятая) — они станут знаками препинания.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
+         {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className="picture-answer" value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={(inputMode === 'voice' && speechState === 'listening') || formatting} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{formatting && <div className="picture-dictation-hint" role="status" aria-live="polite">Gemini расставляет пробелы, запятые и точки…</div>}{inputMode === 'voice' && !formatting && <div className="picture-dictation-hint">После диктовки Gemini расставит только пробелы, запятые и точки. Затем текст можно исправить вручную.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
       <div className="picture-actions">
          {!isRevealed ? null : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
-           <button className="btn-primary" disabled={checking || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
-           <button className="btn-secondary" disabled={checking} onClick={restart}><RotateCcw size={17} /> Начать заново</button>
-           <button className="btn-secondary" disabled={checking} onClick={next}><SkipForward size={17} /> Следующая картинка</button>
+            <button className="btn-primary" disabled={checking || formatting || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
+            <button className="btn-secondary" disabled={checking || formatting} onClick={restart}><RotateCcw size={17} /> Начать заново</button>
+            <button className="btn-secondary" disabled={checking || formatting} onClick={next}><SkipForward size={17} /> Следующая картинка</button>
         </>}
         {startedAt !== null && <button className="btn-secondary" onClick={skip}><SkipForward size={17} /> Пропустить</button>}
       </div>

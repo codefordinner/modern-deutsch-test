@@ -4,6 +4,7 @@ import { checkAISettings, fetchAIModels, fetchAISettings, resetAIPrompt, saveAIS
 import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
+const PICTURE_FORMAT_PROFILE = 'pictureAnswerFormat';
 const CHECK_PROFILE = 'pictureAnswerCheck';
 const WORD_FILL_PROFILE = 'wordFill';
 
@@ -20,6 +21,7 @@ export function AISettingsTab() {
   const [busy, setBusy] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
     [CHECK_PROFILE]: { model: '', prompt: '', severity: 3 },
     [WORD_FILL_PROFILE]: { model: '', prompt: '', severity: 3 },
   });
@@ -32,7 +34,7 @@ export function AISettingsTab() {
       const result = await fetchAISettings();
       setSettings(result);
       const next: Record<string, ProfileEditors> = {};
-      for (const id of [PICTURE_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE]) {
+      for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE]) {
         next[id] = {
           model: result.profiles[id]?.model ?? '',
           prompt: result.profiles[id]?.prompt ?? '',
@@ -118,6 +120,7 @@ export function AISettingsTab() {
       <div className="ai-key-status"><ShieldCheck size={16} /> {settings?.hasApiKey ? 'Ключ сохранён на сервере' : 'Ключ не задан'}</div>
 
       {profileBlock(PICTURE_PROFILE, 'Профиль: описание картинок', 'Промпт для описания картинок', false)}
+      {profileBlock(PICTURE_FORMAT_PROFILE, 'Профиль: обработка голосового ответа', 'Промпт обработки голосового ответа', false)}
       {profileBlock(CHECK_PROFILE, 'Профиль: проверка ответа пользователя', 'Промпт проверки ответа', true)}
       {profileBlock(WORD_FILL_PROFILE, 'Профиль: заполнение слов', 'Промпт заполнения слов', false)}
 

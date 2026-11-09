@@ -14,6 +14,7 @@ export interface AISettingsPublic {
 }
 
 export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
+export const AI_PROFILE_PICTURE_FORMAT = 'pictureAnswerFormat';
 export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
 export const AI_PROFILE_WORD_FILL = 'wordFill';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
@@ -38,6 +39,7 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
+export const DEFAULT_PICTURE_FORMAT_PROMPT = 'Ты обрабатываешь распознанный голосом текст на немецком языке. Верни тот же текст без исправления слов, орфографии, грамматики или порядка слов. Разрешается только расставить пробелы, запятые и точки по смыслу. Не добавляй и не удаляй слова. Верни только готовый текст, без кавычек, пояснений и Markdown.';
 export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Проверяй факты по самому изображению, а не только по эталону (эталон может быть неполным). Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; для каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для нейтральных/хороших сегментов correction опускай); severity: neutral|good|style|error|lie. note на русском: называй правило и/или давай правильный пример (например, «здесь Dativ, верно: dem Mann»), а не общие слова. Одну и ту же ошибку, повторённую несколько раз (например, неверный артикль в каждой фразе), штрафуй один раз и отметь в report, что она повторяется. report на русском, доброжелательно и конкретно: сначала что удалось, затем что исправить с примерами, без общих фраз. correctedText — полный исправленный немецкий текст, если нужны исправления; если в ответе нет знаков препинания (пользователь диктовал голосом), расставь в correctedText запятые и точки по смыслу, не меняя при этом слова и их порядок без необходимости. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. Оценивай по эталону уровня B1: баллы должны отражать полноту, сложность и длину ответа, а не только отсутствие ошибок. Не давай баллы «впустую» — если пользователь написал 2–3 коротких простых предложения без ошибок, это всё равно низкий балл за content и fluency (ответ не раскрывает картинку), поэтому суммарный балл должен быть заметно ниже 60. Если описание настолько общее, что подходит к любой картинке и не называет ни одной конкретной детали, — снизь content и укажи это в report. level — примерный CEFR A1–C1; согласуй level с оценками и сложностью ответа: короткий простой безошибочный текст — не выше A2, развёрнутый ответ с разнообразной лексикой и сложными конструкциями — B1 и выше. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель); подбирай выражения под эту картинку и уровень ученика, которые реально улучшили бы именно этот ответ. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
 export const DEFAULT_WORD_FILL_PROMPT = [
   'Ты наполняешь словарь тренажёра немецкого языка. Ниже — список слов (немецкие, русские или вперемешку).',
@@ -83,6 +85,9 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const pictureProfile = profiles[AI_PROFILE_PICTURE_DESCRIPTION];
   const pictureModel = typeof pictureProfile?.model === 'string' && isGeminiModel(pictureProfile.model) ? pictureProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const picturePrompt = typeof pictureProfile?.prompt === 'string' && pictureProfile.prompt.trim() ? pictureProfile.prompt.trim().slice(0, 10_000) : legacyPrompt;
+  const formatProfile = profiles[AI_PROFILE_PICTURE_FORMAT];
+  const formatModel = typeof formatProfile?.model === 'string' && isGeminiModel(formatProfile.model) ? formatProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
+  const formatPrompt = typeof formatProfile?.prompt === 'string' && formatProfile.prompt.trim() ? formatProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_FORMAT_PROMPT;
   const checkProfile = profiles[AI_PROFILE_PICTURE_CHECK];
   const checkModel = typeof checkProfile?.model === 'string' && isGeminiModel(checkProfile.model) ? checkProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const checkPrompt = typeof checkProfile?.prompt === 'string' && checkProfile.prompt.trim() ? checkProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_CHECK_PROMPT;
@@ -94,6 +99,7 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
       model: pictureModel,
       prompt: picturePrompt,
     },
+    [AI_PROFILE_PICTURE_FORMAT]: { model: formatModel, prompt: formatPrompt },
     [AI_PROFILE_PICTURE_CHECK]: {
       model: checkModel,
       prompt: checkPrompt,
@@ -120,6 +126,7 @@ export async function readAISettings(): Promise<AISettingsPublic> {
     isDefault: !stored,
     profiles: stored?.profiles ?? {
       [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT },
+      [AI_PROFILE_PICTURE_FORMAT]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_FORMAT_PROMPT },
       [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
       [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
     },
@@ -127,13 +134,13 @@ export async function readAISettings(): Promise<AISettingsPublic> {
 }
 
 export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown }): Promise<AISettingsPublic> {
-  if (input.profileId !== AI_PROFILE_PICTURE_DESCRIPTION && input.profileId !== AI_PROFILE_PICTURE_CHECK && input.profileId !== AI_PROFILE_WORD_FILL) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL].includes(input.profileId)) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
   const currentProfile = current?.profiles[input.profileId];
-  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
   const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
   if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
   const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}) };
@@ -143,11 +150,11 @@ export async function writeAISettings(input: { profileId: string; model: unknown
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
-  if (profileId !== AI_PROFILE_PICTURE_DESCRIPTION && profileId !== AI_PROFILE_PICTURE_CHECK && profileId !== AI_PROFILE_WORD_FILL) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL].includes(profileId)) throw new Error('INVALID_PROFILE');
   const current = await readStored();
   if (!current) return readAISettings();
   const currentProfile = current.profiles[profileId];
-  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
   const profile = {
     model: currentProfile?.model ?? '',
     prompt: defaultPrompt,
@@ -243,6 +250,37 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
   return { title: result.title.trim().slice(0, 200), description: result.description.trim().slice(0, 5000) };
 }
 
+export async function formatPictureAnswer(answer: string): Promise<string> {
+  const stored = await readStored();
+  const profile = stored?.profiles[AI_PROFILE_PICTURE_FORMAT];
+  if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
+  if (!profile?.model) throw new Error('MISSING_MODEL');
+  if (!answer.trim()) throw new Error('EMPTY_ANSWER');
+  if (answer.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('ANSWER_TOO_LONG');
+  let response: Response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: `${profile.prompt}\n\nТекст пользователя:\n${answer}` }] }] }),
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
+    throw error;
+  }
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
+  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+  if (typeof text !== 'string' || !text.trim()) throw new Error('INVALID_AI_RESPONSE');
+  const formatted = text.replace(/^```(?:text)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (formatted.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('INVALID_AI_RESPONSE');
+  const sourceWords = answer.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const formattedWords = formatted.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (sourceWords.length !== formattedWords.length || sourceWords.some((word, index) => word !== formattedWords[index])) throw new Error('INVALID_AI_RESPONSE');
+  return formatted;
+}
+
 export async function checkPictureAnswer(input: { imageDataUrl: string; reference: string; answer: string; severity?: number }): Promise<PictureCheckResult> {
   const stored = await readStored();
   const profile = stored?.profiles[AI_PROFILE_PICTURE_CHECK];
@@ -255,7 +293,7 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   const prompt = `${profile.prompt}\n\nДля каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для остальных опускай).\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;
   let response: Response;
   try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] }], generationConfig: { responseMimeType: 'application/json' } }), signal: AbortSignal.timeout(60_000) });
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] }], generationConfig: { responseMimeType: 'application/json' } }), signal: AbortSignal.timeout(120_000) });
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
     throw error;
