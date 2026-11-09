@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AudioCache, SyncProfile (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AudioCache, AudioRegenerationJob, SyncProfile (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -17,8 +17,8 @@
 │     ├─ api.ts              сборка роутера /api (порядок монтирования важен)
 │     ├─ db.ts               PrismaClient
 │     ├─ middleware/         auth (JWT, cookie), csrf (Origin/Referer), normalizeWordBody
-│     ├─ routes/             auth, words, words-admin, categories, pictures, analytics, settings, sync
-│     └─ services/           partOfSpeech, wordImport, hilfsverb, backfillPartOfSpeech, srsSettings, srsSync
+│     ├─ routes/             auth, words, words-admin, categories, pictures, audio, analytics, settings, sync
+│     └─ services/           audio, audioSettings, aiSettings, aiUsage, wordImport, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
 └─ frontend/
    ├─ nginx.conf, Dockerfile статика + прокси /api → app-backend:3001
    ├─ public/                favicon, manifest.webmanifest, sw.js, icons/
@@ -31,17 +31,17 @@
       ├─ hooks/              useDictionary, useSRSProgress, useSrsWeightsSync, useSrsSync, useScores, useHashRoute,
       │                      useUISettings, usePersistentState, useServiceWorkerUpdates, use{Words,Verbs}QuizEngine
       ├─ utils/              чистая логика (см. «Утилиты»)
-      ├─ components/         Navbar, *Trainer, admin/, words/, verbs/, numbers/, time/, articles/, srs/,
+      ├─ components/         Navbar, *Trainer (включая PictureDescriptionTrainer), admin/, words/, verbs/, numbers/, time/, articles/, srs/,
       │                      Modal, ModeSwitch, ToolbarButton, FeedbackBox, StatsPanel, GeneralSettingsModal,
       │                      ToastHost, UpdateBanner, ArticleText, UmlautBar, Scorebar, …
       └─ styles/             components.css, import-export.css, features.css, srs-settings.css, layout.css, mobile.css (последним)
 ```
 
 ## Модель данных
-- **Category** `{id, name, icon, color, isBuiltin}` — 1:N **Word** (каскадное удаление).
-- **Word** `{de, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesens{Ich,Du,ErSieEs,Wir,Ihr,Sie}, categoryId}`.
+- **Category** `{id, name, normalizedName, icon, color, isBuiltin}` — основная связь 1:N с **Word** (`categoryId`) и дополнительная связь M:N через `extraCategories` (каскадное удаление основной категории).
+- **Word** `{de, normalizedDe, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, categoryId}`. Формы Präsens хранятся отдельными полями, а не вложенным объектом.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
-- **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, ipAddress, userAgent, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
+- **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, visitorId, ipAddress, userAgent, browser, os, device, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). Ключ ИИ никогда не возвращается клиенту.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
@@ -141,6 +141,8 @@
 | `onboarding_seen` | приветственный экран уже показан | да |
 | `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
 | `admin_last_word_category_id` | последняя категория в форме слова | нет |
+
+`picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом и намеренно не включается в экспорт. `picture_next` хранится в `sessionStorage` только на время перехода к следующей картинке.
 
 Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Внимание: ключ синхронизации входит в бэкап (внутри `app_ui_settings`) — файл прогресса нужно хранить как пароль.
 
