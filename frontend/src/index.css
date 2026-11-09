@@ -160,18 +160,15 @@ body {
   flex-shrink: 0;
 }
 
-.brand-flag {
-  width: 28px;
-  height: 20px;
-  border-radius: 4px;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  display: block;
+  flex: 0 0 32px;
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(134, 59, 255, 0.2);
 }
-.flag-stripe-black { background: #000000; height: 33.33%; }
-.flag-stripe-red { background: #dd0000; height: 33.33%; }
-.flag-stripe-gold { background: #ffce00; height: 33.34%; }
 
 .brand-title {
   font-size: 18px;

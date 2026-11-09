@@ -71,7 +71,7 @@
 }
 
 @media (min-width: 641px) and (max-width: 820px) {
-  /* Only the flag stays visible; the title is still there for screen readers. */
+  /* Only the mark stays visible; the title is still there for screen readers. */
   .app-header .brand-text {
     position: absolute;
     width: 1px;
