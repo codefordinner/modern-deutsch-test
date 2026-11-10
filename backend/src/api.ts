@@ -10,6 +10,7 @@ import { requireSameOrigin } from './middleware/csrf.middleware';
 import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
 import audioRoutes from './routes/audio.routes';
 import picturesRoutes from './routes/pictures.routes';
+import internalRoutes from './routes/internal.routes';
 
 const router = Router();
 
@@ -28,6 +29,8 @@ router.use('/settings', settingsRoutes);
 router.use('/audio', audioRoutes);
 router.use('/pictures', picturesRoutes);
 router.use('/sync', syncRoutes);
+// Token-authenticated local automation endpoints; mounted separately from browser admin auth.
+router.use('/internal', internalRoutes);
 
 export const apiRouter = router;
 export default router;

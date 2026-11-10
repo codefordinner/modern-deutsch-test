@@ -59,6 +59,7 @@
 | `ALLOWED_ORIGINS` | доп. Origin для CSRF, через запятую | пусто |
 | `TRUST_PROXY` | число прокси перед приложением | `backend/`: 1; `server.ts`: 0 |
 | `STATS_TIMEZONE` | часовой пояс «дня» в статистике | часовой пояс сервера |
+| `HERMES_WORD_IMPORT_TOKEN` | Bearer-токен локального endpoint `/api/internal/word-import` | не задан (endpoint выключен) |
 | `PORT` | порт отдельного backend | 3001 (`server.ts` — всегда 3000) |
 | `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
  | `PIPER_VOICE` | голос Piper по умолчанию | `de_DE-thorsten-medium` |
