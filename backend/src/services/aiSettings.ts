@@ -365,18 +365,24 @@ export async function generateWordFill(input: { words: string; categories: strin
 
   const prompt = `${profile.prompt}\n\nДоступные категории: ${categoryLine}.${input.defaultCategory ? ` Если в слове не указана категория — используй «${input.defaultCategory}».` : ''}\n\nСписок слов:\n${text}`;
 
-  let response: Response;
+  let response: Response | undefined;
   try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      signal: AbortSignal.timeout(240_000),
-    });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        signal: AbortSignal.timeout(240_000),
+      });
+      const transient = response.status === 429 || response.status >= 500;
+      if (!transient || attempt === 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+    }
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
     throw error;
   }
+  if (!response) throw new Error('GEMINI_UNAVAILABLE');
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE');
 
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
