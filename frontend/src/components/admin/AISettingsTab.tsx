@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Bot, CheckCircle, RotateCcw, Save, ShieldCheck } from 'lucide-react';
-import { checkAISettings, fetchAIModels, fetchAISettings, resetAIPrompt, saveAISettings, type AIModel, type AISettingsResponse } from '../../api/settings';
+import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
 const PICTURE_FORMAT_PROFILE = 'pictureAnswerFormat';
 const CHECK_PROFILE = 'pictureAnswerCheck';
 const WORD_FILL_PROFILE = 'wordFill';
+const AI_OPERATION_LABELS: Record<string, string> = {
+  models: 'Список моделей',
+  'settings-check': 'Проверка настроек',
+  'picture-description': 'Описание картинки',
+  'picture-format': 'Форматирование диктовки',
+  'picture-check': 'Проверка ответа',
+  'word-fill': 'Заполнение слов',
+  'prompt-test': 'Тест промпта',
+};
 
 interface ProfileEditors {
   model: string;
@@ -19,6 +28,8 @@ export function AISettingsTab() {
   const [models, setModels] = useState<AIModel[]>([]);
   const [apiKey, setApiKey] = useState('');
   const [busy, setBusy] = useState(false);
+  const [logs, setLogs] = useState<AIErrorLog[]>([]);
+  const [logsBusy, setLogsBusy] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
@@ -46,6 +57,14 @@ export function AISettingsTab() {
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { void load(); }, []);
+
+  const loadLogs = async () => {
+    setLogsBusy(true);
+    try { setLogs((await fetchAIErrorLogs(100)).logs); }
+    catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
+    finally { setLogsBusy(false); }
+  };
+  useEffect(() => { void loadLogs(); }, []);
 
   const save = async () => {
     setBusy(true);
@@ -91,6 +110,14 @@ export function AISettingsTab() {
     finally { setBusy(false); }
   };
 
+  const clearLogs = async () => {
+    if (!confirm('Очистить журнал ошибок ИИ?')) return;
+    setLogsBusy(true);
+    try { await clearAIErrorLogs(); setLogs([]); showToast('Журнал ошибок ИИ очищен', 'success'); }
+    catch (error) { reportError(error, 'Не удалось очистить журнал ошибок ИИ'); }
+    finally { setLogsBusy(false); }
+  };
+
   const profileBlock = (id: string, title: string, label: string, showSeverity: boolean) => (
     <div className="ai-profile-block">
       <h4 className="ai-profile-title">{title}</h4>
@@ -128,6 +155,29 @@ export function AISettingsTab() {
         <button type="button" className="btn-primary" disabled={busy || (!apiKey && !settings?.hasApiKey)} onClick={() => void save()}><Save size={15} /> Сохранить</button>
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button>
       </div>
+
+      <section className="ai-error-log" aria-labelledby="ai-error-log-title">
+        <div className="stats-header">
+          <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
+          <div className="backup-actions">
+            <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
+            <button type="button" className="btn-secondary" disabled={logsBusy || !logs.length} onClick={() => void clearLogs()}><Trash2 size={14} /> Очистить</button>
+          </div>
+        </div>
+        <p className="card-note">Сохраняются только технические данные: операция, модель, код и статус ошибки. Тексты ответов, изображения и API-ключи не записываются.</p>
+        {logs.length === 0 ? <div className="muted-note">Ошибок ИИ пока нет.</div> : <div className="ai-error-log-list">
+          {logs.map((log) => <details key={log.id} className="ai-error-log-item">
+            <summary><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong> · {log.errorCode} · {new Date(log.createdAt).toLocaleString('ru-RU')}</summary>
+            <div className="ai-error-log-details">
+              <div>Профиль: {log.profileId ?? '—'}</div>
+              <div>Модель: {log.model ?? '—'}</div>
+              <div>HTTP Gemini: {log.providerStatus ?? '—'}</div>
+              <div>Длительность: {log.durationMs === null ? '—' : `${log.durationMs} мс`}</div>
+              <div>Сообщение: {log.message}</div>
+            </div>
+          </details>)}
+        </div>}
+      </section>
     </div>
   </div>;
 }

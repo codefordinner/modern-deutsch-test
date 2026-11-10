@@ -4,6 +4,7 @@ import { isAdminRequest, requireAdmin } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
 import { checkPictureAnswer, formatPictureAnswer, generatePictureMetadata, MAX_PICTURE_ANSWER_LENGTH } from '../services/aiSettings';
 import { registerAiUsage } from '../services/aiUsage';
+import { recordAIError } from '../services/aiErrorLog';
 
 const router = Router();
 const IMAGE_PATTERN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
@@ -97,6 +98,7 @@ router.post('/:id/ai-description', requireAdmin, async (req: Request, res: Respo
     const updated = await prisma.picture.update({ where: { id: picture.id }, data: metadata, select: META_SELECT });
     return res.json(serializePicture(updated, true));
   } catch (error) {
+    await recordAIError({ operation: 'picture-description', profileId: 'pictureDescription', error }).catch(() => undefined);
     const messages: Record<string, [number, string]> = {
       MISSING_API_KEY: [400, 'Сначала настройте API-ключ Gemini'],
       MISSING_MODEL: [400, 'Сначала выберите модель Gemini'],
@@ -122,6 +124,7 @@ router.post('/:id/format-answer', pictureFormatLimiter, async (req: Request, res
     if (!usage.allowed) return res.status(429).json({ error: 'Дневной лимит проверок ИИ исчерпан. Попробуйте завтра.' });
     return res.json({ answer: await formatPictureAnswer(req.body.answer) });
   } catch (error) {
+    await recordAIError({ operation: 'picture-format', profileId: 'pictureAnswerFormat', error }).catch(() => undefined);
     const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Обработка диктовки пока не настроена'], MISSING_MODEL: [503, 'Для обработки диктовки не выбрана модель Gemini'], INVALID_API_KEY: [503, 'Ключ Gemini недействителен'], EMPTY_ANSWER: [400, 'Введите описание перед обработкой'], ANSWER_TOO_LONG: [400, 'Описание не должно быть длиннее 10 000 символов'], AI_TIMEOUT: [504, 'ИИ не ответил вовремя. Попробуйте ещё раз.'], INVALID_AI_RESPONSE: [502, 'Gemini вернул некорректный ответ'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
     const result = error instanceof Error ? messages[error.message] : undefined;
     return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось обработать диктовку' });
@@ -144,6 +147,7 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
     const result = await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer: req.body?.answer, severity });
     return res.json(result);
   } catch (error) {
+    await recordAIError({ operation: 'picture-check', profileId: 'pictureAnswerCheck', error }).catch(() => undefined);
     const messages: Record<string, [number, string]> = { MISSING_API_KEY: [503, 'Проверка ИИ пока не настроена'], MISSING_MODEL: [503, 'Для проверки не выбрана модель Gemini'], EMPTY_ANSWER: [400, 'Введите описание перед отправкой'], ANSWER_TOO_LONG: [400, 'Описание не должно быть длиннее 10 000 символов'], AI_TIMEOUT: [504, 'ИИ не ответил вовремя. Попробуйте ещё раз.'], INVALID_AI_RESPONSE: [502, 'ИИ вернул некорректный результат проверки'], GEMINI_UNAVAILABLE: [502, 'Gemini временно недоступен'] };
     const result = error instanceof Error ? messages[error.message] : undefined;
     return res.status(result?.[0] ?? 500).json({ error: result?.[1] ?? 'Не удалось проверить описание' });
@@ -161,7 +165,9 @@ router.post('/prompt-test', requireAdmin, async (req: Request, res: Response) =>
     const picture = await prisma.picture.findUnique({ where: { id: pictureId } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
     return res.json(await checkPictureAnswer({ imageDataUrl: picture.dataUrl, reference: picture.description || '', answer, severity }));
-  } catch { return res.status(502).json({ error: 'Не удалось протестировать промпт' }); }
+  } catch (error) {
+    await recordAIError({ operation: 'prompt-test', profileId: 'pictureAnswerCheck', error }).catch(() => undefined);
+    return res.status(502).json({ error: 'Не удалось протестировать промпт' }); }
 });
 
 router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {

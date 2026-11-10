@@ -24,6 +24,19 @@ export const fetchAIModels = () => request<{ models: AIModel[] }>('/settings/ai/
 export const saveAISettings = (profileId: string, model: string, apiKey: string | undefined, prompt: string, severity?: number) => request<AISettingsResponse>('/settings/ai', { method: 'PUT', body: { profileId, model, prompt, ...(severity === undefined ? {} : { severity }), ...(apiKey ? { apiKey } : {}) }, auth: true });
 export const checkAISettings = () => request<AICheckResponse & { models: AIModel[] }>('/settings/ai/check', { method: 'POST', auth: true });
 export const resetAIPrompt = (profileId: string) => request<AISettingsResponse>(`/settings/ai/profile/${encodeURIComponent(profileId)}`, { method: 'DELETE', auth: true });
-export const saveAIProfile = (profileId: string, model: string, prompt: string) => saveAISettings(profileId, model, undefined, prompt);
+export interface AIErrorLog {
+  id: string;
+  operation: string;
+  profileId: string | null;
+  model: string | null;
+  errorCode: string;
+  providerStatus: number | null;
+  message: string;
+  durationMs: number | null;
+  createdAt: string;
+}
+export const fetchAIErrorLogs = (limit = 100) => request<{ logs: AIErrorLog[] }>(`/settings/ai/logs?limit=${limit}`, { auth: true });
+export const clearAIErrorLogs = () => request<{ ok: boolean }>('/settings/ai/logs', { method: 'DELETE', auth: true });
+
 export interface WordFillResult { json: string; count: number }
 export const fillWordsViaAI = (words: string, categories: string[], defaultCategory?: string) => request<WordFillResult>('/settings/ai/word-fill', { method: 'POST', body: { words, categories, defaultCategory }, auth: true });

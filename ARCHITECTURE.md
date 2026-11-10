@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AudioCache, AudioRegenerationJob, SyncProfile (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AudioCache, AudioRegenerationJob, SyncProfile (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -42,7 +42,8 @@
 - **Word** `{de, normalizedDe, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, categoryId}`. Формы Präsens хранятся отдельными полями, а не вложенным объектом.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, visitorId, ipAddress, userAgent, browser, os, device, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
-- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). Ключ ИИ никогда не возвращается клиенту.
+- **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). AI-ключ никогда не возвращается клиенту.
+- **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, durationMs, createdAt}` — безопасный журнал ошибок AI-операций для админки; промпты, ответы, изображения и API-ключи не сохраняются.
 - **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
@@ -74,7 +75,7 @@
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
-- **settings**: `GET/PUT/DELETE /settings/audio-settings` управляют озвучкой; `/settings/ai` управляет конфигурацией Gemini и профилями промптов, `/settings/ai/models` получает актуальный каталог моделей Gemini, а `/settings/ai/check` проверяет ключ через этот каталог. AI-операции централизованы в `services/aiSettings.ts`; каждый профиль может использовать свою модель.
+- **settings**: `GET/PUT/DELETE /settings/audio-settings` управляют озвучкой; `/settings/ai` управляет конфигурацией Gemini и профилями промптов, `/settings/ai/models` получает актуальный каталог моделей Gemini, `/settings/ai/check` проверяет ключ через этот каталог, а `/settings/ai/logs` читает и очищает безопасный журнал ошибок AI. AI-операции централизованы в `services/aiSettings.ts`; каждый профиль может использовать свою модель.
 - Профили ИИ: `pictureDescription` генерирует эталонные данные картинки; `pictureAnswerFormat` обрабатывает только голосовой ответ ученика, сохраняя слова и меняя лишь пробелы, запятые и точки; `pictureAnswerCheck` проверяет ответ ученика и использует отдельную модель, промпт и параметр жёсткости проверки; `wordFill` превращает сырой список слов в структурированный JSON словаря (`POST /settings/ai/word-fill`, отдельная модель и промпт, до 1000 слов/50k символов).
 - **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
 - **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.

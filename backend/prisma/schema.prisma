@@ -81,6 +81,22 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+/// Safe diagnostic records for failed AI operations. Prompts, answers, images and API keys are never stored.
+model AiErrorLog {
+  id             String   @id @default(cuid())
+  operation      String
+  profileId      String?
+  model          String?
+  errorCode      String
+  providerStatus Int?
+  message        String
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([operation, createdAt])
+}
+
 /// Generated speech audio. The same table supports individual words today and
 /// complete sentences later; `cacheKey` includes the text and TTS settings.
 model AudioCache {

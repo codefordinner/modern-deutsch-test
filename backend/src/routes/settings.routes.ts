@@ -18,6 +18,7 @@ import {
   writeAudioVoice,
 } from '../services/audioSettings';
 import { checkAISettings, fetchGeminiModels, generateWordFill, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
+import { clearAIErrorLogs, readAIErrorLogs, recordAIError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
@@ -38,6 +39,7 @@ router.get('/ai', requireAdmin, async (_req, res) => {
 router.get('/ai/models', requireAdmin, async (_req, res) => {
   try { res.setHeader('Cache-Control', 'no-store'); res.json({ models: await fetchGeminiModels() }); }
   catch (error) {
+    await recordAIError({ operation: 'models', error }).catch(() => undefined);
     if (error instanceof Error && error.message === 'MISSING_API_KEY') return res.status(400).json({ error: 'Сначала сохраните ключ Gemini' });
     if (error instanceof Error && error.message === 'INVALID_API_KEY') return res.status(400).json({ error: 'Ключ Gemini недействителен или не имеет доступа' });
     return res.status(502).json({ error: 'Не удалось получить список моделей Gemini' });
@@ -68,6 +70,24 @@ router.delete('/ai/profile/:profileId', requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/ai/logs', requireAdmin, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ logs: await readAIErrorLogs(Number(req.query.limit) || 100) });
+  } catch {
+    res.status(500).json({ error: 'Не удалось загрузить журнал ошибок ИИ' });
+  }
+});
+
+router.delete('/ai/logs', requireAdmin, async (_req, res) => {
+  try {
+    await clearAIErrorLogs();
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Не удалось очистить журнал ошибок ИИ' });
+  }
+});
+
 router.post('/ai/word-fill', requireAdmin, wordFillLimiter, async (req, res) => {
   try {
     const words = req.body?.words;
@@ -77,6 +97,7 @@ router.post('/ai/word-fill', requireAdmin, wordFillLimiter, async (req, res) => 
     const result = await generateWordFill({ words, categories, defaultCategory });
     res.json(result);
   } catch (error) {
+    await recordAIError({ operation: 'word-fill', profileId: 'wordFill', error }).catch(() => undefined);
     const messages: Record<string, [number, string]> = {
       MISSING_API_KEY: [503, 'ИИ пока не настроен: сохраните ключ Gemini и выберите модель'],
       MISSING_MODEL: [503, 'Для заполнения слов не выбрана модель Gemini'],
