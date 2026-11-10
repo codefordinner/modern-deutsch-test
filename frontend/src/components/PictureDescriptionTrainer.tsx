@@ -125,13 +125,18 @@ export function PictureDescriptionTrainer() {
     audioContextRef.current = null;
     waveBarRefs.current.forEach((bar) => { bar.style.height = '4px'; });
   }, []);
-  const startAudioVisualizer = async () => {
+  const startAudioVisualizer = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) return;
+    let stream: MediaStream | null = null;
+    let context: AudioContext | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextConstructor) { stream.getTracks().forEach((track) => track.stop()); return; }
-      const context = new AudioContextConstructor();
+      if (!AudioContextConstructor) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      context = new AudioContextConstructor();
       microphoneStreamRef.current = stream;
       voiceActiveRef.current = true;
       const analyser = context.createAnalyser();
@@ -153,9 +158,11 @@ export function PictureDescriptionTrainer() {
       };
       animate();
     } catch {
+      stream?.getTracks().forEach((track) => track.stop());
+      if (context) void context.close().catch(() => undefined);
       // Speech recognition can still work when microphone visualisation is unavailable.
     }
-  };
+  }, []);
   useEffect(() => () => { recognitionRef.current?.stop(); stopAudioVisualizer(); }, [stopAudioVisualizer]);
   const stopSpeech = useCallback(() => {
     speechSessionRef.current += 1;
@@ -169,22 +176,6 @@ export function PictureDescriptionTrainer() {
     setStartedAt(null); setIsFinished(true); setHasTimedOut(true);
   }, [elapsed, isExamMode, startedAt, stopSpeech]);
   const resetDescription = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
-  const start = (mode: 'text' | 'voice') => {
-    setIsRevealed(true);
-    setInputMode(mode);
-    resetDescription();
-    if (mode === 'voice') {
-      void startAudioVisualizer();
-      const Recognition = getSpeechRecognition();
-      if (Recognition) void startSpeech(Recognition);
-      else reportError(new Error('Распознавание речи не поддерживается'), 'Голосовой ввод недоступен в Firefox. Микрофон работает, но Firefox не поддерживает встроенное распознавание речи. Используйте Chrome/Edge или введите текст вручную.');
-    }
-  };
-  useEffect(() => {
-    if (!resumeMode || loading) return;
-    start(resumeMode);
-    setResumeMode(null);
-  }, [loading, resumeMode, start]);
   const skip = () => {
     stopSpeech();
     if (pictures.length > 1) {
@@ -228,7 +219,7 @@ export function PictureDescriptionTrainer() {
     } catch { /* storage unavailable */ }
     window.location.reload();
   };
-  const startSpeech = async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
+  const startSpeech = useCallback(async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
     const session = ++speechSessionRef.current;
     const previousRecognition = recognitionRef.current;
     if (previousRecognition) {
@@ -278,6 +269,8 @@ export function PictureDescriptionTrainer() {
       } else if (event.error === 'audio-capture' || event.error === 'no-speech') {
         reportError(new Error(event.error), event.error === 'audio-capture' ? 'Не удалось включить микрофон.' : 'Речь не распознана. Попробуйте ещё раз.');
       }
+      stopAudioVisualizer();
+      setSpeechState('idle');
     };
     recognition.onend = () => {
       resolveEnded();
@@ -296,8 +289,27 @@ export function PictureDescriptionTrainer() {
       setSpeechState('idle');
       reportError(error, 'Не удалось запустить диктовку. Проверьте доступ к микрофону.');
     }
-  };
+  }, [stopAudioVisualizer]);
+  const start = useCallback((mode: 'text' | 'voice') => {
+    setIsRevealed(true);
+    setInputMode(mode);
+    resetDescription();
+    if (mode !== 'voice') return;
+    const Recognition = getSpeechRecognition();
+    if (!Recognition) {
+      reportError(new Error('Распознавание речи не поддерживается'), 'Голосовой ввод недоступен в Firefox. Микрофон работает, но Firefox не поддерживает встроенное распознавание речи. Используйте Chrome/Edge или введите текст вручную.');
+      return;
+    }
+    void startAudioVisualizer();
+    void startSpeech(Recognition);
+  }, [startAudioVisualizer, startSpeech]);
+  useEffect(() => {
+    if (!resumeMode || loading) return;
+    start(resumeMode);
+    setResumeMode(null);
+  }, [loading, resumeMode, start]);
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+  const answerReadOnly = inputMode === 'voice' && (speechState === 'listening' || formatting);
 
   if (loading) return <div className="centered-message">Загрузка картинок…</div>;
   if (loadError) return <div className="centered-message">Не удалось загрузить картинки. Обновите страницу и попробуйте ещё раз.</div>;
@@ -319,7 +331,7 @@ export function PictureDescriptionTrainer() {
       </div>}
        {hasTimedOut && !result && <div className="picture-timeout-message" role="alert">Время вышло. Проверьте описание и отправьте ответ.</div>}
        {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}
-          {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className={`picture-answer ${formatting ? 'is-processing' : ''}`} value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={inputMode === 'voice' && (speechState === 'listening' || formatting)} aria-busy={formatting} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{formatting && <div className="picture-dictation-hint" role="status" aria-live="polite">Подождите немного — расставляем пробелы, запятые и точки…</div>}{inputMode === 'voice' && !formatting && <div className="picture-dictation-hint">После диктовки будут расставлены пробелы, запятые и точки. Затем текст можно исправить вручную.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
+          {(startedAt !== null || (isFinished && !result)) && <><textarea id="picture-answer" className={`picture-answer ${formatting ? 'is-processing' : ''}`} value={answer} maxLength={10000} onChange={(event) => setAnswer(event.target.value)} placeholder="Введите описание картинки на немецком…" rows={7} readOnly={answerReadOnly} aria-busy={formatting} /><div className="picture-answer-meta"><span>Максимум 10 000 символов</span><span>{answer.length} / 10 000</span></div>{formatting && <div className="picture-dictation-hint" role="status" aria-live="polite">Подождите немного — расставляем пробелы, запятые и точки…</div>}{inputMode === 'voice' && !formatting && <div className="picture-dictation-hint">После диктовки будут расставлены пробелы, запятые и точки. Затем текст можно исправить вручную.</div>}{inputMode === 'voice' && speechState === 'listening' && <div className="picture-listening-indicator" role="status" aria-live="polite"><span className="picture-listening-dot" aria-hidden="true" /><span>Слушаю вас</span><span className="picture-speech-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, bar) => <i key={bar} ref={(el) => { if (el) waveBarRefs.current[bar] = el; }} />)}</span></div>}</>}
       <div className="picture-actions">
          {!isRevealed ? null : startedAt !== null ? <button className="btn-primary" onClick={finish}><Check size={17} /> Завершить</button> : <>
             <button className="btn-primary" disabled={checking || formatting || !answer.trim()} onClick={() => void submit()}><Send size={17} /> {checking ? 'Проверка…' : 'Отправить ответ'}</button>
