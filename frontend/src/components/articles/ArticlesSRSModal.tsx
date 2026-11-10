@@ -1,8 +1,7 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Modal } from '../Modal';
 import { SRSBoxStats } from '../srs/SRSBoxStats';
 import { SRSDueControls, SRSPoolProgress, SRSResetButton, SRSToggle } from '../srs/SRSControls';
-import { articleSrsKey } from '../../utils/articles';
 import type { Word, SRSRecord } from '../../types';
 
 interface ArticlesSRSModalProps {
@@ -19,7 +18,6 @@ interface ArticlesSRSModalProps {
 }
 
 export const ArticlesSRSModal: React.FC<ArticlesSRSModalProps> = ({
-  nouns,
   srsState,
   useSRS,
   poolKeys,
@@ -28,8 +26,7 @@ export const ArticlesSRSModal: React.FC<ArticlesSRSModalProps> = ({
   onResetSRS,
   onToggleUseSRS,
 }) => {
-  // One card per noun: "which article does it take?"
-  const keys = useMemo(() => nouns.map((w) => articleSrsKey(w.id)), [nouns]);
+  // One card per noun; the current pool already reflects the selected categories.
 
   return (
     <Modal title="SRS Лейтнера для артиклей" size="md" onClose={onClose}>
@@ -48,9 +45,9 @@ export const ArticlesSRSModal: React.FC<ArticlesSRSModalProps> = ({
 
         <SRSPoolProgress keys={poolKeys} srsState={srsState} scope={scope} />
 
-        <SRSDueControls keys={keys} srsState={srsState} useSRS={useSRS} />
+        <SRSDueControls keys={poolKeys} srsState={srsState} useSRS={useSRS} />
 
-        <SRSBoxStats keys={keys} srsState={srsState} />
+        <SRSBoxStats keys={poolKeys} srsState={srsState} />
 
         <SRSResetButton confirmText="Сбросить прогресс SRS по артиклям?" onReset={onResetSRS} />
       </div>

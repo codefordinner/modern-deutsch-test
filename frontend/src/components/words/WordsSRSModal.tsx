@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Modal } from '../Modal';
 import { SRSBoxStats } from '../srs/SRSBoxStats';
 import { SRSDueControls, SRSPoolProgress, SRSResetButton, SRSToggle } from '../srs/SRSControls';
-import { srsKeys } from '../../utils/srs';
-import type { Word, SRSRecord, WordDirection, WordFormType } from '../../types';
+import type { Word, SRSRecord } from '../../types';
 
 interface WordsSRSModalProps {
   words: Word[];
@@ -18,10 +17,7 @@ interface WordsSRSModalProps {
   onToggleUseSRS: (val: boolean) => void;
 }
 
-const DIRECTIONS: WordDirection[] = ['ru_to_de', 'de_to_ru'];
-
 export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
-  words,
   srsState,
   useSRS,
   poolKeys,
@@ -30,19 +26,6 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
   onResetSRS,
   onToggleUseSRS,
 }) => {
-  // Each direction (ru→de / de→ru) and each applicable form (base/plural/
-  // feminine) has its own box per word, so we count every such card.
-  const keys = useMemo(
-    () =>
-      words.flatMap((w) => {
-        const forms: WordFormType[] = ['base'];
-        if (w.plural) forms.push('plural');
-        if (w.feminine) forms.push('feminine');
-        return DIRECTIONS.flatMap((direction) => forms.map((formType) => srsKeys.word(w.id, direction, formType)));
-      }),
-    [words]
-  );
-
   return (
     <Modal title="Интервальное повторение (SRS Лейтнера)" size="md" onClose={onClose}>
       <div className="modal-body">
@@ -61,9 +44,9 @@ export const WordsSRSModal: React.FC<WordsSRSModalProps> = ({
 
         <SRSPoolProgress keys={poolKeys} srsState={srsState} scope={scope} />
 
-        <SRSDueControls keys={keys} srsState={srsState} useSRS={useSRS} />
+        <SRSDueControls keys={poolKeys} srsState={srsState} useSRS={useSRS} />
 
-        <SRSBoxStats keys={keys} srsState={srsState} />
+        <SRSBoxStats keys={poolKeys} srsState={srsState} />
 
         <SRSResetButton confirmText="Сбросить весь прогресс Лейтнера?" onReset={onResetSRS} />
       </div>
