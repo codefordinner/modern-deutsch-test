@@ -39,6 +39,8 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .picture-answer:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-light); background: var(--bg-primary); }
+.picture-answer:disabled { cursor: wait; opacity: .72; }
+.picture-answer.is-processing { border-color: var(--accent-primary); }
 .picture-answer::placeholder { color: var(--text-muted); opacity: 1; }
 .picture-answer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; color: var(--text-muted); font-size: 12px; }
 .picture-dictation-hint { margin-top: 8px; color: var(--text-secondary); font-size: 13px; }
