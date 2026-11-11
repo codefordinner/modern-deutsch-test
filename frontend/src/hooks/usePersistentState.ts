@@ -31,6 +31,19 @@ export function usePersistentState<T>(
     }
   }, [key, value]);
 
+  useEffect(() => {
+    const onSynced = () => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw !== null) setValue(sanitize(JSON.parse(raw)));
+      } catch {
+        // ignore unavailable or malformed storage
+      }
+    };
+    window.addEventListener('app-storage-updated', onSynced);
+    return () => window.removeEventListener('app-storage-updated', onSynced);
+  }, [key, sanitize]);
+
   return [value, setValue];
 }
 

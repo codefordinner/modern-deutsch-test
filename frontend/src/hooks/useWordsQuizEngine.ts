@@ -11,6 +11,7 @@ import { buildWordCards } from '../utils/wordCards';
 import { buildHint } from '../utils/wordHint';
 import type { DirectionMode } from '../utils/wordCards';
 import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
+import { markSyncSettingsChanged } from '../utils/srsSync';
 
 export type { DirectionMode } from '../utils/wordCards';
 
@@ -79,7 +80,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
 
   const patch = useCallback((p: Partial<WordsSettings>) => setSettings((prev) => ({ ...prev, ...p })), [setSettings]);
   const setDirectionMode = useCallback((v: DirectionMode) => patch({ directionMode: v }), [patch]);
-  const setSelectedCats = useCallback((v: string[]) => patch({ selectedCats: v }), [patch]);
+  const setSelectedCats = useCallback((v: string[]) => { patch({ selectedCats: v }); markSyncSettingsChanged(); }, [patch]);
   const setRequireArticle = useCallback((v: boolean) => patch({ requireArticle: v }), [patch]);
   const setEnableBase = useCallback((v: boolean) => patch({ enableBase: v }), [patch]);
   const setEnablePlural = useCallback((v: boolean) => patch({ enablePlural: v }), [patch]);

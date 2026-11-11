@@ -65,6 +65,17 @@ export function setStudyPrefs(partial: Partial<StudyPrefs>): void {
   notify();
 }
 
+/** Applies settings received from another device without touching the daily counter. */
+export function applySyncedDailyGoal(dailyGoal: number): void {
+  prefs = { ...prefs, dailyGoal: sanitizeGoal(dailyGoal) };
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Non-blocking
+  }
+  notify();
+}
+
 export function useStudyPrefs(): [StudyPrefs, typeof setStudyPrefs] {
   const current = useSyncExternalStore(subscribe, getStudyPrefs, getStudyPrefs);
   return [current, setStudyPrefs];

@@ -5,7 +5,7 @@ import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
 import { applyBackup, downloadBackup, parseBackup } from '../utils/progressBackup';
 import { useSyncStatus } from '../hooks/useSrsSync';
-import { syncNow } from '../utils/srsSync';
+import { markSyncSettingsChanged, syncNow } from '../utils/srsSync';
 import { MAX_SYNC_KEY_LENGTH, MIN_SYNC_KEY_LENGTH, readSyncKey } from '../utils/srsSyncData';
 
 interface GeneralSettingsModalProps {
@@ -60,7 +60,7 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
             min={0}
             max={MAX_DAILY_GOAL}
             value={prefs.dailyGoal}
-            onChange={(e) => setPrefs({ dailyGoal: Number(e.target.value) })}
+            onChange={(e) => { setPrefs({ dailyGoal: Number(e.target.value) }); markSyncSettingsChanged(); }}
           />
           <span className="setting-toggle-desc">Считаются ответы во всех тренажёрах. 0 — без цели.</span>
         </div>

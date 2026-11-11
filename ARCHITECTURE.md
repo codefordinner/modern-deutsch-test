@@ -44,7 +44,7 @@
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, visitorId, ipAddress, userAgent, browser, os, device, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). AI-ключ никогда не возвращается клиенту.
 - **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, durationMs, createdAt}` — безопасный журнал ошибок AI-операций для админки; промпты, ответы, изображения и API-ключи не сохраняются.
-- **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
+- **SyncProfile** `{keyHash, data (JSON), createdAt, updatedAt}` — снимок SRS-прогресса и выбранных настроек обучения для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
 - Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
@@ -119,7 +119,7 @@
 - Верный ответ: +1 ящик, не чаще раза в день (`promotedOn`); ошибка → ящик 1. `nextReview` = сейчас + `[0,1,3,7,14,30]` дней[ящик]. При выборе карточки `nextReview` учитывается только в режиме «только к повторению».
 - **Режим «только к повторению»** (`studyPrefs.dueOnly`): `isDue` — новая карточка, ящик 1 (после ошибки) или `nextReview` наступил. Фильтр в `useSRSProgress.pickCard`; если пусто — `SRSIdleCard`.
 - **Цель на день** (`studyPrefs.dailyGoal`): счётчик ответов за локальные сутки, инкремент в `useScores.recordAnswer`; чип в Navbar и полоса в «Статистике».
-- **Синхронизация между устройствами** (`hooks/useSrsSync.ts`, `utils/srsSync.ts`): задаётся в «Настройки» → «Ключ синхронизации» (хранится в `app_ui_settings.syncKey`). Пустой ключ — ничего не отправляется. Обмен: при старте, смене ключа, возврате на вкладку и появлении сети; после ответов — с задержкой 2,5 с (`scheduleSync`). Сброс прогресса передаётся отметкой `app_srs_reset_at`. Чужой прогресс приходит через событие `srs-synced`.
+- **Синхронизация между устройствами** (`hooks/useSrsSync.ts`, `utils/srsSync.ts`): кроме SRS синхронизируются цель на день и выбранные категории слов/артиклей. Настройки побеждают по времени последнего изменения; счётчик ответов за текущие локальные сутки не синхронизируется. Пустой ключ — ничего не отправляется.
 
 ### Проверка ответов
 `answerMatch.ts`: регистр, пробелы, Unicode-форма, `ae/oe/ue/ss` (настройка), `е/ё`. Числа: `parseTypedInteger`, `germanNumberVariants` (+`hundert`/`tausend`). Подсветка ошибок — LCS в `answerDiff.ts`.
@@ -140,6 +140,7 @@
 | `verbs_mode` | режим тренажёра глаголов | да |
 | `articles_category` | выбранная категория артиклей | да |
 | `app_daily_progress` | ответов за сегодня | нет |
+| `app_sync_settings_updated_at` | время изменения настроек, передаваемых синхронизацией | да |
 | `onboarding_seen` | приветственный экран уже показан | да |
 | `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
 | `admin_last_word_category_id` | последняя категория в форме слова | нет |

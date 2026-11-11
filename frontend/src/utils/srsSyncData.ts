@@ -16,6 +16,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export const emptySyncData = (): SrsSyncData => ({
   srs: { words: {}, verbs: {}, articles: {} },
   resetAt: { words: 0, verbs: 0, articles: 0 },
+  settings: { dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0 },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -47,6 +48,15 @@ export function sanitizeSyncData(raw: unknown): SrsSyncData {
   if (!isRecord(raw)) return result;
   const srs = isRecord(raw.srs) ? raw.srs : {};
   const resetAt = isRecord(raw.resetAt) ? raw.resetAt : {};
+  const settings = isRecord(raw.settings) ? raw.settings : {};
+  const categories = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 200).slice(0, 1000) : ['all'];
+  result.settings = {
+    dailyGoal: Math.min(1000, count(settings.dailyGoal)),
+    wordsCategories: categories(settings.wordsCategories),
+    articlesCategories: categories(settings.articlesCategories),
+    updatedAt: count(settings.updatedAt),
+  };
 
   for (const trainer of SRS_TRAINERS) {
     const reset = resetAt[trainer];
@@ -83,6 +93,7 @@ export function mergeSyncData(a: SrsSyncData, b: SrsSyncData): SrsSyncData {
       }
     }
   }
+  merged.settings = a.settings.updatedAt >= b.settings.updatedAt ? a.settings : b.settings;
   return merged;
 }
 

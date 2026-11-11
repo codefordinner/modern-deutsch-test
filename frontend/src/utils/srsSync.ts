@@ -3,6 +3,7 @@ import { getErrorMessage } from '../api/request';
 import type { SrsSyncData, SrsTrainer } from '../types';
 import { emptySyncData, mergeSyncData, readSyncKey, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
 import { getUISettings } from './uiSettings';
+import { applySyncedDailyGoal } from './studyPrefs';
 
 // Syncing SRS progress between devices that share a sync key (Settings → "Ключ синхронизации").
 // The pure merge logic lives in srsSyncData.ts; this file does the I/O: reading / writing
@@ -39,7 +40,19 @@ function readLocal(): SrsSyncData {
   const srs: Record<string, unknown> = {};
   for (const trainer of SRS_TRAINERS) srs[trainer] = readJSON(stateKeyOf(trainer));
   // Normalise through the merge so records older than a reset are dropped here too.
-  return mergeSyncData(sanitizeSyncData({ srs, resetAt: readJSON(RESET_AT_KEY) }), emptySyncData());
+  const studyPrefs = readJSON('app_study_prefs');
+  const wordsSettings = readJSON('words_settings');
+  const articlesCategories = readJSON('articles_category');
+  return mergeSyncData(sanitizeSyncData({
+    srs,
+    resetAt: readJSON(RESET_AT_KEY),
+    settings: {
+      dailyGoal: (studyPrefs as { dailyGoal?: unknown } | null)?.dailyGoal,
+      wordsCategories: (wordsSettings as { selectedCats?: unknown } | null)?.selectedCats,
+      articlesCategories,
+      updatedAt: readJSON('app_sync_settings_updated_at'),
+    },
+  }), emptySyncData());
 }
 
 /** Writes the merged data into localStorage; returns whether any trainer's progress actually changed. */
@@ -57,6 +70,15 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData): boolean {
   }
   try {
     localStorage.setItem(RESET_AT_KEY, JSON.stringify(data.resetAt));
+    if (data.settings.updatedAt !== previous.settings.updatedAt) {
+      localStorage.setItem('app_study_prefs', JSON.stringify({ dueOnly: readJSON('app_study_prefs') && (readJSON('app_study_prefs') as { dueOnly?: boolean }).dueOnly === true, dailyGoal: data.settings.dailyGoal }));
+      localStorage.setItem('words_settings', JSON.stringify({ ...(readJSON('words_settings') as object ?? {}), selectedCats: data.settings.wordsCategories }));
+      localStorage.setItem('articles_category', JSON.stringify(data.settings.articlesCategories));
+      localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(data.settings.updatedAt));
+      applySyncedDailyGoal(data.settings.dailyGoal);
+      window.dispatchEvent(new Event('app-storage-updated'));
+      changed = true;
+    }
   } catch {
     // ignore
   }
@@ -162,4 +184,14 @@ export function scheduleSync(): void {
     timer = undefined;
     void syncNow();
   }, PUSH_DELAY_MS);
+}
+
+/** Marks learner settings as changed, then schedules the normal debounced exchange. */
+export function markSyncSettingsChanged(): void {
+  try {
+    localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(Date.now()));
+  } catch {
+    // ignore unavailable storage
+  }
+  scheduleSync();
 }

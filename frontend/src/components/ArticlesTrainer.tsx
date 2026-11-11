@@ -15,6 +15,7 @@ import type { Article } from '../utils/articles';
 import { speakGerman } from '../utils/audio';
 import { formatCategories, wordCategoryIds, wordInAnyCategory } from '../utils/wordCategories';
 import type { Word } from '../types';
+import { markSyncSettingsChanged } from '../utils/srsSync';
 
 /**
  * Stored selection of categories: `['all']`, a list of ids, or `[]` (explicitly cleared).
@@ -38,6 +39,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
   const [uiSettings] = useUISettings();
 
   const [savedCats, setSavedCats] = usePersistentState<string[]>('articles_category', ['all'], sanitizeCategories);
+  const setSavedCategories = useCallback((value: string[]) => { setSavedCats(value); markSyncSettingsChanged(); }, [setSavedCats]);
   // A saved category may have been deleted since: ignore the vanished ones, and if nothing is left
   // fall back to "all". An explicitly cleared list stays empty.
   const selectedCats = useMemo(() => {
@@ -133,7 +135,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
           <h3 className="state-title">Категории не выбраны</h3>
           <p className="state-text state-text--narrow">Выберите нужные категории или включите все сразу.</p>
           <div className="state-actions">
-            <button className="btn-primary" onClick={() => setSavedCats(['all'])}>Выбрать все категории</button>
+            <button className="btn-primary" onClick={() => setSavedCategories(['all'])}>Выбрать все категории</button>
             <button className="btn-secondary" onClick={() => setIsCatsOpen(true)}>Выбрать категории</button>
           </div>
         </div>
@@ -145,7 +147,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
           <div className="state-icon">📂</div>
           <h3 className="state-title">В выбранных категориях нет подходящих слов</h3>
           <div className="state-actions">
-            <button className="btn-primary" onClick={() => setSavedCats(['all'])}>Все категории</button>
+            <button className="btn-primary" onClick={() => setSavedCategories(['all'])}>Все категории</button>
             <button className="btn-secondary" onClick={() => setIsCatsOpen(true)}>Выбрать категории</button>
           </div>
         </div>
@@ -243,7 +245,7 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
           categories={categories}
           selected={selectedCats}
           counts={nounCounts}
-          onChange={setSavedCats}
+          onChange={setSavedCategories}
           onClose={() => setIsCatsOpen(false)}
         />
       )}

@@ -58,6 +58,15 @@ export type SrsTrainer = 'words' | 'verbs' | 'articles';
 export interface SrsSyncData {
   srs: Record<SrsTrainer, Record<string, SRSRecord>>;
   resetAt: Record<SrsTrainer, number>;
+  settings: SyncSettings;
+}
+
+/** Learner settings shared by devices using the same sync key. */
+export interface SyncSettings {
+  dailyGoal: number;
+  wordsCategories: string[];
+  articlesCategories: string[];
+  updatedAt: number;
 }
 
 export interface NumberRangeSettings {

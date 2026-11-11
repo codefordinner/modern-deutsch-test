@@ -27,6 +27,14 @@ export type SyncMap = Record<string, SyncRecord>;
 export interface SyncData {
   srs: Record<SyncTrainer, SyncMap>;
   resetAt: Record<SyncTrainer, number>;
+  settings: SyncSettings;
+}
+
+export interface SyncSettings {
+  dailyGoal: number;
+  wordsCategories: string[];
+  articlesCategories: string[];
+  updatedAt: number;
 }
 
 export const MIN_SYNC_KEY_LENGTH = 6;
@@ -38,6 +46,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export const emptySyncData = (): SyncData => ({
   srs: { words: {}, verbs: {}, articles: {} },
   resetAt: { words: 0, verbs: 0, articles: 0 },
+  settings: { dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0 },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -45,6 +54,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const count = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+
+const categoryList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 200).slice(0, 1000) : ['all'];
 
 function sanitizeRecord(raw: unknown): SyncRecord | null {
   if (!isRecord(raw)) return null;
@@ -69,6 +81,13 @@ export function sanitizeSyncData(raw: unknown): SyncData {
   if (!isRecord(raw)) return result;
   const srs = isRecord(raw.srs) ? raw.srs : {};
   const resetAt = isRecord(raw.resetAt) ? raw.resetAt : {};
+  const settings = isRecord(raw.settings) ? raw.settings : {};
+  result.settings = {
+    dailyGoal: Math.min(1000, count(settings.dailyGoal)),
+    wordsCategories: categoryList(settings.wordsCategories),
+    articlesCategories: categoryList(settings.articlesCategories),
+    updatedAt: count(settings.updatedAt),
+  };
 
   for (const trainer of SYNC_TRAINERS) {
     const reset = resetAt[trainer];
@@ -105,6 +124,7 @@ export function mergeSyncData(a: SyncData, b: SyncData): SyncData {
       }
     }
   }
+  merged.settings = a.settings.updatedAt >= b.settings.updatedAt ? a.settings : b.settings;
   return merged;
 }
 
