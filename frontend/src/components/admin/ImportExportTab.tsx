@@ -35,6 +35,7 @@ function buildAiPrompt(categories: Category[]): string {
   "praeteritum" — Präteritum, 3 л. ед. ч.: "ging";
   "partizip2" — Partizip II: "gegangen";
   "hilfsverb" — строго "haben" или "sein";
+  "requiredCase" — падеж управления глагола: "nominativ", "akkusativ", "dativ" или "genitiv";
   "praesensIch", "praesensDu", "praesensErSieEs", "praesensIhr" — формы Präsens (обязательно для сильных глаголов и глаголов с изменением корня: "fährst", "liest"); "praesensWir" и "praesensSie" можно не указывать — они равны инфинитиву.
 
 ПРАВИЛА:

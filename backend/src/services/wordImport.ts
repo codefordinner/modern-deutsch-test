@@ -29,6 +29,7 @@ export const TEXT_FIELDS = [
   'praesensWir',
   'praesensIhr',
   'praesensSie',
+  'requiredCase',
 ] as const;
 export type TextField = (typeof TEXT_FIELDS)[number];
 

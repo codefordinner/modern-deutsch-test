@@ -39,7 +39,7 @@
 
 ## Модель данных
 - **Category** `{id, name, normalizedName, icon, color, isBuiltin}` — основная связь 1:N с **Word** (`categoryId`) и дополнительная связь M:N через `extraCategories` (каскадное удаление основной категории).
-- **Word** `{de, normalizedDe, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, categoryId}`. Формы Präsens хранятся отдельными полями, а не вложенным объектом.
+- **Word** `{de, normalizedDe, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb ('haben'|'sein'), requiredCase, praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, categoryId}`. `requiredCase` используется в режиме управления глаголов и принимает `nominativ|akkusativ|dativ|genitiv`. Формы Präsens хранятся отдельными полями, а не вложенным объектом.
   `partOfSpeech` ∈ noun|verb|adjective|adverb|other (валидируется в API; пусто → выводится `inferPartOfSpeech`).
 - **AnalyticsEvent** `{eventType: visit|tab_switch|quiz_answer, trainerType, isCorrect, visitorId, ipAddress, userAgent, browser, os, device, timestamp}`; публичная запись ограничена rate limit и принимает только известные типы событий.
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ и registry профилей `{profileId: {model, prompt}}`). AI-ключ никогда не возвращается клиенту.

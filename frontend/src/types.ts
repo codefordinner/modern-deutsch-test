@@ -11,6 +11,7 @@ export interface Category {
 
 /** Explicit part of speech of a dictionary entry (`null`/missing = not specified). */
 export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
+export type RequiredCase = 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv';
 
 export interface Word {
   id: string;
@@ -32,6 +33,7 @@ export interface Word {
   praesensWir?: string | null;
   praesensIhr?: string | null;
   praesensSie?: string | null;
+  requiredCase?: RequiredCase | null;
   /** The PRIMARY category (the first of the word's categories). Read all of them via utils/wordCategories.ts. */
   categoryId: string;
   category?: Category;

@@ -25,6 +25,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
   const [praeteritum, setPraeteritum] = useState('');
   const [partizip2, setPartizip2] = useState('');
   const [hilfsverb, setHilfsverb] = useState<'haben' | 'sein'>('haben');
+  const [requiredCase, setRequiredCase] = useState<NonNullable<Word['requiredCase']> | ''>('');
   const [praesensIch, setPraesensIch] = useState('');
   const [praesensDu, setPraesensDu] = useState('');
   const [praesensErSieEs, setPraesensErSieEs] = useState('');
@@ -47,6 +48,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       setPraeteritum(word.praeteritum || '');
       setPartizip2(word.partizip2 || '');
       setHilfsverb(word.hilfsverb === 'sein' ? 'sein' : 'haben');
+      setRequiredCase(word.requiredCase || '');
       setPraesensIch(word.praesensIch || '');
       setPraesensDu(word.praesensDu || '');
       setPraesensErSieEs(word.praesensErSieEs || '');
@@ -93,6 +95,7 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
       praeteritum: praeteritum || null,
       partizip2: partizip2 || null,
       hilfsverb: hilfsverb || null,
+      requiredCase: requiredCase || null,
       praesensIch: praesensIch || null,
       praesensDu: praesensDu || null,
       praesensErSieEs: praesensErSieEs || null,
@@ -112,6 +115,12 @@ export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose,
             <div>
               <label className="field-label" htmlFor="word-de">Немецкий (с артиклем) *</label>
               <input id="word-de" type="text" className="text-input w-full" placeholder="der Tisch / sein" value={de} onChange={(e) => setDe(e.target.value)} required />
+            </div>
+            <div>
+              <label className="field-label field-label--sm" htmlFor="word-required-case">Падеж после глагола</label>
+              <select id="word-required-case" className="text-input w-full" value={requiredCase} onChange={(e) => setRequiredCase(e.target.value as NonNullable<Word['requiredCase']> | '')}>
+                <option value="">Не указан</option><option value="nominativ">Nominativ</option><option value="akkusativ">Akkusativ</option><option value="dativ">Dativ</option><option value="genitiv">Genitiv</option>
+              </select>
             </div>
             <div>
               <label className="field-label" htmlFor="word-ru">Русский перевод *</label>

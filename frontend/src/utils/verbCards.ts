@@ -10,7 +10,7 @@ import type { PraesensPronoun } from './verbConjugation';
 // Not every verb has every form filled in and Präsens forms are never guessed
 // (see verbConjugation.ts), so a verb only yields the cards it can really answer.
 
-export type VerbQuizMode = 'praesens' | 'stammformen' | 'multiple_choice';
+export type VerbQuizMode = 'praesens' | 'stammformen' | 'multiple_choice' | 'required_case';
 
 // Within the "Спряжение / Форма → Инфинитив" mode:
 //  - 'praesens'           only the forward direction: infinitive + pronoun → Präsens form;
@@ -25,7 +25,8 @@ export type VerbCardKind =
   | 'multiple_choice' //             infinitive → the right Partizip II out of several
   | 'infinitive_from_praesens' //    Präsens form (+ pronoun) → infinitive
   | 'infinitive_from_praeteritum' // Präteritum → infinitive
-  | 'infinitive_from_partizip2'; //  Partizip II → infinitive
+  | 'infinitive_from_partizip2' //  Partizip II → infinitive
+  | 'required_case'; // infinitive → required grammatical case
 
 export interface VerbCard {
   kind: VerbCardKind;
@@ -73,6 +74,9 @@ export function buildVerbCards(verbs: Word[]): VerbCard[] {
     }
   }
   for (const verb of verbs) {
+    if (verb.requiredCase) cards.push({ kind: 'required_case', verb, key: srsKeys.verb.requiredCase(verb.id) });
+  }
+  for (const verb of verbs) {
     if (hasPraeteritum(verb)) {
       cards.push({
         kind: 'infinitive_from_praeteritum',
@@ -108,6 +112,7 @@ export const isReverseCard = (kind: VerbCardKind): boolean => REVERSE_KINDS.has(
 export function isCardInSelection(kind: VerbCardKind, mode: VerbQuizMode, subMode: PraesensSubMode): boolean {
   if (mode === 'stammformen') return kind === 'stammformen';
   if (mode === 'multiple_choice') return kind === 'multiple_choice';
+  if (mode === 'required_case') return kind === 'required_case';
   if (kind === 'praesens') return subMode === 'praesens' || subMode === 'both';
   return isReverseCard(kind) && (subMode === 'form_to_infinitive' || subMode === 'both');
 }

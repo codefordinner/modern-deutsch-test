@@ -50,6 +50,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const [praeteritumInput, setPraeteritumInput] = useState('');
   const [partizip2Input, setPartizip2Input] = useState('');
   const [hilfsverbInput, setHilfsverbInput] = useState('haben');
+  const [requiredCaseInput, setRequiredCaseInput] = useState('nominativ');
   const [mcOptions, setMcOptions] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const { useSRS, setUseSRS, srsMap, recordAnswer, resetSRS, pickCard } = useSRSProgress('verbs');
@@ -80,6 +81,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     setPraeteritumInput('');
     setPartizip2Input('');
     setHilfsverbInput('haben');
+    setRequiredCaseInput('nominativ');
     setFeedback(null);
 
     const chosen = pickCard(pool, (card) => card.key);
@@ -176,6 +178,17 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     recordResult(ok);
   };
 
+  const handleCaseSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (feedback) { nextQuestion(); return; }
+    if (!card || card.kind !== 'required_case' || !card.verb.requiredCase) return;
+    const labels: Record<string, string> = { nominativ: 'Nominativ', akkusativ: 'Akkusativ', dativ: 'Dativ', genitiv: 'Genitiv' };
+    const expected = card.verb.requiredCase;
+    const ok = requiredCaseInput === expected;
+    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[requiredCaseInput], expected: labels[expected], isCorrect: ok, userLabel: 'Вы выбрали' }] });
+    recordResult(ok);
+  };
+
   const isPoolEmpty = !isLoading && verbs.length > 0 && pool.length === 0;
 
   return {
@@ -196,8 +209,9 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     // inputs
     userInput, setUserInput,
     praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput,
+    requiredCaseInput, setRequiredCaseInput,
     feedback,
     // actions
-    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption,
+    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSubmit,
   };
 }

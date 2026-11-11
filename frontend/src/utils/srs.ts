@@ -77,6 +77,7 @@ export const srsKeys = {
     stammformen: (verbId: string) => `${verbId}:stammformen`,
     /** "Тест": pick the right Partizip II. */
     multipleChoice: (verbId: string) => `${verbId}:multiple_choice`,
+    requiredCase: (verbId: string) => `${verbId}:required_case`,
     /**
      * "Форма → Инфинитив". Präsens-sourced cards carry the pronoun (and keep
      * the original key format so old progress survives); Präteritum and

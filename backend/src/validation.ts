@@ -7,6 +7,9 @@ const emptyableString = z.string().trim().max(2000).optional();
 // `normalizeWordBody` (middleware) rewrites legacy 'ist'/'hat' to 'sein'/'haben'
 // before validation, so only the canonical values (plus '' for "clear") are legal here.
 const hilfsverbSchema = z.union([z.literal('haben'), z.literal('sein'), z.literal('')]).nullable().optional();
+const requiredCaseSchema = z.union([
+  z.enum(['nominativ', 'akkusativ', 'dativ', 'genitiv']), z.literal(''), z.null(),
+]).optional();
 
 // A word's text fields are all optional strings; the API normalises '' to null.
 export const wordFieldsSchema = {
@@ -24,6 +27,7 @@ export const wordFieldsSchema = {
   praesensWir: nullableString,
   praesensIhr: nullableString,
   praesensSie: nullableString,
+  requiredCase: requiredCaseSchema,
 };
 
 // `partOfSpeech` accepts the five known values plus null/'' for "auto".
@@ -50,6 +54,7 @@ export const createWordSchema = z.object({
   praesensWir: wordFieldsSchema.praesensWir,
   praesensIhr: wordFieldsSchema.praesensIhr,
   praesensSie: wordFieldsSchema.praesensSie,
+  requiredCase: wordFieldsSchema.requiredCase,
   categoryIds: categoryIdsSchema,
   categoryId: categoryIdSchema,
 });
@@ -72,6 +77,7 @@ export const updateWordSchema = z.object({
   praesensWir: nullableString,
   praesensIhr: nullableString,
   praesensSie: nullableString,
+  requiredCase: requiredCaseSchema,
   categoryIds: categoryIdsSchema,
   categoryId: categoryIdSchema,
 });

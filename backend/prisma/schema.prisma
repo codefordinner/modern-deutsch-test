@@ -44,6 +44,8 @@ model Word {
   praesensWir     String?
   praesensIhr     String?
   praesensSie     String?
+  /// Case typically required by the verb: nominativ | akkusativ | dativ | genitiv.
+  requiredCase    String?
   /// PRIMARY category (the first of the word's categories). Kept as a plain column so existing data
   /// needs no migration; the rest of the word's categories are in `extraCategories`.
   categoryId      String

@@ -6,6 +6,7 @@ import { PraesensQuiz } from './verbs/PraesensQuiz';
 import { StammformenQuiz } from './verbs/StammformenQuiz';
 import { MultipleChoiceQuiz } from './verbs/MultipleChoiceQuiz';
 import { FormToInfinitiveQuiz } from './verbs/FormToInfinitiveQuiz';
+import { RequiredCaseQuiz } from './verbs/RequiredCaseQuiz';
 import { SRSIdleCard } from './srs/SRSIdleCard';
 import { ModeSwitch } from './ModeSwitch';
 import { ToolbarButton } from './ToolbarButton';
@@ -19,9 +20,9 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
     useSRS, setUseSRS, srsMap, resetSRS,
     currentVerb, currentPronoun, currentPraesensType, currentFormText, expectedPraesens, mcOptions, currentSrsItem,
     userInput, setUserInput,
-    praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput,
+    praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput, requiredCaseInput, setRequiredCaseInput,
     feedback,
-    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption,
+    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSubmit,
   } = useVerbsQuizEngine(onAnswer);
 
   const [isTableOpen, setIsTableOpen] = useState(false);
@@ -30,6 +31,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
   const emptyPoolMessage: Record<VerbQuizMode, string> = {
     stammformen: 'Нет глаголов, у которых заполнены обе формы — Präteritum и Partizip II. Заполните их в «Панели управления», чтобы этот режим заработал.',
     multiple_choice: 'Для теста нужно минимум два глагола с разными формами Partizip II — неверные варианты берутся из формы других глаголов словаря. Заполните Partizip II в «Панели управления», чтобы этот режим заработал.',
+    required_case: 'Нет глаголов с указанным падежом. Укажите падеж в карточке глагола в «Панели управления».',
     praesens: 'Нет данных для этого режима. Заполните спряжение Präsens (ich/du/er.../wir/ihr/sie), Präteritum и/или Partizip II в «Панели управления» — формы «wir» и «sie/Sie» подставляются автоматически, остальное нужно указать вручную.',
   };
 
@@ -44,6 +46,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
             { value: 'stammformen', label: '3 Формы (Stammformen)', short: '3 Формы' },
             { value: 'praesens', label: 'Спряжение / Форма → Инфинитив', short: 'Спряжение / Форма → Инф.' },
             { value: 'multiple_choice', label: 'Тест (4 варианта)', short: 'Тест (4 варианта)' },
+            { value: 'required_case', label: 'Управление (падеж)', short: 'Падеж' },
           ]}
         />
         <div className="toolbar-actions">
@@ -122,6 +125,8 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
           onSelectOption={handleSelectOption}
           onNext={nextQuestion}
         />
+      ) : currentVerb && mode === 'required_case' ? (
+        <RequiredCaseQuiz verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} value={requiredCaseInput} feedback={feedback} onChange={setRequiredCaseInput} onSubmit={handleCaseSubmit} onNext={nextQuestion} />
       ) : (
         <SRSIdleCard />
       )}
