@@ -19,12 +19,17 @@ function ensureDatabase() {
     if (dbUrl.startsWith('file:')) {
       const dbPath = dbUrl.replace(/^file:/, '');
       const resolved = path.resolve(process.cwd(), dbPath);
-      if (!fs.existsSync(resolved) || fs.statSync(resolved).size === 0) {
+      const databaseIsEmpty = !fs.existsSync(resolved) || fs.statSync(resolved).size === 0;
+      // Always apply the current schema. Previously this ran only for a new
+      // database, so an existing dev.db never received newly added tables
+      // such as AiErrorLog. The error logger then failed while recording and
+      // its caller intentionally ignored that secondary failure.
+      execSync('npx prisma db push --schema=backend/prisma/schema.prisma --accept-data-loss --skip-generate', {
+        stdio: 'inherit',
+        env: { ...process.env, DATABASE_URL: dbUrl },
+      });
+      if (databaseIsEmpty) {
         console.log('[db] Initializing SQLite database schema...');
-        execSync('npx prisma db push --schema=backend/prisma/schema.prisma --accept-data-loss --skip-generate', {
-          stdio: 'inherit',
-          env: { ...process.env, DATABASE_URL: dbUrl },
-        });
         try {
           execSync('npx tsx backend/prisma/seed.ts', {
             stdio: 'inherit',
