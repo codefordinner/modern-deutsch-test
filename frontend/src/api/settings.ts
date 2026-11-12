@@ -37,6 +37,8 @@ export interface AIErrorLog {
 }
 export const fetchAIErrorLogs = (limit = 100) => request<{ logs: AIErrorLog[] }>(`/settings/ai/logs?limit=${limit}`, { auth: true });
 export const clearAIErrorLogs = () => request<{ ok: boolean }>('/settings/ai/logs', { method: 'DELETE', auth: true });
+export interface AIQueueItem { id: string; operation: string; profileId?: string; model?: string; status: 'queued' | 'running' | 'completed' | 'failed'; createdAt: string; startedAt?: string; finishedAt?: string; error?: string }
+export interface AIQueueSnapshot { items: AIQueueItem[]; active: number; waiting: number; concurrency: number }
 
 export interface WordFillResult { json: string; count: number }
 export const fillWordsViaAI = (words: string, categories: string[], defaultCategory?: string) => request<WordFillResult>('/settings/ai/word-fill', { method: 'POST', body: { words, categories, defaultCategory }, auth: true });

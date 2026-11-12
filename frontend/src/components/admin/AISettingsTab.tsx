@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
-import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse } from '../../api/settings';
+import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
@@ -20,6 +20,7 @@ const AI_OPERATION_LABELS: Record<string, string> = {
   'required-case': 'Определение падежей глаголов',
   'prompt-test': 'Тест промпта',
 };
+const AI_QUEUE_STATUS_LABELS: Record<string, string> = { queued: 'ожидает', running: 'выполняется', completed: 'завершено', failed: 'ошибка' };
 
 interface ProfileEditors {
   model: string;
@@ -34,6 +35,7 @@ export function AISettingsTab() {
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<AIErrorLog[]>([]);
   const [logsBusy, setLogsBusy] = useState(false);
+  const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
@@ -71,6 +73,11 @@ export function AISettingsTab() {
     finally { setLogsBusy(false); }
   };
   useEffect(() => { void loadLogs(); }, []);
+  useEffect(() => {
+    const source = new EventSource('/api/settings/ai/queue');
+    source.onmessage = (event) => { try { setQueue(JSON.parse(event.data) as AIQueueSnapshot); } catch { /* ignore malformed event */ } };
+    return () => source.close();
+  }, []);
 
   const save = async () => {
     setBusy(true);
@@ -165,6 +172,11 @@ export function AISettingsTab() {
       </div>
 
       <section className="ai-error-log" aria-labelledby="ai-error-log-title">
+        <section className="ai-error-log" aria-labelledby="ai-queue-title">
+          <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
+          <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
+          {!queue?.items.length ? <div className="muted-note">Очередь пуста.</div> : <div className="ai-error-log-list">{queue.items.slice().reverse().map((item) => <div key={item.id} className="ai-error-log-item"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong> · {AI_QUEUE_STATUS_LABELS[item.status] ?? item.status} · {item.model ?? 'модель не указана'}{item.error ? ` · ${item.error}` : ''}</div>)}</div>}
+        </section>
         <div className="stats-header">
           <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
           <div className="backup-actions">

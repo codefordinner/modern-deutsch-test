@@ -19,6 +19,7 @@ import {
 } from '../services/audioSettings';
 import { checkAISettings, fetchGeminiModels, generateWordFill, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
 import { clearAIErrorLogs, readAIErrorLogs, recordAIError } from '../services/aiErrorLog';
+import { readAIQueue, subscribeAIQueue } from '../services/aiQueue';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
@@ -77,6 +78,18 @@ router.get('/ai/logs', requireAdmin, async (req, res) => {
   } catch {
     res.status(500).json({ error: 'Не удалось загрузить журнал ошибок ИИ' });
   }
+});
+
+router.get('/ai/queue', requireAdmin, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  const send = (items = readAIQueue().items) => res.write(`data: ${JSON.stringify({ ...readAIQueue(), items })}\n\n`);
+  send();
+  const unsubscribe = subscribeAIQueue((items) => send(items));
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15_000);
+  req.on('close', () => { clearInterval(heartbeat); unsubscribe(); });
 });
 
 router.delete('/ai/logs', requireAdmin, async (_req, res) => {
