@@ -17,7 +17,7 @@ import {
   resolvePartOfSpeech,
 } from '../services/wordImport';
 import type { ParsedRow, RowError } from '../services/wordImport';
-import { WORD_INCLUDE, allCategoriesExist, readCategoryIds, serializeWord } from '../services/wordCategories';
+import { WORD_INCLUDE, allCategoriesExist, normalizeCategoryName, readCategoryIds, serializeWord } from '../services/wordCategories';
 
 const router = Router();
 
@@ -231,7 +231,7 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
     const rowErrors: RowError[] = [...errors];
 
     const categories = await prisma.category.findMany();
-    const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
+    const categoryByName = new Map(categories.map((c) => [normalizeCategoryName(c.name), c]));
 
     let defaultCategoryName: string | null = null;
     if (defaultCategoryId) {
@@ -262,7 +262,7 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
       seen.add(key);
 
       for (const name of categoryNames) {
-        const categoryKey = name.trim().toLowerCase();
+        const categoryKey = normalizeCategoryName(name);
         if (!categoryByName.has(categoryKey) && !newCategoryNames.has(categoryKey)) {
           newCategoryNames.set(categoryKey, name.trim());
         }
@@ -284,26 +284,26 @@ router.post('/import', requireAdmin, async (req: Request, res: Response) => {
     if (dryRun || planned.length === 0) return res.json(summary);
 
     // Create the categories that don't exist yet (icon/colour from the "categories" list if given).
-    const metaByName = new Map(raw.categories.map((c) => [c.name.trim().toLowerCase(), c]));
+    const metaByName = new Map(raw.categories.map((c) => [normalizeCategoryName(c.name), c]));
     for (const [key, name] of newCategoryNames) {
       const meta = metaByName.get(key);
       const created = await prisma.category.create({
         data: {
           name,
-          normalizedName: name.trim().normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(),
+          normalizedName: normalizeCategoryName(name),
           icon: meta?.icon || DEFAULT_CATEGORY_ICON,
           color: meta?.color || DEFAULT_CATEGORY_COLOR,
           isBuiltin: false,
         },
       });
-      categoryByName.set(key, created);
+        categoryByName.set(key, created);
     }
 
     const fallbackPos: PartOfSpeech | null = partOfSpeech ?? null;
     const operations = planned.map(({ row, categoryNames }) => {
       const unique = new Map<string, (typeof categories)[number]>();
       for (const name of categoryNames) {
-        const category = categoryByName.get(name.trim().toLowerCase());
+        const category = categoryByName.get(normalizeCategoryName(name));
         if (!category) throw new Error(`Category "${name}" is missing`);
         unique.set(category.id, category);
       }

@@ -1,5 +1,6 @@
 import { inferPartOfSpeech, isPartOfSpeech } from './partOfSpeech';
 import type { PartOfSpeech } from './partOfSpeech';
+import { normalizeCategoryName } from './wordCategories';
 
 /**
  * Разбор данных для массового импорта слов.
@@ -95,7 +96,7 @@ export function toCategoryNames(value: unknown): string[] {
   const names: string[] = [];
   for (const part of parts) {
     const name = part.replace(/\s+/g, ' ').trim();
-    const key = name.toLowerCase();
+    const key = normalizeCategoryName(name);
     if (!name || seen.has(key)) continue;
     seen.add(key);
     names.push(name);

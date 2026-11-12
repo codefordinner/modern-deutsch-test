@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
 import { generateWordFill } from '../services/aiSettings';
+import { recordAIError } from '../services/aiErrorLog';
 import { isPartOfSpeech } from '../services/partOfSpeech';
 import {
   ImportFormatError,
@@ -12,6 +13,7 @@ import {
   resolvePartOfSpeech,
 } from '../services/wordImport';
 import type { ParsedRow, RowError } from '../services/wordImport';
+import { normalizeCategoryName } from '../services/wordCategories';
 
 const router = Router();
 const DEFAULT_CATEGORY_ICON = '📌';
@@ -64,7 +66,7 @@ router.post('/word-import', requireHermesToken, async (req, res) => {
 
     const normalized = normalizeRows(raw.rows);
     const rowErrors: RowError[] = [...normalized.errors];
-    const categoryByName = new Map(categories.map((category) => [category.name.trim().toLowerCase(), category]));
+    const categoryByName = new Map(categories.map((category) => [normalizeCategoryName(category.name), category]));
     const existing = await prisma.word.findMany({ select: { de: true } });
     const seen = new Set(existing.map((word) => duplicateKey(word.de)));
     const planned: PlannedWord[] = [];
@@ -84,7 +86,7 @@ router.post('/word-import', requireHermesToken, async (req, res) => {
       }
       seen.add(key);
       for (const name of categoryNames) {
-        const categoryKey = name.trim().toLowerCase();
+        const categoryKey = normalizeCategoryName(name);
         if (!categoryByName.has(categoryKey) && !newCategoryNames.has(categoryKey)) {
           newCategoryNames.set(categoryKey, name.trim());
         }
@@ -103,13 +105,13 @@ router.post('/word-import', requireHermesToken, async (req, res) => {
       newCategories: [...newCategoryNames.values()],
     };
 
-    const metaByName = new Map(raw.categories.map((category) => [category.name.trim().toLowerCase(), category]));
+    const metaByName = new Map(raw.categories.map((category) => [normalizeCategoryName(category.name), category]));
     for (const [key, name] of newCategoryNames) {
       const meta = metaByName.get(key);
       const created = await prisma.category.create({
         data: {
           name,
-          normalizedName: name.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(),
+          normalizedName: normalizeCategoryName(name),
           icon: meta?.icon || DEFAULT_CATEGORY_ICON,
           color: meta?.color || DEFAULT_CATEGORY_COLOR,
           isBuiltin: false,
@@ -122,7 +124,7 @@ router.post('/word-import', requireHermesToken, async (req, res) => {
       const operations = planned.map(({ row, categoryNames }) => {
         const unique = new Map<string, (typeof categories)[number]>();
         for (const name of categoryNames) {
-          const category = categoryByName.get(name.trim().toLowerCase());
+          const category = categoryByName.get(normalizeCategoryName(name));
           if (!category) throw new Error(`Category "${name}" is missing`);
           unique.set(category.id, category);
         }
@@ -143,6 +145,7 @@ router.post('/word-import', requireHermesToken, async (req, res) => {
 
     return res.json({ ...summary, generatedCount: generated.count });
   } catch (error) {
+    await recordAIError({ operation: 'word-fill', profileId: 'wordFill', error });
     console.error('[internal word-import] failed:', error);
     if (error instanceof Error) {
       const messages: Record<string, [number, string]> = {

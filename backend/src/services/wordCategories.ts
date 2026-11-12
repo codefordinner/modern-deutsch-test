@@ -13,6 +13,10 @@ import { prisma } from '../db';
  */
 export const WORD_INCLUDE = { category: true, extraCategories: true } as const;
 
+/** The canonical key used for category lookup across CRUD, import and AI tools. */
+export const normalizeCategoryName = (value: string): string =>
+  value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+
 type WordWithCategories = Word & { category: Category; extraCategories: Category[] };
 
 export function serializeWord<T extends WordWithCategories>(word: T) {

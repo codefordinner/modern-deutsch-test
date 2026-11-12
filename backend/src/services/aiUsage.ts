@@ -10,7 +10,10 @@ import { prisma } from '../db';
  */
 
 const COUNTER_KEY = 'aiDailyUsage';
-const GLOBAL_DAILY_CAP = Number(process.env.AI_DAILY_CHECK_CAP ?? 500);
+const configuredDailyCap = Number(process.env.AI_DAILY_CHECK_CAP ?? 500);
+const GLOBAL_DAILY_CAP = Number.isFinite(configuredDailyCap) && configuredDailyCap > 0
+  ? Math.floor(configuredDailyCap)
+  : 500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const localDay = (date: Date): string => {
