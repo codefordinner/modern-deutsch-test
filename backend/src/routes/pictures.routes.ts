@@ -118,7 +118,7 @@ router.post('/:id/format-answer', pictureFormatLimiter, async (req: Request, res
   try {
     const picture = await prisma.picture.findFirst({ where: { id: req.params.id, isActive: true }, select: { id: true } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
-    if (typeof req.body?.answer !== 'string') return res.status(400).json({ error: 'Введите описание перед обработкой' });
+    if (typeof req.body?.answer !== 'string' || !req.body.answer.trim()) return res.status(400).json({ error: 'Введите описание перед обработкой' });
     if (req.body.answer.length > MAX_PICTURE_ANSWER_LENGTH) return res.status(400).json({ error: 'Описание не должно быть длиннее 10 000 символов' });
     const usage = await registerAiUsage();
     if (!usage.allowed) return res.status(429).json({ error: 'Дневной лимит проверок ИИ исчерпан. Попробуйте завтра.' });
@@ -135,7 +135,7 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
   try {
     const picture = await prisma.picture.findFirst({ where: { id: req.params.id, isActive: true } });
     if (!picture) return res.status(404).json({ error: 'Картинка не найдена' });
-    if (typeof req.body?.answer !== 'string') return res.status(400).json({ error: 'Введите описание перед отправкой' });
+    if (typeof req.body?.answer !== 'string' || !req.body.answer.trim()) return res.status(400).json({ error: 'Введите описание перед отправкой' });
     if (req.body.answer.length > MAX_PICTURE_ANSWER_LENGTH) return res.status(400).json({ error: 'Описание не должно быть длиннее 10 000 символов' });
     const severity = req.body?.severity;
     if (severity !== undefined && (typeof severity !== 'number' || !Number.isFinite(severity) || severity < 1 || severity > 5)) {
@@ -157,6 +157,7 @@ router.post('/:id/check-answer', pictureCheckLimiter, async (req: Request, res: 
 router.post('/prompt-test', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { pictureId, answer, severity } = req.body ?? {};
+    if (typeof pictureId !== 'string' || !pictureId.trim()) return res.status(400).json({ error: 'Выберите картинку для теста' });
     if (typeof answer !== 'string') return res.status(400).json({ error: 'Введите описание перед отправкой' });
     if (answer.length > MAX_PICTURE_ANSWER_LENGTH) return res.status(400).json({ error: 'Описание не должно быть длиннее 10 000 символов' });
     if (severity !== undefined && (typeof severity !== 'number' || !Number.isFinite(severity) || severity < 1 || severity > 5)) {

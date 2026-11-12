@@ -21,6 +21,8 @@ const MAX_HISTORY = 100;
 let active = 0;
 const configuredConcurrency = Number(process.env.AI_QUEUE_CONCURRENCY ?? 2);
 const CONCURRENCY = Number.isFinite(configuredConcurrency) ? Math.max(1, Math.min(8, Math.floor(configuredConcurrency))) : 2;
+const retryRuns = new Map<string, { operation: string; profileId?: string; model?: string; run: () => Promise<unknown> }>();
+const retriedItems = new Set<string>();
 
 function snapshot(): AIQueueItem[] { return [...items.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
 function notify(): void {
@@ -31,7 +33,7 @@ function notify(): void {
 }
 function trim(): void {
   const finished = snapshot().filter((item) => item.status === 'completed' || item.status === 'failed');
-  for (const item of finished.slice(0, Math.max(0, finished.length - MAX_HISTORY))) items.delete(item.id);
+  for (const item of finished.slice(0, Math.max(0, finished.length - MAX_HISTORY))) { items.delete(item.id); retryRuns.delete(item.id); retriedItems.delete(item.id); }
 }
 
 async function pump(): Promise<void> {
@@ -59,15 +61,31 @@ async function pump(): Promise<void> {
         if (!details.model && task.item.model) details.model = task.item.model;
       }
       task.item.error = error instanceof Error ? error.message : 'AI_ERROR'; task.reject(error);
-    }).finally(() => { active--; trim(); notify(); void pump(); });
+      }).finally(() => { active--; trim(); notify(); void pump(); });
   }
 }
 
 export function enqueueAI<T>(operation: string, profileId: string | undefined, run: () => Promise<T>, model?: string): Promise<T> {
   const item: AIQueueItem = { id: randomUUID(), operation, ...(profileId ? { profileId } : {}), ...(model ? { model } : {}), status: 'queued', createdAt: new Date().toISOString() };
   items.set(item.id, item);
+  retryRuns.set(item.id, { operation, profileId, model, run });
   notify();
   return new Promise<T>((resolve, reject) => { tasks.push({ item, run: run as () => Promise<unknown>, resolve: resolve as (value: unknown) => void, reject }); void pump(); });
+}
+
+/** Re-enqueues a failed request while its in-memory input/closure is still available. */
+export function retryAI(id: string): AIQueueItem | null {
+  const previous = items.get(id);
+  const retry = retryRuns.get(id);
+  if (!previous || previous.status !== 'failed' || !retry || retriedItems.has(id)) return null;
+  retriedItems.add(id);
+  const item: AIQueueItem = { id: randomUUID(), operation: retry.operation, ...(retry.profileId ? { profileId: retry.profileId } : {}), ...(retry.model ? { model: retry.model } : {}), status: 'queued', createdAt: new Date().toISOString() };
+  items.set(item.id, item);
+  retryRuns.set(item.id, retry);
+  tasks.push({ item, run: retry.run, resolve: () => undefined, reject: () => undefined });
+  notify();
+  void pump();
+  return item;
 }
 
 export function readAIQueue(): { items: AIQueueItem[]; active: number; waiting: number; concurrency: number } {

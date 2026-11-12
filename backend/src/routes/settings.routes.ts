@@ -19,7 +19,7 @@ import {
 } from '../services/audioSettings';
 import { checkAISettings, fetchGeminiModels, generateWordFill, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
 import { clearAIErrorLogs, readAIErrorLogs, recordAIError } from '../services/aiErrorLog';
-import { readAIQueue, subscribeAIQueue } from '../services/aiQueue';
+import { readAIQueue, retryAI, subscribeAIQueue } from '../services/aiQueue';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
@@ -96,6 +96,12 @@ router.get('/ai/queue', requireAdmin, (req, res) => {
 router.get('/ai/queue/state', requireAdmin, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(readAIQueue());
+});
+
+router.post('/ai/queue/:id/retry', requireAdmin, (req, res) => {
+  const item = retryAI(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Задача уже выполняется, не завершилась с ошибкой или больше недоступна' });
+  return res.status(202).json({ item });
 });
 
 router.delete('/ai/logs', requireAdmin, async (_req, res) => {

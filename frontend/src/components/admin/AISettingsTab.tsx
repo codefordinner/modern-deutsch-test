@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
-import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, fetchAIQueue, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
+import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, fetchAIQueue, resetAIPrompt, retryAIQueueItem, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
@@ -37,6 +37,8 @@ export function AISettingsTab() {
   const [logs, setLogs] = useState<AIErrorLog[]>([]);
   const [logsBusy, setLogsBusy] = useState(false);
   const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
+  const [logFilter, setLogFilter] = useState('all');
+  const [retrying, setRetrying] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
@@ -136,12 +138,20 @@ export function AISettingsTab() {
     finally { setLogsBusy(false); }
   };
 
+  const retry = async (id: string) => {
+    setRetrying(id);
+    try { await retryAIQueueItem(id); showToast('Запрос снова поставлен в очередь', 'success'); }
+    catch (error) { reportError(error, 'Не удалось повторить запрос'); }
+    finally { setRetrying(null); }
+  };
+
   const profileBlock = (id: string, title: string, label: string, showSeverity: boolean) => (
     <div className="ai-profile-block">
       <h4 className="ai-profile-title">{title}</h4>
       <label className="setting-toggle-title" htmlFor={`ai-model-${id}`}>Модель для этого профиля</label>
-      <select id={`ai-model-${id}`} className="text-input" value={profiles[id].model} onChange={(event) => setProfile(id, { model: event.target.value })} disabled={!models.length}>
-        <option value="">{models.length ? 'Выберите модель' : 'Сначала проверьте ключ'}</option>
+       <select id={`ai-model-${id}`} className="text-input" value={profiles[id].model} onChange={(event) => setProfile(id, { model: event.target.value })} disabled={!models.length && !profiles[id].model}>
+         <option value="">{models.length ? 'Выберите модель' : profiles[id].model ? 'Текущая модель сохранена' : 'Сначала проверьте ключ'}</option>
+         {profiles[id].model && !models.some((item) => item.name === profiles[id].model) && <option value={profiles[id].model}>{profiles[id].model} (сохранённая модель)</option>}
         {models.map((item) => <option key={item.name} value={item.name}>{item.displayName} ({item.name})</option>)}
       </select>
       <div className="ai-prompt-label">
@@ -160,7 +170,9 @@ export function AISettingsTab() {
     </div>
   );
 
-  const visibleQueueItems = queue?.items.filter((item) => item.status === 'queued' || item.status === 'running' || item.status === 'failed') ?? [];
+  const visibleQueueItems = queue?.items.filter((item) => item.status !== 'completed') ?? [];
+  const filteredLogs = logFilter === 'all' ? logs : logs.filter((log) => log.operation === logFilter);
+  const logOperations = [...new Set(logs.map((log) => log.operation))];
 
   return <div className="card ai-settings-card">
     <h3 className="card-title"><Bot size={20} /> Модуль ИИ</h3>
@@ -186,29 +198,21 @@ export function AISettingsTab() {
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
           <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
-          {!visibleQueueItems.length ? <div className="muted-note">Активных задач и ошибок нет.</div> : <div className="ai-error-log-list">{visibleQueueItems.slice().reverse().map((item) => <div key={item.id} className="ai-error-log-item"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong> · {AI_QUEUE_STATUS_LABELS[item.status] ?? item.status} · {item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}{item.error ? ` · ${item.error}` : ''}</div>)}</div>}
+           {!visibleQueueItems.length ? <div className="muted-note">Активных задач и ошибок нет.</div> : <div className="ai-queue-list">{visibleQueueItems.slice().reverse().map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small></div>{item.error && <div className="ai-queue-error">{item.error}</div>}{item.status === 'failed' && <button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button>}</div>)}</div>}
         </section>
       </section>
       <section className="ai-error-log" aria-labelledby="ai-error-log-title">
-        <div className="stats-header">
-          <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
-          <div className="backup-actions">
+          <div className="stats-header">
+            <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
+            <div className="backup-actions">
+              <select className="text-input ai-log-filter" aria-label="Фильтр операций" value={logFilter} onChange={(event) => setLogFilter(event.target.value)}><option value="all">Все операции</option>{logOperations.map((operation) => <option key={operation} value={operation}>{AI_OPERATION_LABELS[operation] ?? operation}</option>)}</select>
             <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
             <button type="button" className="btn-secondary" disabled={logsBusy || !logs.length} onClick={() => void clearLogs()}><Trash2 size={14} /> Очистить</button>
           </div>
         </div>
         <p className="card-note">Сохраняются только технические данные: операция, модель, код и статус ошибки. Тексты ответов, изображения и API-ключи не записываются.</p>
-        {logs.length === 0 ? <div className="muted-note">Ошибок ИИ пока нет.</div> : <div className="ai-error-log-list">
-          {logs.map((log) => <details key={log.id} className="ai-error-log-item">
-            <summary><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong> · {log.errorCode} · {new Date(log.createdAt).toLocaleString('ru-RU')}</summary>
-            <div className="ai-error-log-details">
-              <div>Профиль: {log.profileId ?? '—'}</div>
-              <div>Модель: {log.model ?? '—'}</div>
-              <div>HTTP Gemini: {log.providerStatus ?? '—'}</div>
-              <div>Длительность: {log.durationMs === null ? '—' : `${log.durationMs} мс`}</div>
-              <div>Сообщение: {log.message}</div>
-            </div>
-          </details>)}
+         {logs.length === 0 ? <div className="muted-note">Ошибок ИИ пока нет.</div> : !filteredLogs.length ? <div className="muted-note">Для выбранной операции ошибок нет.</div> : <div className="ai-error-log-list">
+           {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code">{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.message}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl></article>)}
         </div>}
       </section>
     </div>

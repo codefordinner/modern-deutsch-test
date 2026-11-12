@@ -115,6 +115,7 @@ router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (r
       prisma.word.findMany({ where: { id: { in: ids } }, select: { id: true, de: true, ru: true } }),
       prisma.category.findMany({ select: { id: true, name: true } }),
     ]);
+    if (words.length === 0) return res.json({ success: true, count: 0 });
     const job = startAIBulkJob(words.length, async (state) => {
         const result = await redistributeCategories(words, categories.map((c) => c.name));
        const selectedIds = new Set(words.map((word) => word.id));

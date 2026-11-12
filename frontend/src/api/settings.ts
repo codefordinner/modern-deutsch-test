@@ -40,6 +40,7 @@ export const clearAIErrorLogs = () => request<{ ok: boolean }>('/settings/ai/log
 export interface AIQueueItem { id: string; operation: string; profileId?: string; model?: string; status: 'queued' | 'running' | 'completed' | 'failed'; createdAt: string; startedAt?: string; finishedAt?: string; error?: string }
 export interface AIQueueSnapshot { items: AIQueueItem[]; active: number; waiting: number; concurrency: number }
 export const fetchAIQueue = () => request<AIQueueSnapshot>('/settings/ai/queue/state', { auth: true });
+export const retryAIQueueItem = (id: string) => request<{ item: AIQueueItem }>(`/settings/ai/queue/${encodeURIComponent(id)}/retry`, { method: 'POST', auth: true });
 
 export interface WordFillResult { json: string; count: number }
 export const fillWordsViaAI = (words: string, categories: string[], defaultCategory?: string) => request<WordFillResult>('/settings/ai/word-fill', { method: 'POST', body: { words, categories, defaultCategory }, auth: true });
