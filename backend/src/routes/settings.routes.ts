@@ -84,12 +84,18 @@ router.get('/ai/queue', requireAdmin, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
   const send = (items = readAIQueue().items) => res.write(`data: ${JSON.stringify({ ...readAIQueue(), items })}\n\n`);
   send();
   const unsubscribe = subscribeAIQueue((items) => send(items));
   const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15_000);
   req.on('close', () => { clearInterval(heartbeat); unsubscribe(); });
+});
+
+router.get('/ai/queue/state', requireAdmin, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(readAIQueue());
 });
 
 router.delete('/ai/logs', requireAdmin, async (_req, res) => {

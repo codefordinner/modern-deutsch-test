@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
-import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
+import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, fetchAIQueue, resetAIPrompt, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
 
 const PICTURE_PROFILE = 'pictureDescription';
@@ -78,7 +78,9 @@ export function AISettingsTab() {
   useEffect(() => {
     const source = new EventSource('/api/settings/ai/queue');
     source.onmessage = (event) => { try { setQueue(JSON.parse(event.data) as AIQueueSnapshot); } catch { /* ignore malformed event */ } };
-    return () => source.close();
+    void fetchAIQueue().then(setQueue).catch(() => undefined);
+    const fallback = window.setInterval(() => { void fetchAIQueue().then(setQueue).catch(() => undefined); }, 5000);
+    return () => { source.close(); window.clearInterval(fallback); };
   }, []);
 
   const save = async () => {
@@ -158,6 +160,8 @@ export function AISettingsTab() {
     </div>
   );
 
+  const visibleQueueItems = queue?.items.filter((item) => item.status === 'queued' || item.status === 'running' || item.status === 'failed') ?? [];
+
   return <div className="card ai-settings-card">
     <h3 className="card-title"><Bot size={20} /> Модуль ИИ</h3>
     <p className="card-note">Провайдер — Google Gemini. Для каждого профиля можно выбрать свою модель и инструкцию. Новые профили можно добавить без изменения AI API.</p>
@@ -182,7 +186,7 @@ export function AISettingsTab() {
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
           <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
-          {!queue?.items.length ? <div className="muted-note">Очередь пуста.</div> : <div className="ai-error-log-list">{queue.items.slice().reverse().map((item) => <div key={item.id} className="ai-error-log-item"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong> · {AI_QUEUE_STATUS_LABELS[item.status] ?? item.status} · {item.model ?? 'модель не указана'}{item.error ? ` · ${item.error}` : ''}</div>)}</div>}
+          {!visibleQueueItems.length ? <div className="muted-note">Активных задач и ошибок нет.</div> : <div className="ai-error-log-list">{visibleQueueItems.slice().reverse().map((item) => <div key={item.id} className="ai-error-log-item"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong> · {AI_QUEUE_STATUS_LABELS[item.status] ?? item.status} · {item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}{item.error ? ` · ${item.error}` : ''}</div>)}</div>}
         </section>
       </section>
       <section className="ai-error-log" aria-labelledby="ai-error-log-title">

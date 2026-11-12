@@ -17,6 +17,7 @@ import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
 import { detectRequiredCases, redistributeCategories } from '../services/aiSettings';
 import { recordAIError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
+import { readAIBulkJob, startAIBulkJob } from '../services/aiBulkJobs';
 
 /**
  * Admin-only tools for working with many words at once:
@@ -112,19 +113,25 @@ router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (r
       prisma.word.findMany({ where: { id: { in: ids } }, select: { id: true, de: true, ru: true } }),
       prisma.category.findMany({ select: { id: true, name: true } }),
     ]);
-    const result = await redistributeCategories(words, categories.map((c) => c.name));
-    const selectedIds = new Set(words.map((word) => word.id));
-    const byName = new Map(categories.map((c) => [c.name, c.id]));
-    const updates: Prisma.PrismaPromise<unknown>[] = [];
-    for (const item of result) {
-      if (!selectedIds.has(item.id)) continue;
-      const categoryIds = item.categories.map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
-      if (!categoryIds.length) continue;
-      updates.push(prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } }));
-    }
-    await prisma.$transaction(updates);
-    const count = updates.length;
-    res.json({ success: true, count });
+    const job = startAIBulkJob(words.length, async (state) => {
+      try {
+        const result = await redistributeCategories(words, categories.map((c) => c.name));
+      const selectedIds = new Set(words.map((word) => word.id));
+      const byName = new Map(categories.map((c) => [c.name, c.id]));
+      const updates: Prisma.PrismaPromise<unknown>[] = [];
+      for (const item of result) {
+        if (!selectedIds.has(item.id)) continue;
+        const categoryIds = item.categories.map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
+        updates.push(prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } }));
+      }
+        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
+      } catch (error) {
+        await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
+        throw error;
+      }
+    });
+    res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
     res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для перераспределения категорий не выбрана модель Gemini' : 'ИИ не смог перераспределить категории' });
@@ -137,20 +144,30 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
     if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
     const words = await prisma.word.findMany({ where: { id: { in: ids }, partOfSpeech: 'verb' }, select: { id: true, de: true, ru: true } });
     if (words.length === 0) return res.json({ success: true, count: 0 });
-    const result = await detectRequiredCases(words);
-    const selectedIds = new Set(words.map((word) => word.id));
-    const updates: Prisma.PrismaPromise<unknown>[] = [];
-    for (const item of result) {
-      if (!selectedIds.has(item.id)) continue;
-      updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
-    }
-    await prisma.$transaction(updates);
-    const count = updates.length;
-    res.json({ success: true, count });
+    const job = startAIBulkJob(words.length, async (state) => {
+      try {
+        const result = await detectRequiredCases(words);
+      const selectedIds = new Set(words.map((word) => word.id));
+      const updates: Prisma.PrismaPromise<unknown>[] = [];
+      for (const item of result) if (selectedIds.has(item.id)) updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
+        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
+      } catch (error) {
+        await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
+        throw error;
+      }
+    });
+    res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
     res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для определения падежей не выбрана модель Gemini' : 'ИИ не смог определить падежи' });
   }
+});
+
+router.get('/ai/jobs/:jobId', requireAdmin, (req: Request, res: Response) => {
+  const job = readAIBulkJob(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Задание ИИ не найдено' });
+  return res.json(job);
 });
 
 // ---- Duplicates -------------------------------------------------------------

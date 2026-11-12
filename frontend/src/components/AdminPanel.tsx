@@ -20,7 +20,7 @@ import {
   UNAUTHORIZED_EVENT,
 } from '../api/request';
 import { checkSession, logout } from '../api/auth';
-import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, detectRequiredCasesViaAI, redistributeCategoriesViaAI } from '../api/adminWords';
+import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, detectRequiredCasesViaAI, redistributeCategoriesViaAI, getAIBulkJob } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';
@@ -178,8 +178,18 @@ export const AdminPanel: React.FC = () => {
 
   const handleAIAction = async (action: 'categories' | 'cases', ids: string[]): Promise<boolean> => {
     try {
-      const result = action === 'categories' ? await redistributeCategoriesViaAI(ids) : await detectRequiredCasesViaAI(ids);
-      showToast(`ИИ обработал слов: ${result.count}`, 'success');
+      const started = action === 'categories' ? await redistributeCategoriesViaAI(ids) : await detectRequiredCasesViaAI(ids);
+      let result = started;
+      for (let attempt = 0; attempt < 360 && (result.status === 'queued' || result.status === 'running'); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        result = await getAIBulkJob(started.id);
+      }
+      if (result.status === 'failed') {
+        const messages: Record<string, string> = { MISSING_API_KEY: 'Сначала сохраните API-ключ Gemini в настройках ИИ', MISSING_MODEL: 'Для этого AI-профиля не выбрана модель Gemini', INVALID_AI_RESPONSE: 'Gemini вернул неполный или некорректный ответ для одного из пакетов', GEMINI_UNAVAILABLE: 'Gemini временно недоступен', AI_TIMEOUT: 'Один из AI-пакетов превысил время ожидания' };
+        throw new Error(messages[result.error ?? ''] ?? result.error ?? 'ИИ не смог завершить обработку');
+      }
+      if (result.status !== 'completed') throw new Error('ИИ не завершил обработку за отведённое время');
+      showToast(`ИИ обработал слов: ${result.count ?? 0}`, 'success');
       refreshAll();
       return true;
     } catch (e) { reportError(e, action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи'); return false; }
