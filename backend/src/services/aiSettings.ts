@@ -459,14 +459,21 @@ async function generateBatchJson(profileId: string, words: AiWordInput[], contex
 
 export async function redistributeCategories(words: AiWordInput[], categories: string[]): Promise<Array<{ id: string; categories: string[] }>> {
   const result = await generateBatchJson(AI_PROFILE_CATEGORY_REDISTRIBUTION, words, `Разрешённые категории: ${JSON.stringify(categories)}`);
-  const allowed = new Set(categories);
+  const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+  const allowed = new Map(categories.map((category) => [normalizeCategoryName(category), category]));
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
   const seen = new Set<string>();
   const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    const names = Array.isArray(row.categories) ? row.categories.filter((v): v is string => typeof v === 'string' && allowed.has(v)) : [];
+    if (!Array.isArray(row.categories) || row.categories.length === 0 || row.categories.some((value) => typeof value !== 'string' || !allowed.has(normalizeCategoryName(value)))) {
+      throw new Error('INVALID_AI_RESPONSE');
+    }
+    const names = row.categories.flatMap((value) => {
+      const canonical = allowed.get(normalizeCategoryName(value as string));
+      return canonical ? [canonical] : [];
+    });
     if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || names.length === 0) throw new Error('INVALID_AI_RESPONSE');
     seen.add(row.id);
     return { id: row.id, categories: [...new Set(names)] };

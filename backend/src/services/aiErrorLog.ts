@@ -39,29 +39,35 @@ export async function recordAIError(input: {
   error: unknown;
   durationMs?: number;
 }): Promise<void> {
-  const error = input.error;
-  const aiError = error instanceof AIServiceError ? error : null;
-  const message = error instanceof Error ? error.message : String(error);
-  let model = aiError?.model ?? (error as { model?: string } | null)?.model ?? null;
-  if (!model && input.profileId) {
-    const settings = await prisma.setting.findUnique({ where: { key: 'aiSettings' }, select: { value: true } }).catch(() => null);
-    try {
-      const profiles = settings ? (JSON.parse(settings.value) as { profiles?: Record<string, { model?: unknown }> }).profiles : undefined;
-      const candidate = profiles?.[input.profileId]?.model;
-      if (typeof candidate === 'string' && candidate) model = candidate;
-    } catch { /* Keep the error log usable even if settings are malformed. */ }
+  try {
+    const error = input.error;
+    const aiError = error instanceof AIServiceError ? error : null;
+    const message = error instanceof Error ? error.message : String(error);
+    let model = aiError?.model ?? (error as { model?: string } | null)?.model ?? null;
+    if (!model && input.profileId) {
+      const settings = await prisma.setting.findUnique({ where: { key: 'aiSettings' }, select: { value: true } }).catch(() => null);
+      try {
+        const profiles = settings ? (JSON.parse(settings.value) as { profiles?: Record<string, { model?: unknown }> }).profiles : undefined;
+        const candidate = profiles?.[input.profileId]?.model;
+        if (typeof candidate === 'string' && candidate) model = candidate;
+      } catch { /* Keep the error log usable even if settings are malformed. */ }
+    }
+    await prisma.aiErrorLog.create({
+      data: {
+        operation: input.operation,
+        profileId: input.profileId ?? null,
+        model,
+        errorCode: aiError?.code ?? (message || 'UNKNOWN_ERROR'),
+        providerStatus: aiError?.providerStatus ?? null,
+        message: redact(message || 'Unknown error'),
+        durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
+      },
+    });
+  } catch (loggingError) {
+    // Never hide the original AI failure. This is especially important for
+    // background jobs, where there is no request catch block left to report it.
+    console.error('[ai] could not write AI error log:', loggingError);
   }
-  await prisma.aiErrorLog.create({
-    data: {
-      operation: input.operation,
-      profileId: input.profileId ?? null,
-      model,
-      errorCode: aiError?.code ?? (message || 'UNKNOWN_ERROR'),
-      providerStatus: aiError?.providerStatus ?? null,
-      message: redact(message || 'Unknown error'),
-      durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
-    },
-  });
 }
 
 export async function readAIErrorLogs(limit = 100) {

@@ -32,6 +32,8 @@ const MAX_IDS = 5000;
 const CHUNK = 500; // stays well below SQLite's bound-variable limit
 const aiBulkLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Слишком много запросов к ИИ. Подождите минуту.' } });
 
+const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+
 function readIds(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const ids = [...new Set(value.filter((v): v is string => typeof v === 'string' && v.length > 0))];
@@ -114,23 +116,20 @@ router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (r
       prisma.category.findMany({ select: { id: true, name: true } }),
     ]);
     const job = startAIBulkJob(words.length, async (state) => {
-      try {
         const result = await redistributeCategories(words, categories.map((c) => c.name));
-      const selectedIds = new Set(words.map((word) => word.id));
-      const byName = new Map(categories.map((c) => [c.name, c.id]));
-      const updates: Prisma.PrismaPromise<unknown>[] = [];
-      for (const item of result) {
-        if (!selectedIds.has(item.id)) continue;
-        const categoryIds = item.categories.map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
-        updates.push(prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } }));
-      }
-        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
-        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
-      } catch (error) {
-        await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
-        throw error;
-      }
-    });
+       const selectedIds = new Set(words.map((word) => word.id));
+       const byName = new Map(categories.map((c) => [normalizeCategoryName(c.name), c.id]));
+       const updates: Prisma.PrismaPromise<unknown>[] = [];
+       for (const item of result) {
+         if (!selectedIds.has(item.id)) continue;
+         const categoryIds = item.categories.map((name) => byName.get(normalizeCategoryName(name)));
+         if (categoryIds.some((id): id is undefined => id === undefined) || categoryIds.length === 0) throw new Error('INVALID_AI_RESPONSE');
+         const uniqueCategoryIds = [...new Set(categoryIds)];
+         updates.push(prisma.word.update({ where: { id: item.id }, data: { categoryId: uniqueCategoryIds[0], extraCategories: { set: uniqueCategoryIds.slice(1).map((id) => ({ id })) } } }));
+       }
+       if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+       await prisma.$transaction(updates); state.completed = state.total; return updates.length;
+      }, (error) => recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }));
     res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
@@ -145,18 +144,13 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
     const words = await prisma.word.findMany({ where: { id: { in: ids }, partOfSpeech: 'verb' }, select: { id: true, de: true, ru: true } });
     if (words.length === 0) return res.json({ success: true, count: 0 });
     const job = startAIBulkJob(words.length, async (state) => {
-      try {
         const result = await detectRequiredCases(words);
-      const selectedIds = new Set(words.map((word) => word.id));
-      const updates: Prisma.PrismaPromise<unknown>[] = [];
-      for (const item of result) if (selectedIds.has(item.id)) updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
-        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
-        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
-      } catch (error) {
-        await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
-        throw error;
-      }
-    });
+       const selectedIds = new Set(words.map((word) => word.id));
+       const updates: Prisma.PrismaPromise<unknown>[] = [];
+       for (const item of result) if (selectedIds.has(item.id)) updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
+       if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+       await prisma.$transaction(updates); state.completed = state.total; return updates.length;
+      }, (error) => recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }));
     res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
