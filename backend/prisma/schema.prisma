@@ -135,6 +135,8 @@ model AudioRegenerationJob {
 model SyncProfile {
   keyHash   String   @id
   data      String
+  /// Optimistic-lock revision used to prevent concurrent sync requests from overwriting each other.
+  revision  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

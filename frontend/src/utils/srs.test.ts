@@ -60,7 +60,12 @@ describe('Leitner SRS algorithm', () => {
 
   it('sanitizes corrupt local maps and keeps card-key formats stable', () => {
     expect(sanitizeSRSMap(null)).toEqual({});
-    expect(sanitizeSRSMap({ valid: { box: 2 }, broken: null })).toEqual({ valid: { box: 2 } });
+    expect(sanitizeSRSMap({ valid: { box: 2 }, broken: null, invalid: { box: 'bad' } })).toEqual({
+      valid: { box: 2, streak: 0, mistakes: 0, lastReviewed: '1970-01-01T00:00:00.000Z', nextReview: '1970-01-01T00:00:00.000Z' },
+    });
+    expect(sanitizeSRSMap({ capped: { box: 99, streak: -2, mistakes: 2.8, nextReview: 'bad' } }).capped).toMatchObject({
+      box: 5, streak: 0, mistakes: 2, lastReviewed: '1970-01-01T00:00:00.000Z', nextReview: '1970-01-01T00:00:00.000Z',
+    });
     expect(srsKeys.word('42', 'ru_to_de', 'plural')).toBe('42:ru_to_de:plural');
     expect(srsKeys.verb.stammformen('laufen')).toBe('laufen:stammformen');
   });

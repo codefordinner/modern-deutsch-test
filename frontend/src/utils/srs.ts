@@ -44,7 +44,29 @@ export function sanitizeSRSMap(raw: unknown): SRSMap {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
   const result: SRSMap = {};
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) result[key] = value as SRSRecord;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+
+    const candidate = value as Record<string, unknown>;
+    const box = candidate.box;
+    if (typeof box !== 'number' || !Number.isFinite(box)) continue;
+
+    const nonNegativeInteger = (item: unknown): number =>
+      typeof item === 'number' && Number.isFinite(item) && item >= 0 ? Math.floor(item) : 0;
+    const validDate = (item: unknown): string | null =>
+      typeof item === 'string' && !Number.isNaN(Date.parse(item)) ? item : null;
+    const lastReviewed = validDate(candidate.lastReviewed) ?? new Date(0).toISOString();
+    const nextReview = validDate(candidate.nextReview) ?? lastReviewed;
+    const record: SRSRecord = {
+      box: Math.min(SRS_BOX_COUNT, Math.max(1, Math.round(box))),
+      streak: nonNegativeInteger(candidate.streak),
+      mistakes: nonNegativeInteger(candidate.mistakes),
+      lastReviewed,
+      nextReview,
+    };
+    if (typeof candidate.promotedOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.promotedOn)) {
+      record.promotedOn = candidate.promotedOn;
+    }
+    result[key] = record;
   }
   return result;
 }
