@@ -26,6 +26,7 @@ interface ProfileEditors {
   model: string;
   prompt: string;
   severity: number;
+  batchSize?: number;
 }
 
 export function AISettingsTab() {
@@ -41,8 +42,8 @@ export function AISettingsTab() {
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
     [CHECK_PROFILE]: { model: '', prompt: '', severity: 3 },
     [WORD_FILL_PROFILE]: { model: '', prompt: '', severity: 3 },
-    [CATEGORY_PROFILE]: { model: '', prompt: '', severity: 3 },
-    [REQUIRED_CASE_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [CATEGORY_PROFILE]: { model: '', prompt: '', severity: 3, batchSize: 100 },
+    [REQUIRED_CASE_PROFILE]: { model: '', prompt: '', severity: 3, batchSize: 100 },
   });
 
   const setProfile = (id: string, patch: Partial<ProfileEditors>) =>
@@ -58,6 +59,7 @@ export function AISettingsTab() {
           model: result.profiles[id]?.model ?? '',
           prompt: result.profiles[id]?.prompt ?? '',
           severity: result.profiles[id]?.severity ?? 3,
+          batchSize: result.profiles[id]?.batchSize ?? 100,
         };
       }
       setProfiles(next);
@@ -91,7 +93,8 @@ export function AISettingsTab() {
           editor.model,
           last ? undefined : apiKey,
           editor.prompt,
-          hasSeverity ? editor.severity : undefined
+          hasSeverity ? editor.severity : undefined,
+          id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE ? editor.batchSize : undefined
         );
       }
       setApiKey('');
@@ -148,6 +151,10 @@ export function AISettingsTab() {
         <label className="setting-toggle-title" htmlFor="ai-severity">Жёсткость проверки: {profiles[id].severity} из 5</label>
       )}
       {showSeverity && <input id="ai-severity" type="range" min="1" max="5" step="1" value={profiles[id].severity} onChange={(event) => setProfile(id, { severity: Number(event.target.value) })} />}
+      {(id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE) && <>
+        <label className="setting-toggle-title" htmlFor={`ai-batch-size-${id}`}>Слов за один промпт: {profiles[id].batchSize}</label>
+        <input id={`ai-batch-size-${id}`} type="range" min="10" max="1000" step="10" value={profiles[id].batchSize ?? 100} onChange={(event) => setProfile(id, { batchSize: Number(event.target.value) })} />
+      </>}
     </div>
   );
 
@@ -171,12 +178,14 @@ export function AISettingsTab() {
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button>
       </div>
 
-      <section className="ai-error-log" aria-labelledby="ai-error-log-title">
+      <section aria-labelledby="ai-queue-title">
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
           <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
           {!queue?.items.length ? <div className="muted-note">Очередь пуста.</div> : <div className="ai-error-log-list">{queue.items.slice().reverse().map((item) => <div key={item.id} className="ai-error-log-item"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong> · {AI_QUEUE_STATUS_LABELS[item.status] ?? item.status} · {item.model ?? 'модель не указана'}{item.error ? ` · ${item.error}` : ''}</div>)}</div>}
         </section>
+      </section>
+      <section className="ai-error-log" aria-labelledby="ai-error-log-title">
         <div className="stats-header">
           <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
           <div className="backup-actions">

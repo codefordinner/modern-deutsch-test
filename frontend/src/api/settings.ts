@@ -16,12 +16,12 @@ export const saveAudioVoice = (voice: string) => request<AudioVoiceResponse>('/s
 export const resetAudioVoice = () => request<AudioVoiceResponse>('/settings/audio-voice', { method: 'DELETE', auth: true });
 
 export interface AIModel { name: string; displayName: string; supportedGenerationMethods: string[] }
-export interface AIProfile { model: string; prompt: string; severity?: number }
+export interface AIProfile { model: string; prompt: string; severity?: number; batchSize?: number }
 export interface AISettingsResponse { provider: 'gemini'; hasApiKey: boolean; isDefault: boolean; profiles: Record<string, AIProfile> }
 export interface AICheckResponse { ok: boolean; message: string; settings: AISettingsResponse }
 export const fetchAISettings = () => request<AISettingsResponse>('/settings/ai', { auth: true });
 export const fetchAIModels = () => request<{ models: AIModel[] }>('/settings/ai/models', { auth: true });
-export const saveAISettings = (profileId: string, model: string, apiKey: string | undefined, prompt: string, severity?: number) => request<AISettingsResponse>('/settings/ai', { method: 'PUT', body: { profileId, model, prompt, ...(severity === undefined ? {} : { severity }), ...(apiKey ? { apiKey } : {}) }, auth: true });
+export const saveAISettings = (profileId: string, model: string, apiKey: string | undefined, prompt: string, severity?: number, batchSize?: number) => request<AISettingsResponse>('/settings/ai', { method: 'PUT', body: { profileId, model, prompt, ...(severity === undefined ? {} : { severity }), ...(batchSize === undefined ? {} : { batchSize }), ...(apiKey ? { apiKey } : {}) }, auth: true });
 export const checkAISettings = () => request<AICheckResponse & { models: AIModel[] }>('/settings/ai/check', { method: 'POST', auth: true });
 export const resetAIPrompt = (profileId: string) => request<AISettingsResponse>(`/settings/ai/profile/${encodeURIComponent(profileId)}`, { method: 'DELETE', auth: true });
 export interface AIErrorLog {

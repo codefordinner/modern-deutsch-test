@@ -12,7 +12,7 @@ export interface AISettingsPublic {
   provider: 'gemini';
   hasApiKey: boolean;
   isDefault: boolean;
-  profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number }>;
+  profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }>;
 }
 
 export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
@@ -32,7 +32,7 @@ export interface PictureCheckResult {
   level: string;
   usefulExpressions: string[];
 }
-interface StoredAISettings { provider: 'gemini'; apiKey: string; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number }> }
+interface StoredAISettings { provider: 'gemini'; apiKey: string; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }> }
 const DEFAULT_MODEL = '';
 export const DEFAULT_PICTURE_PROMPT = [
   'Ты готовишь эталонные данные для тренажёра описания картинки.',
@@ -74,6 +74,7 @@ export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
 export const MAX_AI_BATCH_WORDS = 5000;
+export const DEFAULT_AI_BATCH_SIZE = 100;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -88,7 +89,7 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const raw = value as Record<string, unknown>;
   if (raw.provider !== 'gemini' || (raw.model !== undefined && raw.model !== '' && !isGeminiModel(raw.model)) || !isValidApiKey(raw.apiKey)) return null;
   const legacyPrompt = typeof raw.prompt === 'string' && raw.prompt.trim() ? raw.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_PROMPT;
-  const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, { model: string; prompt: string; severity?: number }> : {};
+  const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, { model: string; prompt: string; severity?: number; batchSize?: number }> : {};
   const pictureProfile = profiles[AI_PROFILE_PICTURE_DESCRIPTION];
   const pictureModel = typeof pictureProfile?.model === 'string' && isGeminiModel(pictureProfile.model) ? pictureProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const picturePrompt = typeof pictureProfile?.prompt === 'string' && pictureProfile.prompt.trim() ? pictureProfile.prompt.trim().slice(0, 10_000) : legacyPrompt;
@@ -102,11 +103,12 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const wordFillModel = typeof wordFillProfile?.model === 'string' && isGeminiModel(wordFillProfile.model) ? wordFillProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const wordFillPrompt = typeof wordFillProfile?.prompt === 'string' && wordFillProfile.prompt.trim() ? wordFillProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_FILL_PROMPT;
   const categoryProfile = profiles[AI_PROFILE_CATEGORY_REDISTRIBUTION];
-  const categoryModel = typeof categoryProfile?.model === 'string' && isGeminiModel(categoryProfile.model) ? categoryProfile.model.trim() : '';
+  const categoryModel = typeof categoryProfile?.model === 'string' && isGeminiModel(categoryProfile.model) ? categoryProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const categoryPrompt = typeof categoryProfile?.prompt === 'string' && categoryProfile.prompt.trim() ? categoryProfile.prompt.trim().slice(0, 10_000) : DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT;
   const caseProfile = profiles[AI_PROFILE_REQUIRED_CASE];
-  const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : '';
+  const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const casePrompt = typeof caseProfile?.prompt === 'string' && caseProfile.prompt.trim() ? caseProfile.prompt.trim().slice(0, 10_000) : DEFAULT_REQUIRED_CASE_PROMPT;
+  const batchSizeOf = (profile: { batchSize?: number } | undefined) => Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
   return { provider: 'gemini', apiKey: raw.apiKey.trim(), profiles: {
     [AI_PROFILE_PICTURE_DESCRIPTION]: {
       model: pictureModel,
@@ -122,8 +124,8 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
       model: wordFillModel,
       prompt: wordFillPrompt,
     },
-    [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: categoryModel, prompt: categoryPrompt },
-    [AI_PROFILE_REQUIRED_CASE]: { model: caseModel, prompt: casePrompt },
+    [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: categoryModel, prompt: categoryPrompt, batchSize: batchSizeOf(categoryProfile) },
+    [AI_PROFILE_REQUIRED_CASE]: { model: caseModel, prompt: casePrompt, batchSize: batchSizeOf(caseProfile) },
   } };
 }
 
@@ -144,13 +146,13 @@ export async function readAISettings(): Promise<AISettingsPublic> {
       [AI_PROFILE_PICTURE_FORMAT]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_FORMAT_PROMPT },
       [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
       [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
-      [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT },
-      [AI_PROFILE_REQUIRED_CASE]: { model: DEFAULT_MODEL, prompt: DEFAULT_REQUIRED_CASE_PROMPT },
+      [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
+      [AI_PROFILE_REQUIRED_CASE]: { model: DEFAULT_MODEL, prompt: DEFAULT_REQUIRED_CASE_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
     },
   };
 }
 
-export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown }): Promise<AISettingsPublic> {
+export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown }): Promise<AISettingsPublic> {
   if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(input.profileId)) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
@@ -160,7 +162,9 @@ export async function writeAISettings(input: { profileId: string; model: unknown
   const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : input.profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : DEFAULT_PICTURE_PROMPT;
   const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
   if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
-  const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}) };
+  const batchProfile = input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || input.profileId === AI_PROFILE_REQUIRED_CASE;
+  const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(input.batchSize ?? currentProfile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
+  const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}), ...(batchProfile ? { batchSize } : {}) };
   const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), profiles: { ...(current?.profiles ?? {}), [input.profileId]: profile } };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
   return { provider: 'gemini', hasApiKey: true, isDefault: false, profiles: value.profiles };
@@ -176,6 +180,7 @@ export async function resetAIProfile(profileId: string): Promise<AISettingsPubli
     model: currentProfile?.model ?? '',
     prompt: defaultPrompt,
     ...(profileId === AI_PROFILE_PICTURE_CHECK ? { severity: currentProfile?.severity ?? 3 } : {}),
+    ...((profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || profileId === AI_PROFILE_REQUIRED_CASE) ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
   };
   const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
@@ -425,48 +430,62 @@ async function generateBatchJson(profileId: string, words: AiWordInput[], contex
   if (!profile?.model) throw new Error('MISSING_MODEL');
   if (!words.length) throw new Error('EMPTY_WORDS');
   if (words.length > MAX_AI_BATCH_WORDS) throw new Error('WORDS_TOO_MANY');
-  const prompt = `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(words)}`;
-  let response: Response;
-  try {
-    response = await enqueueAI(profileId === AI_PROFILE_REQUIRED_CASE ? 'required-case' : 'category-redistribution', profileId, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+  const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile.batchSize) || DEFAULT_AI_BATCH_SIZE)));
+  const chunks: AiWordInput[][] = [];
+  for (let i = 0; i < words.length; i += batchSize) chunks.push(words.slice(i, i + batchSize));
+  const generate = async (chunk: AiWordInput[]) => {
+    const prompt = `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(chunk)}`;
+    return enqueueAI(profileId === AI_PROFILE_REQUIRED_CASE ? 'required-case' : 'category-redistribution', profileId, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }),
       signal: AbortSignal.timeout(240_000),
     }), profile.model);
-  } catch (error) {
-      if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw Object.assign(new Error('AI_TIMEOUT'), { model: profile.model, durationMs: (error as Error & { durationMs?: number }).durationMs });
-    throw error;
+  };
+  const responses = await Promise.all(chunks.map(generate));
+  const all: unknown[] = [];
+  for (const response of responses) {
+    if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model });
+    const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+    const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+    if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
+    try {
+      const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim());
+      if (!Array.isArray(parsed)) throw new Error();
+      all.push(...parsed);
+    } catch { throw new Error('INVALID_AI_RESPONSE'); }
   }
-  if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model });
-  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
-  const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
-  if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
-  try {
-    const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim());
-    if (!Array.isArray(parsed)) throw new Error();
-    return parsed;
-  } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  return all;
 }
 
 export async function redistributeCategories(words: AiWordInput[], categories: string[]): Promise<Array<{ id: string; categories: string[] }>> {
   const result = await generateBatchJson(AI_PROFILE_CATEGORY_REDISTRIBUTION, words, `Разрешённые категории: ${JSON.stringify(categories)}`);
   const allowed = new Set(categories);
-  return result.map((item) => {
+  const expected = new Set(words.map((word) => word.id));
+  if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+  const seen = new Set<string>();
+  const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
     const names = Array.isArray(row.categories) ? row.categories.filter((v): v is string => typeof v === 'string' && allowed.has(v)) : [];
-    if (typeof row.id !== 'string' || names.length === 0) throw new Error('INVALID_AI_RESPONSE');
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || names.length === 0) throw new Error('INVALID_AI_RESPONSE');
+    seen.add(row.id);
     return { id: row.id, categories: [...new Set(names)] };
   });
+  return normalized;
 }
 
 export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{ id: string; requiredCase: 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null }>> {
   const result = await generateBatchJson(AI_PROFILE_REQUIRED_CASE, words, 'Допустимые значения requiredCase: nominativ, akkusativ, dativ, genitiv или null.');
   const valid = new Set(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
-  return result.map((item) => {
+  const expected = new Set(words.map((word) => word.id));
+  if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+  const seen = new Set<string>();
+  const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    if (typeof row.id !== 'string' || (row.requiredCase !== null && typeof row.requiredCase !== 'string' || (typeof row.requiredCase === 'string' && !valid.has(row.requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || (row.requiredCase !== null && typeof row.requiredCase !== 'string' || (typeof row.requiredCase === 'string' && !valid.has(row.requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
+    seen.add(row.id);
     return { id: row.id, requiredCase: row.requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
   });
+  return normalized;
 }

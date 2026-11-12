@@ -115,14 +115,15 @@ router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (r
     const result = await redistributeCategories(words, categories.map((c) => c.name));
     const selectedIds = new Set(words.map((word) => word.id));
     const byName = new Map(categories.map((c) => [c.name, c.id]));
-    let count = 0;
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
     for (const item of result) {
       if (!selectedIds.has(item.id)) continue;
       const categoryIds = item.categories.map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
       if (!categoryIds.length) continue;
-      await prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } });
-      count++;
+      updates.push(prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } }));
     }
+    await prisma.$transaction(updates);
+    const count = updates.length;
     res.json({ success: true, count });
   } catch (error) {
     await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
@@ -138,12 +139,13 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
     if (words.length === 0) return res.json({ success: true, count: 0 });
     const result = await detectRequiredCases(words);
     const selectedIds = new Set(words.map((word) => word.id));
-    let count = 0;
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
     for (const item of result) {
       if (!selectedIds.has(item.id)) continue;
-      await prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } });
-      count++;
+      updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
     }
+    await prisma.$transaction(updates);
+    const count = updates.length;
     res.json({ success: true, count });
   } catch (error) {
     await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
