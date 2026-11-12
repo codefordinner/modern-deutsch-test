@@ -20,7 +20,7 @@ import {
   UNAUTHORIZED_EVENT,
 } from '../api/request';
 import { checkSession, logout } from '../api/auth';
-import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord } from '../api/adminWords';
+import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, detectRequiredCasesViaAI, redistributeCategoriesViaAI } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';
@@ -176,6 +176,15 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleAIAction = async (action: 'categories' | 'cases', ids: string[]): Promise<boolean> => {
+    try {
+      const result = action === 'categories' ? await redistributeCategoriesViaAI(ids) : await detectRequiredCasesViaAI(ids);
+      showToast(`ИИ обработал слов: ${result.count}`, 'success');
+      refreshAll();
+      return true;
+    } catch (e) { reportError(e, action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи'); return false; }
+  };
+
   if (isAuthed === null) return <div className="centered-message">Проверка сессии...</div>;
   if (!isAuthed) return <AdminLogin onLogin={handleLogin} />;
 
@@ -211,6 +220,7 @@ export const AdminPanel: React.FC = () => {
           onBulkCategory={handleBulkCategory}
           onBulkPartOfSpeech={handleBulkPartOfSpeech}
           onBulkDelete={handleBulkDelete}
+          onAIAction={handleAIAction}
         />
       )}
       {tab === 'categories' && (

@@ -7,6 +7,8 @@ export type AIErrorOperation =
   | 'picture-format'
   | 'picture-check'
   | 'word-fill'
+  | 'category-redistribution'
+  | 'required-case'
   | 'prompt-test';
 
 export class AIServiceError extends Error {

@@ -14,6 +14,9 @@ import {
   resolvePartOfSpeech,
 } from '../services/wordImport';
 import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
+import { detectRequiredCases, redistributeCategories } from '../services/aiSettings';
+import { recordAIError } from '../services/aiErrorLog';
+import rateLimit from 'express-rate-limit';
 
 /**
  * Admin-only tools for working with many words at once:
@@ -26,6 +29,7 @@ const router = Router();
 
 const MAX_IDS = 5000;
 const CHUNK = 500; // stays well below SQLite's bound-variable limit
+const aiBulkLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Слишком много запросов к ИИ. Подождите минуту.' } });
 
 function readIds(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
@@ -97,6 +101,53 @@ router.post('/bulk/delete', requireAdmin, async (req: Request, res: Response) =>
     res.json({ success: true, count });
   } catch (error) {
     res.status(500).json({ error: 'Не удалось удалить слова' });
+  }
+});
+
+router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (req: Request, res: Response) => {
+  try {
+    const ids = readIds(req.body?.ids);
+    if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
+    const [words, categories] = await Promise.all([
+      prisma.word.findMany({ where: { id: { in: ids } }, select: { id: true, de: true, ru: true } }),
+      prisma.category.findMany({ select: { id: true, name: true } }),
+    ]);
+    const result = await redistributeCategories(words, categories.map((c) => c.name));
+    const selectedIds = new Set(words.map((word) => word.id));
+    const byName = new Map(categories.map((c) => [c.name, c.id]));
+    let count = 0;
+    for (const item of result) {
+      if (!selectedIds.has(item.id)) continue;
+      const categoryIds = item.categories.map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
+      if (!categoryIds.length) continue;
+      await prisma.word.update({ where: { id: item.id }, data: { categoryId: categoryIds[0], extraCategories: { set: categoryIds.slice(1).map((id) => ({ id })) } } });
+      count++;
+    }
+    res.json({ success: true, count });
+  } catch (error) {
+    await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
+    res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для перераспределения категорий не выбрана модель Gemini' : 'ИИ не смог перераспределить категории' });
+  }
+});
+
+router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Request, res: Response) => {
+  try {
+    const ids = readIds(req.body?.ids);
+    if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
+    const words = await prisma.word.findMany({ where: { id: { in: ids }, partOfSpeech: 'verb' }, select: { id: true, de: true, ru: true } });
+    if (words.length === 0) return res.json({ success: true, count: 0 });
+    const result = await detectRequiredCases(words);
+    const selectedIds = new Set(words.map((word) => word.id));
+    let count = 0;
+    for (const item of result) {
+      if (!selectedIds.has(item.id)) continue;
+      await prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } });
+      count++;
+    }
+    res.json({ success: true, count });
+  } catch (error) {
+    await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
+    res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для определения падежей не выбрана модель Gemini' : 'ИИ не смог определить падежи' });
   }
 });
 

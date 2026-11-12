@@ -18,6 +18,8 @@ export const AI_PROFILE_PICTURE_DESCRIPTION = 'pictureDescription';
 export const AI_PROFILE_PICTURE_FORMAT = 'pictureAnswerFormat';
 export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
 export const AI_PROFILE_WORD_FILL = 'wordFill';
+export const AI_PROFILE_CATEGORY_REDISTRIBUTION = 'categoryRedistribution';
+export const AI_PROFILE_REQUIRED_CASE = 'requiredCase';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
 export interface PictureCheckResult {
   segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string; correction?: string }>;
@@ -65,9 +67,12 @@ export const DEFAULT_WORD_FILL_PROMPT = [
   ']',
   '```',
 ].join(' ');
+export const DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT = 'Ты распределяешь слова немецкого учебного словаря по существующим категориям. Верни только JSON-массив объектов {"id":"...","categories":["точное название категории"]}. Для каждого слова выбери одну или несколько наиболее подходящих категорий только из переданного списка. Не придумывай категории, не меняй id, не пропускай слова.';
+export const DEFAULT_REQUIRED_CASE_PROMPT = 'Ты определяешь управление немецких глаголов. Верни только JSON-массив объектов {"id":"...","requiredCase":"nominativ|akkusativ|dativ|genitiv|null"}. Выбери падеж, который требует глагол в типичном значении; если глагол не требует объекта или уверенности нет, верни null. Не угадывай, не меняй id и не пропускай слова.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
+export const MAX_AI_BATCH_WORDS = 5000;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -95,6 +100,12 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const wordFillProfile = profiles[AI_PROFILE_WORD_FILL];
   const wordFillModel = typeof wordFillProfile?.model === 'string' && isGeminiModel(wordFillProfile.model) ? wordFillProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const wordFillPrompt = typeof wordFillProfile?.prompt === 'string' && wordFillProfile.prompt.trim() ? wordFillProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_FILL_PROMPT;
+  const categoryProfile = profiles[AI_PROFILE_CATEGORY_REDISTRIBUTION];
+  const categoryModel = typeof categoryProfile?.model === 'string' && isGeminiModel(categoryProfile.model) ? categoryProfile.model.trim() : '';
+  const categoryPrompt = typeof categoryProfile?.prompt === 'string' && categoryProfile.prompt.trim() ? categoryProfile.prompt.trim().slice(0, 10_000) : DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT;
+  const caseProfile = profiles[AI_PROFILE_REQUIRED_CASE];
+  const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : '';
+  const casePrompt = typeof caseProfile?.prompt === 'string' && caseProfile.prompt.trim() ? caseProfile.prompt.trim().slice(0, 10_000) : DEFAULT_REQUIRED_CASE_PROMPT;
   return { provider: 'gemini', apiKey: raw.apiKey.trim(), profiles: {
     [AI_PROFILE_PICTURE_DESCRIPTION]: {
       model: pictureModel,
@@ -110,6 +121,8 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
       model: wordFillModel,
       prompt: wordFillPrompt,
     },
+    [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: categoryModel, prompt: categoryPrompt },
+    [AI_PROFILE_REQUIRED_CASE]: { model: caseModel, prompt: casePrompt },
   } };
 }
 
@@ -130,18 +143,20 @@ export async function readAISettings(): Promise<AISettingsPublic> {
       [AI_PROFILE_PICTURE_FORMAT]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_FORMAT_PROMPT },
       [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
       [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
+      [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT },
+      [AI_PROFILE_REQUIRED_CASE]: { model: DEFAULT_MODEL, prompt: DEFAULT_REQUIRED_CASE_PROMPT },
     },
   };
 }
 
 export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown }): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL].includes(input.profileId)) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(input.profileId)) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
   const currentProfile = current?.profiles[input.profileId];
-  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : input.profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : DEFAULT_PICTURE_PROMPT;
   const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
   if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
   const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}) };
@@ -151,11 +166,11 @@ export async function writeAISettings(input: { profileId: string; model: unknown
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL].includes(profileId)) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(profileId)) throw new Error('INVALID_PROFILE');
   const current = await readStored();
   if (!current) return readAISettings();
   const currentProfile = current.profiles[profileId];
-  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : DEFAULT_PICTURE_PROMPT;
   const profile = {
     model: currentProfile?.model ?? '',
     prompt: defaultPrompt,
@@ -398,4 +413,59 @@ export async function generateWordFill(input: { words: string; categories: strin
   if (parsed.length > MAX_WORD_FILL_WORDS) throw new Error('WORDS_TOO_MANY');
 
   return { json, count: parsed.length };
+}
+
+type AiWordInput = { id: string; de: string; ru: string };
+
+async function generateBatchJson(profileId: string, words: AiWordInput[], context: string): Promise<unknown[]> {
+  const stored = await readStored();
+  if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
+  const profile = stored.profiles[profileId];
+  if (!profile?.model) throw new Error('MISSING_MODEL');
+  if (!words.length) throw new Error('EMPTY_WORDS');
+  if (words.length > MAX_AI_BATCH_WORDS) throw new Error('WORDS_TOO_MANY');
+  const prompt = `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(words)}`;
+  let response: Response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }),
+      signal: AbortSignal.timeout(240_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error('AI_TIMEOUT');
+    throw error;
+  }
+  if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status });
+  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
+  if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
+  try {
+    const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim());
+    if (!Array.isArray(parsed)) throw new Error();
+    return parsed;
+  } catch { throw new Error('INVALID_AI_RESPONSE'); }
+}
+
+export async function redistributeCategories(words: AiWordInput[], categories: string[]): Promise<Array<{ id: string; categories: string[] }>> {
+  const result = await generateBatchJson(AI_PROFILE_CATEGORY_REDISTRIBUTION, words, `Разрешённые категории: ${JSON.stringify(categories)}`);
+  const allowed = new Set(categories);
+  return result.map((item) => {
+    if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
+    const row = item as Record<string, unknown>;
+    const names = Array.isArray(row.categories) ? row.categories.filter((v): v is string => typeof v === 'string' && allowed.has(v)) : [];
+    if (typeof row.id !== 'string' || names.length === 0) throw new Error('INVALID_AI_RESPONSE');
+    return { id: row.id, categories: [...new Set(names)] };
+  });
+}
+
+export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{ id: string; requiredCase: 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null }>> {
+  const result = await generateBatchJson(AI_PROFILE_REQUIRED_CASE, words, 'Допустимые значения requiredCase: nominativ, akkusativ, dativ, genitiv или null.');
+  const valid = new Set(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
+  return result.map((item) => {
+    if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== 'string' || (row.requiredCase !== null && typeof row.requiredCase !== 'string' || (typeof row.requiredCase === 'string' && !valid.has(row.requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
+    return { id: row.id, requiredCase: row.requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
+  });
 }

@@ -7,6 +7,8 @@ const PICTURE_PROFILE = 'pictureDescription';
 const PICTURE_FORMAT_PROFILE = 'pictureAnswerFormat';
 const CHECK_PROFILE = 'pictureAnswerCheck';
 const WORD_FILL_PROFILE = 'wordFill';
+const CATEGORY_PROFILE = 'categoryRedistribution';
+const REQUIRED_CASE_PROFILE = 'requiredCase';
 const AI_OPERATION_LABELS: Record<string, string> = {
   models: 'Список моделей',
   'settings-check': 'Проверка настроек',
@@ -14,6 +16,8 @@ const AI_OPERATION_LABELS: Record<string, string> = {
   'picture-format': 'Форматирование диктовки',
   'picture-check': 'Проверка ответа',
   'word-fill': 'Заполнение слов',
+  'category-redistribution': 'Перераспределение категорий',
+  'required-case': 'Определение падежей глаголов',
   'prompt-test': 'Тест промпта',
 };
 
@@ -35,6 +39,8 @@ export function AISettingsTab() {
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
     [CHECK_PROFILE]: { model: '', prompt: '', severity: 3 },
     [WORD_FILL_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [CATEGORY_PROFILE]: { model: '', prompt: '', severity: 3 },
+    [REQUIRED_CASE_PROFILE]: { model: '', prompt: '', severity: 3 },
   });
 
   const setProfile = (id: string, patch: Partial<ProfileEditors>) =>
@@ -45,7 +51,7 @@ export function AISettingsTab() {
       const result = await fetchAISettings();
       setSettings(result);
       const next: Record<string, ProfileEditors> = {};
-      for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE]) {
+      for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE, CATEGORY_PROFILE, REQUIRED_CASE_PROFILE]) {
         next[id] = {
           model: result.profiles[id]?.model ?? '',
           prompt: result.profiles[id]?.prompt ?? '',
@@ -150,6 +156,8 @@ export function AISettingsTab() {
       {profileBlock(PICTURE_FORMAT_PROFILE, 'Профиль: обработка голосового ответа', 'Промпт обработки голосового ответа', false)}
       {profileBlock(CHECK_PROFILE, 'Профиль: проверка ответа пользователя', 'Промпт проверки ответа', true)}
       {profileBlock(WORD_FILL_PROFILE, 'Профиль: заполнение слов', 'Промпт заполнения слов', false)}
+      {profileBlock(CATEGORY_PROFILE, 'Профиль: перераспределение категорий', 'Промпт перераспределения категорий', false)}
+      {profileBlock(REQUIRED_CASE_PROFILE, 'Профиль: определение падежей глаголов', 'Промпт определения падежей', false)}
 
       <div className="backup-actions">
         <button type="button" className="btn-primary" disabled={busy || (!apiKey && !settings?.hasApiKey)} onClick={() => void save()}><Save size={15} /> Сохранить</button>

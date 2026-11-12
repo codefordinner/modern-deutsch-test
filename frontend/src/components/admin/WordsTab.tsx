@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Sparkles } from 'lucide-react';
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
 import { wordCategories } from '../../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../../types';
@@ -18,6 +18,7 @@ interface WordsTabProps {
   onBulkCategory: (ids: string[], categoryId: string) => Promise<boolean>;
   onBulkPartOfSpeech: (ids: string[], partOfSpeech: PartOfSpeech | null) => Promise<boolean>;
   onBulkDelete: (ids: string[]) => Promise<boolean>;
+  onAIAction: (action: 'categories' | 'cases', ids: string[]) => Promise<boolean>;
 }
 
 export const WordsTab: React.FC<WordsTabProps> = ({
@@ -33,6 +34,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
   onBulkCategory,
   onBulkPartOfSpeech,
   onBulkDelete,
+  onAIAction,
 }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetCategory, setTargetCategory] = useState('');
@@ -142,6 +144,8 @@ export const WordsTab: React.FC<WordsTabProps> = ({
           >
             <Trash2 size={14} /> Удалить
           </button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => onAIAction('categories', selectedIds))}><Sparkles size={14} /> Категории через ИИ</button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => onAIAction('cases', selectedIds))}><Sparkles size={14} /> Падежи через ИИ</button>
           <button type="button" className="btn-secondary" onClick={() => setSelected(new Set())}>Снять выбор</button>
         </div>
       )}
