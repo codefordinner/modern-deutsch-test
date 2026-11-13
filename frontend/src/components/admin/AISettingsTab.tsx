@@ -38,6 +38,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const [settings, setSettings] = useState<AISettingsResponse | null>(null);
   const [models, setModels] = useState<AIModel[]>([]);
   const [apiKey, setApiKey] = useState('');
+  const [requestsPerMinute, setRequestsPerMinute] = useState(10);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<AIErrorLog[]>([]);
   const [logsBusy, setLogsBusy] = useState(false);
@@ -60,6 +61,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     try {
       const result = await fetchAISettings();
       setSettings(result);
+      setRequestsPerMinute(result.requestsPerMinute ?? 10);
       const next: Record<string, ProfileEditors> = {};
       for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE, CATEGORY_PROFILE, REQUIRED_CASE_PROFILE]) {
         next[id] = {
@@ -104,7 +106,8 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
           last ? undefined : apiKey,
           editor.prompt,
           hasSeverity ? editor.severity : undefined,
-          id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE ? editor.batchSize : undefined
+           id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE ? editor.batchSize : undefined,
+           id === PICTURE_PROFILE ? requestsPerMinute : undefined
         );
       }
       setApiKey('');
@@ -185,8 +188,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   return <div className={`card ai-settings-card ${showSettings ? 'ai-settings-card--settings' : 'ai-settings-card--logs'}`}>
     <h3 className="card-title"><Bot size={20} /> {showSettings ? 'Настройки ИИ' : 'Логи ИИ'}</h3>
     <p className="card-note">{showSettings ? 'Провайдер — Google Gemini. Выберите нужный профиль ниже, чтобы открыть его подробности и изменить инструкцию.' : 'Здесь отображаются активные задачи и технические ошибки AI-операций. Тексты промптов и ответы пользователей не сохраняются.'}</p>
-    <div className="settings-divider">
-      <label className="setting-toggle-title" htmlFor="ai-api-key">API-ключ Gemini</label>
+      <div className="settings-divider">
+       <label className="setting-toggle-title" htmlFor="ai-rate-limit">Запросов к Gemini в минуту: {requestsPerMinute}</label>
+       <input id="ai-rate-limit" type="range" min="1" max="60" step="1" value={requestsPerMinute} onChange={(event) => setRequestsPerMinute(Number(event.target.value))} />
+       <p className="card-note">Ограничение действует для всех операций ИИ. Если Gemini часто отвечает 429, уменьшите значение.</p>
+       <label className="setting-toggle-title" htmlFor="ai-api-key">API-ключ Gemini</label>
       <input id="ai-api-key" className="text-input" type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.hasApiKey ? 'Ключ сохранён — введите новый для замены' : 'Введите API-ключ'} />
       <div className="ai-key-status"><ShieldCheck size={16} /> {settings?.hasApiKey ? 'Ключ сохранён на сервере' : 'Ключ не задан'}</div>
 

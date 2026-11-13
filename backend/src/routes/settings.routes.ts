@@ -49,7 +49,7 @@ router.get('/ai/models', requireAdmin, async (_req, res) => {
 
 router.put('/ai', requireAdmin, async (req, res) => {
   if (req.body?.model !== '' && !isGeminiModel(req.body?.model)) return res.status(400).json({ error: 'Выбрана неизвестная модель Gemini' });
-  try { res.json(await writeAISettings({ profileId: req.body?.profileId, model: req.body.model, apiKey: req.body.apiKey, prompt: req.body.prompt, severity: req.body.severity, batchSize: req.body.batchSize })); }
+  try { res.json(await writeAISettings({ profileId: req.body?.profileId, model: req.body.model, apiKey: req.body.apiKey, prompt: req.body.prompt, severity: req.body.severity, batchSize: req.body.batchSize, requestsPerMinute: req.body.requestsPerMinute })); }
   catch (error) {
     if (error instanceof Error && error.message === 'INVALID_API_KEY') return res.status(400).json({ error: 'Ключ Gemini должен содержать не менее 10 символов' });
     if (error instanceof Error && error.message === 'INVALID_PROMPT') return res.status(400).json({ error: 'Промпт не должен быть пустым и не может быть длиннее 10 000 символов' });

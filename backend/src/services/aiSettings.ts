@@ -1,6 +1,6 @@
 import { prisma } from '../db';
 import { AIServiceError, recordAIError } from './aiErrorLog';
-import { enqueueAI } from './aiQueue';
+import { configureAIRequestRateLimit, enqueueAI } from './aiQueue';
 
 /** Central AI configuration module. Provider calls must be added here, not in routes or UI. */
 export const AI_SETTINGS_KEY = 'aiSettings';
@@ -12,6 +12,7 @@ export interface AISettingsPublic {
   provider: 'gemini';
   hasApiKey: boolean;
   isDefault: boolean;
+  requestsPerMinute: number;
   profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }>;
 }
 
@@ -32,7 +33,8 @@ export interface PictureCheckResult {
   level: string;
   usefulExpressions: string[];
 }
-interface StoredAISettings { provider: 'gemini'; apiKey: string; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }> }
+interface StoredAISettings { provider: 'gemini'; apiKey: string; requestsPerMinute: number; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }> }
+export const DEFAULT_AI_REQUESTS_PER_MINUTE = 10;
 const DEFAULT_MODEL = '';
 export const DEFAULT_PICTURE_PROMPT = [
   'Ты готовишь эталонные данные для тренажёра описания картинки.',
@@ -109,7 +111,8 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const casePrompt = typeof caseProfile?.prompt === 'string' && caseProfile.prompt.trim() ? caseProfile.prompt.trim().slice(0, 10_000) : DEFAULT_REQUIRED_CASE_PROMPT;
   const batchSizeOf = (profile: { batchSize?: number } | undefined) => Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
-  return { provider: 'gemini', apiKey: raw.apiKey.trim(), profiles: {
+  const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(raw.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
+  return { provider: 'gemini', apiKey: raw.apiKey.trim(), requestsPerMinute, profiles: {
     [AI_PROFILE_PICTURE_DESCRIPTION]: {
       model: pictureModel,
       prompt: picturePrompt,
@@ -131,8 +134,8 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
 
 async function readStored(): Promise<StoredAISettings | null> {
   const row = await prisma.setting.findUnique({ where: { key: AI_SETTINGS_KEY } });
-  if (!row) return null;
-  try { return sanitizeStored(JSON.parse(row.value)); } catch { return null; }
+  if (!row) { configureAIRequestRateLimit(DEFAULT_AI_REQUESTS_PER_MINUTE); return null; }
+  try { const value = sanitizeStored(JSON.parse(row.value)); configureAIRequestRateLimit(value?.requestsPerMinute ?? DEFAULT_AI_REQUESTS_PER_MINUTE); return value; } catch { configureAIRequestRateLimit(DEFAULT_AI_REQUESTS_PER_MINUTE); return null; }
 }
 
 export async function readAISettings(): Promise<AISettingsPublic> {
@@ -141,6 +144,7 @@ export async function readAISettings(): Promise<AISettingsPublic> {
     provider: 'gemini',
     hasApiKey: Boolean(stored?.apiKey),
     isDefault: !stored,
+    requestsPerMinute: stored?.requestsPerMinute ?? DEFAULT_AI_REQUESTS_PER_MINUTE,
     profiles: stored?.profiles ?? {
       [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT },
       [AI_PROFILE_PICTURE_FORMAT]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_FORMAT_PROMPT },
@@ -152,7 +156,7 @@ export async function readAISettings(): Promise<AISettingsPublic> {
   };
 }
 
-export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown }): Promise<AISettingsPublic> {
+export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown; requestsPerMinute?: unknown }): Promise<AISettingsPublic> {
   if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(input.profileId)) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
@@ -165,9 +169,11 @@ export async function writeAISettings(input: { profileId: string; model: unknown
   const batchProfile = input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || input.profileId === AI_PROFILE_REQUIRED_CASE;
   const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(input.batchSize ?? currentProfile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
   const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}), ...(batchProfile ? { batchSize } : {}) };
-  const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), profiles: { ...(current?.profiles ?? {}), [input.profileId]: profile } };
+  const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(input.requestsPerMinute ?? current?.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
+  const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), requestsPerMinute, profiles: { ...(current?.profiles ?? {}), [input.profileId]: profile } };
+  configureAIRequestRateLimit(requestsPerMinute);
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
-  return { provider: 'gemini', hasApiKey: true, isDefault: false, profiles: value.profiles };
+  return { provider: 'gemini', hasApiKey: true, isDefault: false, requestsPerMinute, profiles: value.profiles };
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
@@ -184,7 +190,7 @@ export async function resetAIProfile(profileId: string): Promise<AISettingsPubli
   };
   const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
-  return { provider: 'gemini', hasApiKey: true, isDefault: false, profiles: value.profiles };
+  return { provider: 'gemini', hasApiKey: true, isDefault: false, requestsPerMinute: value.requestsPerMinute, profiles: value.profiles };
 }
 
 async function readApiKey(): Promise<string | null> {

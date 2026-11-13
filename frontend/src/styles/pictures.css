@@ -102,6 +102,7 @@
 .picture-segment--lie { background: #7f1d1d; color: #fff; }
 .ai-settings-card { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px; }
 .ai-settings-card .settings-divider { display: grid; gap: 10px; }
+.ai-settings-card input[type="range"] { accent-color: var(--accent-primary); }
 .ai-profile-title { margin: 0 0 4px; font-size: 17px; color: var(--text-primary); }
 .ai-profile-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
 .ai-profile-summary::-webkit-details-marker { display: none; }

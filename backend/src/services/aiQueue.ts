@@ -21,6 +21,9 @@ const MAX_HISTORY = 100;
 let active = 0;
 const configuredConcurrency = Number(process.env.AI_QUEUE_CONCURRENCY ?? 2);
 const CONCURRENCY = Number.isFinite(configuredConcurrency) ? Math.max(1, Math.min(8, Math.floor(configuredConcurrency))) : 2;
+const DEFAULT_REQUESTS_PER_MINUTE = 10;
+let requestsPerMinute = DEFAULT_REQUESTS_PER_MINUTE;
+const requestStarts: number[] = [];
 const retryRuns = new Map<string, { operation: string; profileId?: string; model?: string; run: () => Promise<unknown> }>();
 const retriedItems = new Set<string>();
 
@@ -44,7 +47,7 @@ async function pump(): Promise<void> {
     task.item.status = 'running';
     task.item.startedAt = new Date().toISOString();
     notify();
-    void task.run().then((result) => {
+    void waitForRequestSlot().then(() => task.run()).then((result) => {
       if (result instanceof Response && !result.ok) {
         task.item.status = 'failed';
         task.item.error = `HTTP_${result.status}`;
@@ -62,6 +65,24 @@ async function pump(): Promise<void> {
       }
       task.item.error = error instanceof Error ? error.message : 'AI_ERROR'; task.reject(error);
       }).finally(() => { active--; trim(); notify(); void pump(); });
+  }
+}
+
+/** Updates the shared provider request limit without restarting the queue. */
+export function configureAIRequestRateLimit(value: number): void {
+  requestsPerMinute = Math.max(1, Math.min(60, Math.round(value)));
+}
+
+async function waitForRequestSlot(): Promise<void> {
+  while (true) {
+    const now = Date.now();
+    while (requestStarts.length && requestStarts[0] <= now - 60_000) requestStarts.shift();
+    if (requestStarts.length < requestsPerMinute) {
+      requestStarts.push(now);
+      return;
+    }
+    const waitMs = Math.max(50, requestStarts[0] + 60_000 - now);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 }
 
