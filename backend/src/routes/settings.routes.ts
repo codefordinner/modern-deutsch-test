@@ -18,7 +18,7 @@ import {
   writeAudioVoice,
 } from '../services/audioSettings';
 import { checkAISettings, fetchGeminiModels, generateWordFill, isGeminiModel, readAISettings, resetAIProfile, writeAISettings } from '../services/aiSettings';
-import { clearAIErrorLogs, readAIErrorLogs, recordAIError } from '../services/aiErrorLog';
+import { clearAIErrorLogs, countAIErrorLogs, readAIErrorLogs, recordAIError, type AIErrorLogStatus } from '../services/aiErrorLog';
 import { readAIQueue, retryAI, subscribeAIQueue } from '../services/aiQueue';
 import rateLimit from 'express-rate-limit';
 
@@ -74,7 +74,13 @@ router.delete('/ai/profile/:profileId', requireAdmin, async (req, res) => {
 router.get('/ai/logs', requireAdmin, async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ logs: await readAIErrorLogs(Number(req.query.limit) || 100) });
+    const requestedStatus = req.query.status;
+    const status: AIErrorLogStatus = requestedStatus === 'ok' || requestedStatus === 'error' ? requestedStatus : 'all';
+    const [logs, counts] = await Promise.all([
+      readAIErrorLogs(Number(req.query.limit) || 100, status),
+      countAIErrorLogs(),
+    ]);
+    res.json({ logs, counts });
   } catch {
     res.status(500).json({ error: 'Не удалось загрузить журнал ошибок ИИ' });
   }

@@ -83,8 +83,17 @@ export async function recordAIRequest(input: {
   }
 }
 
-export async function readAIErrorLogs(limit = 100) {
+export type AIErrorLogStatus = 'all' | 'ok' | 'error';
+
+export async function readAIErrorLogs(limit = 100, status: AIErrorLogStatus = 'all') {
+  const where = status === 'ok'
+    ? { errorCode: 'AI_OK' }
+    : status === 'error'
+      ? { errorCode: { not: 'AI_OK' } }
+      : undefined;
+
   return prisma.aiErrorLog.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(500, Math.round(limit))),
     select: {
@@ -99,6 +108,15 @@ export async function readAIErrorLogs(limit = 100) {
       createdAt: true,
     },
   });
+}
+
+/** Counts are calculated over the whole table, not only the visible page. */
+export async function countAIErrorLogs() {
+  const [completed, errors] = await Promise.all([
+    prisma.aiErrorLog.count({ where: { errorCode: 'AI_OK' } }),
+    prisma.aiErrorLog.count({ where: { errorCode: { not: 'AI_OK' } } }),
+  ]);
+  return { completed, errors };
 }
 
 export async function clearAIErrorLogs(): Promise<void> {

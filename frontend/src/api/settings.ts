@@ -35,7 +35,12 @@ export interface AIErrorLog {
   durationMs: number | null;
   createdAt: string;
 }
-export const fetchAIErrorLogs = (limit = 100) => request<{ logs: AIErrorLog[] }>(`/settings/ai/logs?limit=${limit}`, { auth: true });
+
+export interface AIErrorLogCounts {
+  completed: number;
+  errors: number;
+}
+export const fetchAIErrorLogs = (limit = 100, status: 'all' | 'ok' | 'error' = 'all') => request<{ logs: AIErrorLog[]; counts: AIErrorLogCounts }>(`/settings/ai/logs?limit=${limit}&status=${status}`, { auth: true });
 export const clearAIErrorLogs = () => request<{ ok: boolean }>('/settings/ai/logs', { method: 'DELETE', auth: true });
 export interface AIQueueItem { id: string; operation: string; profileId?: string; model?: string; status: 'queued' | 'running' | 'completed' | 'failed'; createdAt: string; startedAt?: string; finishedAt?: string; error?: string }
 export interface AIQueueSnapshot { items: AIQueueItem[]; active: number; waiting: number; concurrency: number }
