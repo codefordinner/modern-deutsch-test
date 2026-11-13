@@ -103,6 +103,15 @@
 .ai-settings-card { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px; }
 .ai-settings-card .settings-divider { display: grid; gap: 10px; }
 .ai-profile-title { margin: 0 0 4px; font-size: 17px; color: var(--text-primary); }
+.ai-profile-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+.ai-profile-summary::-webkit-details-marker { display: none; }
+.ai-profile-summary::before { content: '＋'; color: var(--accent-primary); font-size: 18px; }
+.ai-profile-block[open] .ai-profile-summary::before { content: '−'; }
+.ai-profile-open-hint { color: var(--text-secondary); font-size: 13px; font-weight: 400; }
+.ai-profile-content { display: grid; gap: 10px; margin-top: 14px; }
+.ai-settings-card--settings .ai-logs-content { display: none; }
+.ai-settings-card--logs .settings-divider { display: grid; }
+.ai-settings-card--logs .settings-divider > :not(.ai-logs-content) { display: none; }
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
 .ai-prompt-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ai-prompt-label .setting-toggle-title { margin: 0; }

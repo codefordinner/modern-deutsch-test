@@ -22,6 +22,10 @@ const AI_OPERATION_LABELS: Record<string, string> = {
 };
 const AI_QUEUE_STATUS_LABELS: Record<string, string> = { queued: 'ожидает', running: 'выполняется', completed: 'завершено', failed: 'ошибка' };
 
+interface AISettingsTabProps {
+  view?: 'settings' | 'logs';
+}
+
 interface ProfileEditors {
   model: string;
   prompt: string;
@@ -29,7 +33,8 @@ interface ProfileEditors {
   batchSize?: number;
 }
 
-export function AISettingsTab() {
+export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
+  const showSettings = view === 'settings';
   const [settings, setSettings] = useState<AISettingsResponse | null>(null);
   const [models, setModels] = useState<AIModel[]>([]);
   const [apiKey, setApiKey] = useState('');
@@ -68,7 +73,7 @@ export function AISettingsTab() {
       if (result.hasApiKey) { try { setModels((await fetchAIModels()).models); } catch { /* catalog is optional on load */ } }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { if (showSettings) void load(); }, [showSettings]);
 
   const loadLogs = async () => {
     setLogsBusy(true);
@@ -76,14 +81,15 @@ export function AISettingsTab() {
     catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
     finally { setLogsBusy(false); }
   };
-  useEffect(() => { void loadLogs(); }, []);
+  useEffect(() => { if (!showSettings) void loadLogs(); }, [showSettings]);
   useEffect(() => {
+    if (showSettings) return undefined;
     const source = new EventSource('/api/settings/ai/queue');
     source.onmessage = (event) => { try { setQueue(JSON.parse(event.data) as AIQueueSnapshot); } catch { /* ignore malformed event */ } };
     void fetchAIQueue().then(setQueue).catch(() => undefined);
     const fallback = window.setInterval(() => { void fetchAIQueue().then(setQueue).catch(() => undefined); }, 5000);
     return () => { source.close(); window.clearInterval(fallback); };
-  }, []);
+  }, [showSettings]);
 
   const save = async () => {
     setBusy(true);
@@ -146,8 +152,9 @@ export function AISettingsTab() {
   };
 
   const profileBlock = (id: string, title: string, label: string, showSeverity: boolean) => (
-    <div className="ai-profile-block">
-      <h4 className="ai-profile-title">{title}</h4>
+    <details className="ai-profile-block">
+      <summary className="ai-profile-summary"><span className="ai-profile-title">{title}</span><span className="ai-profile-open-hint">Открыть</span></summary>
+      <div className="ai-profile-content">
       <label className="setting-toggle-title" htmlFor={`ai-model-${id}`}>Модель для этого профиля</label>
        <select id={`ai-model-${id}`} className="text-input" value={profiles[id].model} onChange={(event) => setProfile(id, { model: event.target.value })} disabled={!models.length && !profiles[id].model}>
          <option value="">{models.length ? 'Выберите модель' : profiles[id].model ? 'Текущая модель сохранена' : 'Сначала проверьте ключ'}</option>
@@ -167,16 +174,17 @@ export function AISettingsTab() {
         <label className="setting-toggle-title" htmlFor={`ai-batch-size-${id}`}>Слов за один промпт: {profiles[id].batchSize}</label>
         <input id={`ai-batch-size-${id}`} type="range" min="10" max="1000" step="10" value={profiles[id].batchSize ?? 100} onChange={(event) => setProfile(id, { batchSize: Number(event.target.value) })} />
       </>}
-    </div>
+      </div>
+    </details>
   );
 
   const visibleQueueItems = queue?.items.filter((item) => item.status !== 'completed') ?? [];
   const filteredLogs = logFilter === 'all' ? logs : logs.filter((log) => log.operation === logFilter);
   const logOperations = [...new Set(logs.map((log) => log.operation))];
 
-  return <div className="card ai-settings-card">
-    <h3 className="card-title"><Bot size={20} /> Модуль ИИ</h3>
-    <p className="card-note">Провайдер — Google Gemini. Для каждого профиля можно выбрать свою модель и инструкцию. Новые профили можно добавить без изменения AI API.</p>
+  return <div className={`card ai-settings-card ${showSettings ? 'ai-settings-card--settings' : 'ai-settings-card--logs'}`}>
+    <h3 className="card-title"><Bot size={20} /> {showSettings ? 'Настройки ИИ' : 'Логи ИИ'}</h3>
+    <p className="card-note">{showSettings ? 'Провайдер — Google Gemini. Выберите нужный профиль ниже, чтобы открыть его подробности и изменить инструкцию.' : 'Здесь отображаются активные задачи и технические ошибки AI-операций. Тексты промптов и ответы пользователей не сохраняются.'}</p>
     <div className="settings-divider">
       <label className="setting-toggle-title" htmlFor="ai-api-key">API-ключ Gemini</label>
       <input id="ai-api-key" className="text-input" type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.hasApiKey ? 'Ключ сохранён — введите новый для замены' : 'Введите API-ключ'} />
@@ -194,14 +202,14 @@ export function AISettingsTab() {
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button>
       </div>
 
-      <section aria-labelledby="ai-queue-title">
+       <section className="ai-logs-content" aria-labelledby="ai-queue-title">
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
           <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
            {!visibleQueueItems.length ? <div className="muted-note">Активных задач и ошибок нет.</div> : <div className="ai-queue-list">{visibleQueueItems.slice().reverse().map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small></div>{item.error && <div className="ai-queue-error">{item.error}</div>}{item.status === 'failed' && <button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button>}</div>)}</div>}
         </section>
       </section>
-      <section className="ai-error-log" aria-labelledby="ai-error-log-title">
+       <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
           <div className="stats-header">
             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
             <div className="backup-actions">
