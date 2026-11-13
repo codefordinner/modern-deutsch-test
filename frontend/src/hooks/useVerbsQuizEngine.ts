@@ -30,7 +30,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   const [mode, setMode] = usePersistentState<VerbQuizMode>(
     'verbs_mode',
     'stammformen',
-    oneOf<VerbQuizMode>(['praesens', 'stammformen', 'multiple_choice'], 'stammformen')
+    oneOf<VerbQuizMode>(['praesens', 'stammformen', 'multiple_choice', 'required_case'], 'stammformen')
   );
   const { verbs, error, hasData, isLoading: isFetchingVerbs, refetch } = useVerbs();
   const loadError = !hasData && error !== undefined ? getErrorMessage(error, 'Не удалось загрузить глаголы') : null;
