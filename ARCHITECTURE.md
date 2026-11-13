@@ -95,6 +95,8 @@
 ### Вкладки (hash-роутинг `#/numbers|words|articles|verbs|time|admin`)
 
 Метаданные вкладок находятся в едином registry `frontend/src/config/tabs.ts`: id, подпись, заголовок, иконка, участие в счёте и поддержка SRS. Hash-роутинг, Navbar, подписи аналитики и список scored-вкладок используют этот registry. Содержимое вкладок выбирает `components/routing/TrainerContent.tsx`. При добавлении вкладки сначала добавьте её в registry, затем компонент и специализированные настройки/SRS по необходимости; не создавайте отдельные ручные списки вкладок.
+
+Состояние админки также сохраняется в hash URL: `#/admin?tab=ai-settings` открывает нужный раздел после перезагрузки, а `#/admin?category=<id>` сохраняет выбранную категорию слов.
 | Вкладка | Компонент | Логика |
 |---|---|---|
 | Числа | `NumbersTrainer` | `numbers-generator.ts` (`germanNumberVariants`), `answerMatch` |

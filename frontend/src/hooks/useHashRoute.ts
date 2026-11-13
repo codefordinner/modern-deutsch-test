@@ -11,7 +11,7 @@ export const DEFAULT_TAB: AppTab = 'numbers';
 export const tabHref = (tab: AppTab): string => `#/${tab}`;
 
 function parseTab(hash: string): AppTab | null {
-  const id = /^#\/?([a-z]+)\/?$/.exec(hash)?.[1];
+  const id = /^#\/?([a-z]+)(?:[/?].*)?$/.exec(hash)?.[1];
   return TABS.find((tab) => tab === id) ?? null;
 }
 

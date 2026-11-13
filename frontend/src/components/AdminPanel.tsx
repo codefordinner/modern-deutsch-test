@@ -29,13 +29,26 @@ import type { Word, Category, PartOfSpeech } from '../types';
 
 type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'ai-settings' | 'ai-logs' | 'analytics';
 
+const ADMIN_TABS: readonly AdminTab[] = ['words', 'categories', 'import', 'duplicates', 'srs', 'audio', 'pictures', 'ai-settings', 'ai-logs', 'analytics'];
+const readAdminRoute = (): { tab: AdminTab; category: string } => {
+  if (typeof window === 'undefined') return { tab: 'words', category: 'all' };
+  const match = /^#\/?admin(?:\?([^#]*))?$/.exec(window.location.hash);
+  const params = new URLSearchParams(match?.[1] ?? '');
+  const rawTab = params.get('tab');
+  return {
+    tab: ADMIN_TABS.includes(rawTab as AdminTab) ? rawTab as AdminTab : 'words',
+    category: params.get('category') || 'all',
+  };
+};
+
 export const AdminPanel: React.FC = () => {
   // The session cookie is HttpOnly (invisible to JS), so the client asks the
   // server whether it is currently signed in rather than checking local state.
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<AdminTab>('words');
+  const initialRoute = readAdminRoute();
+  const [tab, setTab] = useState<AdminTab>(initialRoute.tab);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState(initialRoute.category);
   const [editingWord, setEditingWord] = useState<Word | null>(null);
   const [isWordOpen, setIsWordOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -64,6 +77,15 @@ export const AdminPanel: React.FC = () => {
   // Shared with the trainers (see hooks/useDictionary.ts): editing here refreshes what they show too.
   const { categories, error: categoriesError } = useCategories();
   const { words: allWords, error: wordsError } = useWords();
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (tab !== 'words') params.set('tab', tab);
+    if (tab === 'words' && category !== 'all') params.set('category', category);
+    const query = params.toString();
+    const nextHash = `#/admin${query ? `?${query}` : ''}`;
+    if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash);
+  }, [tab, category]);
 
   useEffect(() => {
     if (isAuthed && categoriesError) reportError(categoriesError, 'Не удалось загрузить категории');
