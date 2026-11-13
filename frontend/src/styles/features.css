@@ -87,8 +87,10 @@
   gap: 10px;
   width: 100%;
   max-width: 540px;
-  margin: 20px 0 8px;
+  margin: 20px auto 8px;
 }
+
+.question-form:has(.case-grid) { text-align: center; }
 
 .case-btn {
   padding: 15px 10px;
