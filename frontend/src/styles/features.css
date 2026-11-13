@@ -80,6 +80,35 @@
 
 @media (hover: none) { .article-btn-key { display: none; } }
 
+/* ---- Required case quiz ---- */
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 540px;
+  margin: 20px 0 8px;
+}
+
+.case-btn {
+  padding: 15px 10px;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
+}
+
+.case-btn:hover:not(:disabled) { background: var(--bg-tertiary); transform: translateY(-1px); }
+.case-btn:disabled { cursor: default; }
+.case-btn.is-correct { background: var(--success); border-color: var(--success); color: #fff; }
+.case-btn.is-wrong { opacity: 0.55; text-decoration: line-through; }
+.case-btn.is-dim { opacity: 0.35; }
+
 /* ---- Daily goal ---- */
 .daily-chip {
   display: inline-flex;
