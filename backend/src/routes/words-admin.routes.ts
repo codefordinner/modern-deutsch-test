@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
-import { isPartOfSpeech } from '../services/partOfSpeech';
+import { inferPartOfSpeech, isPartOfSpeech } from '../services/partOfSpeech';
 import type { PartOfSpeech } from '../services/partOfSpeech';
 import {
   ImportFormatError,
@@ -143,8 +143,11 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
   try {
     const ids = readIds(req.body?.ids);
     if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
-    const words = await prisma.word.findMany({ where: { id: { in: ids }, partOfSpeech: 'verb' }, select: { id: true, de: true, ru: true } });
-    if (words.length === 0) return res.json({ success: true, count: 0 });
+    const selectedWords = await prisma.word.findMany({ where: { id: { in: ids } }, select: { id: true, de: true, ru: true, partOfSpeech: true, praeteritum: true, partizip2: true, category: { select: { name: true } } } });
+    const words = selectedWords
+      .filter((word) => word.partOfSpeech === 'verb' || (word.partOfSpeech === null && inferPartOfSpeech({ de: word.de, praeteritum: word.praeteritum, partizip2: word.partizip2, categoryName: word.category.name }) === 'verb'))
+      .map(({ id, de, ru }) => ({ id, de, ru }));
+    if (words.length === 0) return res.status(400).json({ error: 'Среди выбранных слов нет глаголов' });
     const job = startAIBulkJob(words.length, async (state) => {
         const result = await detectRequiredCases(words);
        const selectedIds = new Set(words.map((word) => word.id));
