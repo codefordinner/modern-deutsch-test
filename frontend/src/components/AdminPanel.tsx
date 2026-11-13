@@ -20,7 +20,7 @@ import {
   UNAUTHORIZED_EVENT,
 } from '../api/request';
 import { checkSession, logout } from '../api/auth';
-import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, detectRequiredCasesViaAI, redistributeCategoriesViaAI, getAIBulkJob } from '../api/adminWords';
+import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, checkWordsViaAI, detectRequiredCasesViaAI, redistributeCategoriesViaAI, getAIBulkJob } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
 import { reportError, showToast } from '../utils/toast';
@@ -217,6 +217,27 @@ export const AdminPanel: React.FC = () => {
     } catch (e) { reportError(e, action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи'); return false; }
   };
 
+  const handleCheckWords = async (ids: string[]): Promise<boolean> => {
+    try {
+      const started = await checkWordsViaAI(ids);
+      let result = started;
+      for (let attempt = 0; attempt < 360 && (result.status === 'queued' || result.status === 'running'); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        result = await getAIBulkJob(started.id);
+      }
+      if (result.status === 'failed') throw new Error(result.error ?? 'ИИ не смог проверить слова');
+      if (result.status !== 'completed') throw new Error('ИИ не завершил проверку за отведённое время');
+      const rows = (result.result ?? []) as Array<{ id: string; issues: Array<{ severity: string; field: string; message: string; suggestion?: string }> }>;
+      const problems = rows.reduce((sum, row) => sum + row.issues.length, 0);
+      const details = rows.filter((row) => row.issues.length).map((row) => {
+        const word = allWords.find((item) => item.id === row.id);
+        return `${word?.de ?? row.id}: ${row.issues.map((issue) => `${issue.severity === 'error' ? 'Ошибка' : 'Предупреждение'} (${issue.field}) — ${issue.message}${issue.suggestion ? ` Рекомендация: ${issue.suggestion}` : ''}`).join('; ')}`;
+      }).join('\n');
+      window.alert(problems ? `Найдено проблем: ${problems}\n\n${details}` : 'Проблем не найдено. Все проверенные записи выглядят корректно.');
+      return true;
+    } catch (e) { reportError(e, 'Не удалось проверить слова'); return false; }
+  };
+
   if (isAuthed === null) return <div className="centered-message">Проверка сессии...</div>;
   if (!isAuthed) return <AdminLogin onLogin={handleLogin} />;
 
@@ -253,7 +274,8 @@ export const AdminPanel: React.FC = () => {
           onBulkCategory={handleBulkCategory}
           onBulkPartOfSpeech={handleBulkPartOfSpeech}
           onBulkDelete={handleBulkDelete}
-          onAIAction={handleAIAction}
+           onAIAction={handleAIAction}
+           onCheckWords={handleCheckWords}
         />
       )}
       {tab === 'categories' && (

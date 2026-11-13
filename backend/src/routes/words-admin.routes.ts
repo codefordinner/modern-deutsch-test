@@ -14,7 +14,7 @@ import {
   resolvePartOfSpeech,
 } from '../services/wordImport';
 import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
-import { detectRequiredCases, redistributeCategories } from '../services/aiSettings';
+import { checkWordsWithAI, detectRequiredCases, redistributeCategories } from '../services/aiSettings';
 import { recordAIError } from '../services/aiErrorLog';
 import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
@@ -160,6 +160,41 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
   } catch (error) {
     await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
     res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для определения падежей не выбрана модель Gemini' : 'ИИ не смог определить падежи' });
+  }
+});
+
+router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: Response) => {
+  try {
+    const ids = readIds(req.body?.ids);
+    if (!ids) return res.status(400).json({ error: 'Нужен список ids' });
+    const rows = await prisma.word.findMany({ where: { id: { in: ids } }, include: WORD_INCLUDE });
+    if (!rows.length) return res.status(400).json({ error: 'Слова не найдены' });
+    const categoryNames = new Map(rows.map((word) => [word.id, [word.category.name, ...word.extraCategories.map((category) => category.name)]]));
+    const structural = rows.map((word) => {
+      const issues: Array<{ field: string; severity: 'error' | 'warning'; message: string }> = [];
+      const text = (value: string | null | undefined) => Boolean(value?.trim());
+      if (!text(word.de)) issues.push({ field: 'de', severity: 'error', message: 'Не заполнено немецкое слово' });
+      if (!text(word.ru)) issues.push({ field: 'ru', severity: 'error', message: 'Не заполнен перевод' });
+      if (!categoryNames.get(word.id)?.length) issues.push({ field: 'category', severity: 'error', message: 'Не указана категория' });
+      if (word.partOfSpeech === 'verb') {
+        if (!text(word.praeteritum)) issues.push({ field: 'praeteritum', severity: 'warning', message: 'Не заполнен Präteritum' });
+        if (!text(word.partizip2)) issues.push({ field: 'partizip2', severity: 'warning', message: 'Не заполнен Partizip II' });
+        if (word.hilfsverb && word.hilfsverb !== 'haben' && word.hilfsverb !== 'sein') issues.push({ field: 'hilfsverb', severity: 'error', message: 'Недопустимый вспомогательный глагол' });
+        if (word.requiredCase && !['nominativ', 'akkusativ', 'dativ', 'genitiv'].includes(word.requiredCase)) issues.push({ field: 'requiredCase', severity: 'error', message: 'Недопустимый падеж' });
+      }
+      return { id: word.id, issues };
+    });
+    const job = startAIBulkJob(rows.length, async (state) => {
+      const ai = await checkWordsWithAI(rows.map((word) => ({ id: word.id, de: word.de, ru: word.ru, category: categoryNames.get(word.id), partOfSpeech: word.partOfSpeech, plural: word.plural, feminine: word.feminine, praeteritum: word.praeteritum, partizip2: word.partizip2, hilfsverb: word.hilfsverb, praesensIch: word.praesensIch, praesensDu: word.praesensDu, praesensErSieEs: word.praesensErSieEs, praesensWir: word.praesensWir, praesensIhr: word.praesensIhr, praesensSie: word.praesensSie, requiredCase: word.requiredCase })));
+      const byId = new Map(ai.map((item) => [item.id, item.issues]));
+      state.result = structural.map((item) => ({ ...item, issues: [...item.issues, ...(byId.get(item.id) ?? [])] }));
+      state.completed = state.total;
+      return rows.length;
+    }, (error) => recordAIError({ operation: 'word-check', profileId: 'wordCheck', error }));
+    return res.status(202).json(job);
+  } catch (error) {
+    await recordAIError({ operation: 'word-check', profileId: 'wordCheck', error }).catch(() => undefined);
+    return res.status(502).json({ error: error instanceof Error && error.message === 'MISSING_MODEL' ? 'Для проверки слов не выбрана модель Gemini' : 'ИИ не смог проверить слова' });
   }
 });
 

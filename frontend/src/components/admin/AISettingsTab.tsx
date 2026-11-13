@@ -9,6 +9,7 @@ const CHECK_PROFILE = 'pictureAnswerCheck';
 const WORD_FILL_PROFILE = 'wordFill';
 const CATEGORY_PROFILE = 'categoryRedistribution';
 const REQUIRED_CASE_PROFILE = 'requiredCase';
+const WORD_CHECK_PROFILE = 'wordCheck';
 const AI_OPERATION_LABELS: Record<string, string> = {
   models: 'Список моделей',
   'settings-check': 'Проверка настроек',
@@ -18,6 +19,7 @@ const AI_OPERATION_LABELS: Record<string, string> = {
   'word-fill': 'Заполнение слов',
   'category-redistribution': 'Перераспределение категорий',
   'required-case': 'Определение падежей глаголов',
+  'word-check': 'Проверка слов',
   'prompt-test': 'Тест промпта',
 };
 const AI_QUEUE_STATUS_LABELS: Record<string, string> = { queued: 'ожидает', running: 'выполняется', completed: 'завершено', failed: 'ошибка' };
@@ -76,6 +78,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     [WORD_FILL_PROFILE]: { model: '', prompt: '', severity: 3 },
     [CATEGORY_PROFILE]: { model: '', prompt: '', severity: 3, batchSize: 100 },
     [REQUIRED_CASE_PROFILE]: { model: '', prompt: '', severity: 3, batchSize: 100 },
+    [WORD_CHECK_PROFILE]: { model: '', prompt: '', severity: 3, batchSize: 100 },
   });
 
   const setProfile = (id: string, patch: Partial<ProfileEditors>) =>
@@ -87,7 +90,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
       setSettings(result);
       setRequestsPerMinute(result.requestsPerMinute ?? 10);
       const next: Record<string, ProfileEditors> = {};
-      for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE, CATEGORY_PROFILE, REQUIRED_CASE_PROFILE]) {
+      for (const id of [PICTURE_PROFILE, PICTURE_FORMAT_PROFILE, CHECK_PROFILE, WORD_FILL_PROFILE, CATEGORY_PROFILE, REQUIRED_CASE_PROFILE, WORD_CHECK_PROFILE]) {
         next[id] = {
           model: result.profiles[id]?.model ?? '',
           prompt: result.profiles[id]?.prompt ?? '',
@@ -142,7 +145,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
           last ? undefined : apiKey,
           editor.prompt,
           hasSeverity ? editor.severity : undefined,
-           id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE ? editor.batchSize : undefined,
+            id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE || id === WORD_CHECK_PROFILE ? editor.batchSize : undefined,
            id === PICTURE_PROFILE ? requestsPerMinute : undefined
         );
       }
@@ -209,7 +212,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
         <label className="setting-toggle-title" htmlFor="ai-severity">Жёсткость проверки: {profiles[id].severity} из 5</label>
       )}
       {showSeverity && <input id="ai-severity" type="range" min="1" max="5" step="1" value={profiles[id].severity} onChange={(event) => setProfile(id, { severity: Number(event.target.value) })} />}
-      {(id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE) && <>
+      {(id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE || id === WORD_CHECK_PROFILE) && <>
         <label className="setting-toggle-title" htmlFor={`ai-batch-size-${id}`}>Слов за один промпт: {profiles[id].batchSize}</label>
         <input id={`ai-batch-size-${id}`} type="range" min="10" max="1000" step="10" value={profiles[id].batchSize ?? 100} onChange={(event) => setProfile(id, { batchSize: Number(event.target.value) })} />
       </>}
@@ -244,7 +247,8 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
       {profileBlock(CHECK_PROFILE, 'Профиль: проверка ответа пользователя', 'Промпт проверки ответа', true)}
       {profileBlock(WORD_FILL_PROFILE, 'Профиль: заполнение слов', 'Промпт заполнения слов', false)}
       {profileBlock(CATEGORY_PROFILE, 'Профиль: перераспределение категорий', 'Промпт перераспределения категорий', false)}
-      {profileBlock(REQUIRED_CASE_PROFILE, 'Профиль: определение падежей глаголов', 'Промпт определения падежей', false)}
+       {profileBlock(REQUIRED_CASE_PROFILE, 'Профиль: определение падежей глаголов', 'Промпт определения падежей', false)}
+       {profileBlock(WORD_CHECK_PROFILE, 'Профиль: полная проверка слов', 'Промпт полной проверки слова', false)}
 
       <div className="backup-actions">
         <button type="button" className="btn-primary" disabled={busy || (!apiKey && !settings?.hasApiKey)} onClick={() => void save()}><Save size={15} /> Сохранить</button>

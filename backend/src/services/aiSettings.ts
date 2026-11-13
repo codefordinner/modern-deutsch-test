@@ -22,6 +22,7 @@ export const AI_PROFILE_PICTURE_CHECK = 'pictureAnswerCheck';
 export const AI_PROFILE_WORD_FILL = 'wordFill';
 export const AI_PROFILE_CATEGORY_REDISTRIBUTION = 'categoryRedistribution';
 export const AI_PROFILE_REQUIRED_CASE = 'requiredCase';
+export const AI_PROFILE_WORD_CHECK = 'wordCheck';
 export type PictureCheckSeverity = 'neutral' | 'good' | 'style' | 'error' | 'lie';
 export interface PictureCheckResult {
   segments: Array<{ text: string; severity: PictureCheckSeverity; note?: string; correction?: string }>;
@@ -72,6 +73,7 @@ export const DEFAULT_WORD_FILL_PROMPT = [
 ].join(' ');
 export const DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT = 'Ты распределяешь слова немецкого учебного словаря по существующим категориям. Верни только JSON-массив объектов {"id":"...","categories":["точное название категории"]}. Для каждого слова выбери одну или несколько наиболее подходящих категорий только из переданного списка. Не придумывай категории, не меняй id, не пропускай слова.';
 export const DEFAULT_REQUIRED_CASE_PROMPT = 'Ты определяешь управление немецких глаголов. Верни только JSON-массив объектов {"id":"...","requiredCase":"nominativ|akkusativ|dativ|genitiv|null"}. Выбери падеж, который требует глагол в типичном значении; если глагол не требует объекта или уверенности нет, верни null. Не угадывай, не меняй id и не пропускай слова.';
+export const DEFAULT_WORD_CHECK_PROMPT = 'Ты проверяешь записи немецкого учебного словаря. Проверь именно переданные данные, не выдумывай отсутствующие формы. Для глаголов проверь Infinitiv, Präteritum, Partizip II, Hilfsverb, все Präsens-формы и управление (падеж). Проверь перевод, часть речи и смысл категории. Верни только JSON-массив объектов {"id":"...","issues":[{"field":"...","severity":"error|warning","message":"...","suggestion":"..."}]}. Если проблем нет, issues=[]; не меняй id и не пропускай записи. Сообщения на русском, немецкие формы — только если уверен.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
@@ -110,6 +112,9 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
   const caseProfile = profiles[AI_PROFILE_REQUIRED_CASE];
   const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const casePrompt = typeof caseProfile?.prompt === 'string' && caseProfile.prompt.trim() ? caseProfile.prompt.trim().slice(0, 10_000) : DEFAULT_REQUIRED_CASE_PROMPT;
+  const wordCheckProfile = profiles[AI_PROFILE_WORD_CHECK];
+  const wordCheckModel = typeof wordCheckProfile?.model === 'string' && isGeminiModel(wordCheckProfile.model) ? wordCheckProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
+  const wordCheckPrompt = typeof wordCheckProfile?.prompt === 'string' && wordCheckProfile.prompt.trim() ? wordCheckProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_CHECK_PROMPT;
   const batchSizeOf = (profile: { batchSize?: number } | undefined) => Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
   const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(raw.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
   return { provider: 'gemini', apiKey: raw.apiKey.trim(), requestsPerMinute, profiles: {
@@ -129,6 +134,7 @@ function sanitizeStored(value: unknown): StoredAISettings | null {
     },
     [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: categoryModel, prompt: categoryPrompt, batchSize: batchSizeOf(categoryProfile) },
     [AI_PROFILE_REQUIRED_CASE]: { model: caseModel, prompt: casePrompt, batchSize: batchSizeOf(caseProfile) },
+    [AI_PROFILE_WORD_CHECK]: { model: wordCheckModel, prompt: wordCheckPrompt, batchSize: batchSizeOf(wordCheckProfile) },
   } };
 }
 
@@ -152,21 +158,22 @@ export async function readAISettings(): Promise<AISettingsPublic> {
       [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
       [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
       [AI_PROFILE_REQUIRED_CASE]: { model: DEFAULT_MODEL, prompt: DEFAULT_REQUIRED_CASE_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
+      [AI_PROFILE_WORD_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_CHECK_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
     },
   };
 }
 
 export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown; requestsPerMinute?: unknown }): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(input.profileId)) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE, AI_PROFILE_WORD_CHECK].includes(input.profileId)) throw new Error('INVALID_PROFILE');
   if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
   const currentProfile = current?.profiles[input.profileId];
-  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : input.profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : input.profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : input.profileId === AI_PROFILE_WORD_CHECK ? DEFAULT_WORD_CHECK_PROMPT : DEFAULT_PICTURE_PROMPT;
   const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
   if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
-  const batchProfile = input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || input.profileId === AI_PROFILE_REQUIRED_CASE;
+  const batchProfile = input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || input.profileId === AI_PROFILE_REQUIRED_CASE || input.profileId === AI_PROFILE_WORD_CHECK;
   const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(input.batchSize ?? currentProfile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
   const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}), ...(batchProfile ? { batchSize } : {}) };
   const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(input.requestsPerMinute ?? current?.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
@@ -177,16 +184,16 @@ export async function writeAISettings(input: { profileId: string; model: unknown
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE].includes(profileId)) throw new Error('INVALID_PROFILE');
+  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE, AI_PROFILE_WORD_CHECK].includes(profileId)) throw new Error('INVALID_PROFILE');
   const current = await readStored();
   if (!current) return readAISettings();
   const currentProfile = current.profiles[profileId];
-  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : profileId === AI_PROFILE_WORD_CHECK ? DEFAULT_WORD_CHECK_PROMPT : DEFAULT_PICTURE_PROMPT;
   const profile = {
     model: currentProfile?.model ?? '',
     prompt: defaultPrompt,
     ...(profileId === AI_PROFILE_PICTURE_CHECK ? { severity: currentProfile?.severity ?? 3 } : {}),
-    ...((profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || profileId === AI_PROFILE_REQUIRED_CASE) ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
+    ...((profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || profileId === AI_PROFILE_REQUIRED_CASE || profileId === AI_PROFILE_WORD_CHECK) ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
   };
   const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
@@ -427,7 +434,7 @@ export async function generateWordFill(input: { words: string; categories: strin
   return { json, count: parsed.length };
 }
 
-type AiWordInput = { id: string; de: string; ru: string };
+type AiWordInput = { id: string; de: string; ru: string; [key: string]: unknown };
 
 async function generateBatchJson(profileId: string, words: AiWordInput[], context: string): Promise<unknown[]> {
   const stored = await readStored();
@@ -441,7 +448,7 @@ async function generateBatchJson(profileId: string, words: AiWordInput[], contex
   for (let i = 0; i < words.length; i += batchSize) chunks.push(words.slice(i, i + batchSize));
   const generate = async (chunk: AiWordInput[]) => {
     const prompt = `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(chunk)}`;
-    return enqueueAI(profileId === AI_PROFILE_REQUIRED_CASE ? 'required-case' : 'category-redistribution', profileId, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+    return enqueueAI(profileId === AI_PROFILE_REQUIRED_CASE ? 'required-case' : profileId === AI_PROFILE_WORD_CHECK ? 'word-check' : 'category-redistribution', profileId, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }),
       signal: AbortSignal.timeout(240_000),
@@ -502,4 +509,27 @@ export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{
     return { id: row.id, requiredCase: requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
   });
   return normalized;
+}
+
+export interface WordCheckIssue { field: string; severity: 'error' | 'warning'; message: string; suggestion?: string }
+export interface WordCheckResult { id: string; issues: WordCheckIssue[] }
+
+export async function checkWordsWithAI(words: AiWordInput[]): Promise<WordCheckResult[]> {
+  const result = await generateBatchJson(AI_PROFILE_WORD_CHECK, words, 'Проверяй каждую запись полностью, включая все переданные формы и категорию.');
+  const expected = new Set(words.map((word) => word.id));
+  if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
+  const seen = new Set<string>();
+  return result.map((item) => {
+    if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || !Array.isArray(row.issues)) throw new Error('INVALID_AI_RESPONSE');
+    seen.add(row.id);
+    const issues = row.issues.map((issue) => {
+      if (typeof issue !== 'object' || issue === null) throw new Error('INVALID_AI_RESPONSE');
+      const value = issue as Record<string, unknown>;
+      if (typeof value.field !== 'string' || (value.severity !== 'error' && value.severity !== 'warning') || typeof value.message !== 'string' || (value.suggestion !== undefined && typeof value.suggestion !== 'string')) throw new Error('INVALID_AI_RESPONSE');
+      return { field: value.field, severity: value.severity as 'error' | 'warning', message: value.message, ...(value.suggestion ? { suggestion: value.suggestion } : {}) };
+    });
+    return { id: row.id, issues };
+  });
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 export type AIBulkJobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export interface AIBulkJob { id: string; status: AIBulkJobStatus; total: number; completed: number; count?: number; error?: string; createdAt: string; finishedAt?: string }
+export interface AIBulkJob { id: string; status: AIBulkJobStatus; total: number; completed: number; count?: number; result?: unknown; error?: string; createdAt: string; finishedAt?: string }
 const jobs = new Map<string, AIBulkJob>();
 const MAX_JOBS = 100;
 
