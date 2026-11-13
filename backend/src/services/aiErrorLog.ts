@@ -34,16 +34,29 @@ const redact = (value: string): string => value
   .slice(0, 1000);
 
 export async function recordAIError(input: {
-  operation: AIErrorOperation;
+  operation: string;
   profileId?: string;
   error: unknown;
   durationMs?: number;
+}): Promise<void> {
+  return recordAIRequest({ ...input, success: false });
+}
+
+/** Records every provider call, including successful calls. */
+export async function recordAIRequest(input: {
+  operation: string;
+  profileId?: string;
+  model?: string;
+  responseStatus?: number;
+  durationMs?: number;
+  error?: unknown;
+  success: boolean;
 }): Promise<void> {
   try {
     const error = input.error;
     const aiError = error instanceof AIServiceError ? error : null;
     const message = error instanceof Error ? error.message : String(error);
-    let model = aiError?.model ?? (error as { model?: string } | null)?.model ?? null;
+    let model = input.model ?? aiError?.model ?? (error as { model?: string } | null)?.model ?? null;
     if (!model && input.profileId) {
       const settings = await prisma.setting.findUnique({ where: { key: 'aiSettings' }, select: { value: true } }).catch(() => null);
       try {
@@ -54,12 +67,12 @@ export async function recordAIError(input: {
     }
     await prisma.aiErrorLog.create({
       data: {
-        operation: input.operation,
+         operation: input.operation,
         profileId: input.profileId ?? null,
         model,
-        errorCode: aiError?.code ?? (message || 'UNKNOWN_ERROR'),
-        providerStatus: aiError?.providerStatus ?? null,
-        message: redact(message || 'Unknown error'),
+         errorCode: input.success ? 'AI_OK' : aiError?.code ?? (message || 'UNKNOWN_ERROR'),
+         providerStatus: input.responseStatus ?? aiError?.providerStatus ?? null,
+         message: redact(input.success ? 'Запрос выполнен' : message || 'Unknown error'),
         durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
       },
     });

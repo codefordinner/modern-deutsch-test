@@ -220,14 +220,14 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
       </section>
        <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
           <div className="stats-header">
-            <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал ошибок ИИ</h3>
+             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал запросов ИИ</h3>
             <div className="backup-actions">
               <select className="text-input ai-log-filter" aria-label="Фильтр операций" value={logFilter} onChange={(event) => setLogFilter(event.target.value)}><option value="all">Все операции</option>{logOperations.map((operation) => <option key={operation} value={operation}>{AI_OPERATION_LABELS[operation] ?? operation}</option>)}</select>
             <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
             <button type="button" className="btn-secondary" disabled={logsBusy || !logs.length} onClick={() => void clearLogs()}><Trash2 size={14} /> Очистить</button>
           </div>
         </div>
-        <p className="card-note">Сохраняются только технические данные: операция, модель, код и статус ошибки. Тексты ответов, изображения и API-ключи не записываются.</p>
+         <p className="card-note">Сохраняются технические данные всех запросов: операция, модель, HTTP-статус и результат. Тексты ответов, изображения и API-ключи не записываются.</p>
          {logs.length === 0 ? <div className="muted-note">Ошибок ИИ пока нет.</div> : !filteredLogs.length ? <div className="muted-note">Для выбранной операции ошибок нет.</div> : <div className="ai-error-log-list">
            {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code">{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.message}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl></article>)}
         </div>}

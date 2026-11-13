@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { recordAIRequest } from './aiErrorLog';
 
 export type AIQueueStatus = 'queued' | 'running' | 'completed' | 'failed';
 export interface AIQueueItem {
@@ -47,7 +48,9 @@ async function pump(): Promise<void> {
     task.item.status = 'running';
     task.item.startedAt = new Date().toISOString();
     notify();
+    const startedAtMs = Date.now();
     void waitForRequestSlot().then(() => task.run()).then((result) => {
+      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, durationMs: Date.now() - startedAtMs, success: result instanceof Response ? result.ok : true });
       if (result instanceof Response && !result.ok) {
         task.item.status = 'failed';
         task.item.error = `HTTP_${result.status}`;
@@ -56,6 +59,7 @@ async function pump(): Promise<void> {
       }
       task.item.finishedAt = new Date().toISOString(); task.resolve(result);
     }).catch((error) => {
+      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, durationMs: Date.now() - startedAtMs, error, success: false });
       task.item.status = 'failed'; task.item.finishedAt = new Date().toISOString();
       const durationMs = task.item.startedAt ? Date.now() - Date.parse(task.item.startedAt) : 0;
       if (error && typeof error === 'object') {

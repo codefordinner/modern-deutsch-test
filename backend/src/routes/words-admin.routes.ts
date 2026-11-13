@@ -16,6 +16,7 @@ import {
 import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
 import { detectRequiredCases, redistributeCategories } from '../services/aiSettings';
 import { recordAIError } from '../services/aiErrorLog';
+import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
 import { readAIBulkJob, startAIBulkJob } from '../services/aiBulkJobs';
 
@@ -130,7 +131,7 @@ router.post('/ai/redistribute-categories', requireAdmin, aiBulkLimiter, async (r
        }
        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
-      }, (error) => recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }));
+       }, (error) => error instanceof AIServiceError ? undefined : recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }));
     res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'category-redistribution', profileId: 'categoryRedistribution', error }).catch(() => undefined);
@@ -151,7 +152,7 @@ router.post('/ai/required-case', requireAdmin, aiBulkLimiter, async (req: Reques
        for (const item of result) if (selectedIds.has(item.id)) updates.push(prisma.word.update({ where: { id: item.id }, data: { requiredCase: item.requiredCase } }));
        if (updates.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
        await prisma.$transaction(updates); state.completed = state.total; return updates.length;
-      }, (error) => recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }));
+       }, (error) => error instanceof AIServiceError ? undefined : recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }));
     res.status(202).json(job);
   } catch (error) {
     await recordAIError({ operation: 'required-case', profileId: 'requiredCase', error }).catch(() => undefined);
