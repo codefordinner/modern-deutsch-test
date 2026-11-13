@@ -50,13 +50,13 @@ async function pump(): Promise<void> {
     notify();
     const startedAtMs = Date.now();
     void waitForRequestSlot().then(() => task.run()).then((result) => {
-      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, durationMs: Date.now() - startedAtMs, success: result instanceof Response ? result.ok : true });
       if (result instanceof Response && !result.ok) {
         task.item.status = 'failed';
         task.item.error = `HTTP_${result.status}`;
       } else {
         task.item.status = 'completed';
       }
+      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, durationMs: Date.now() - startedAtMs, error: result instanceof Response && !result.ok ? new Error(`HTTP_${result.status}`) : undefined, success: result instanceof Response ? result.ok : true });
       task.item.finishedAt = new Date().toISOString(); task.resolve(result);
     }).catch((error) => {
       void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, durationMs: Date.now() - startedAtMs, error, success: false });
