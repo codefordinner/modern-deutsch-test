@@ -181,7 +181,10 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     </details>
   );
 
-  const visibleQueueItems = queue?.items.filter((item) => item.status !== 'completed') ?? [];
+  const queueStatusOrder: Record<string, number> = { running: 0, queued: 1, failed: 2 };
+  const visibleQueueItems = (queue?.items.filter((item) => item.status !== 'completed') ?? [])
+    .slice()
+    .sort((a, b) => (queueStatusOrder[a.status] ?? 3) - (queueStatusOrder[b.status] ?? 3) || b.createdAt.localeCompare(a.createdAt));
   const filteredLogs = logFilter === 'all' ? logs : logs.filter((log) => log.operation === logFilter);
   const logOperations = [...new Set(logs.map((log) => log.operation))];
 
