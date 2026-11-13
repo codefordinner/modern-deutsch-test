@@ -1,5 +1,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
+ARG BUILD_VERSION=local
+ENV BUILD_VERSION=$BUILD_VERSION
 COPY package*.json ./
 RUN npm ci
 COPY . .

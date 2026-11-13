@@ -15,7 +15,8 @@
  *
  * Bump VERSION when you change this file's caching rules: old caches are deleted on activate.
  */
-const VERSION = 'v2';
+// Replaced by scripts/build.mjs during production builds.
+const VERSION = '__BUILD_VERSION__';
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSET_CACHE = `assets-${VERSION}`;
 const API_CACHE = `api-${VERSION}`;

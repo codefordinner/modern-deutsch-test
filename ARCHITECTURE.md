@@ -158,7 +158,7 @@
 Перенос между устройствами: «Настройки» → «Скачать/Загрузить» (`utils/progressBackup.ts`, JSON `{app, version, exportedAt, data}`; загрузка **заменяет** прогресс и перезагружает страницу) либо ключ синхронизации.
 
 ### PWA и офлайн
-`manifest.webmanifest` + `sw.js` (регистрируется только в production, `VERSION` = `v2`). Стратегии: HTML — network-first; `/assets/*` — cache-first; `GET /api/words` и `/api/categories` — network-first с таймаутом 4 с и запасом из кэша (при изменении данных страницы получают `DICTIONARY_UPDATED` и перезагружают словарь); остальное не перехватывается (в том числе `/api/settings/*` и `/api/sync/*`: офлайн действуют веса по умолчанию, синхронизация ждёт сети).
+`manifest.webmanifest` + `sw.js` (регистрируется только в production). Версия кэшей Service Worker подставляется автоматически скриптом `frontend/scripts/build.mjs`: в CI используется GitHub SHA, локально — текущий Git commit, а без Git — timestamp. Поэтому ручное изменение `VERSION` не требуется. Стратегии: HTML — network-first; `/assets/*` — cache-first; `GET /api/words` и `/api/categories` — network-first с таймаутом 4 с и запасом из кэша (при изменении данных страницы получают `DICTIONARY_UPDATED` и перезагружают словарь); остальное не перехватывается (в том числе `/api/settings/*` и `/api/sync/*`: офлайн действуют веса по умолчанию, синхронизация ждёт сети). HTML-shell (`/` и `/index.html`) отдаётся с `Cache-Control: no-cache, no-store`, потому что он содержит имя текущего hashed JS-файла.
 Новый воркер сам не активируется: `useServiceWorkerUpdates` + `UpdateBanner` предлагают «Обновить», после согласия страница перезагружается.
 
 ## Сборка и деплой

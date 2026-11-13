@@ -93,6 +93,8 @@ jobs:
         with:
           context: ./frontend
           push: true
+          build-args: |
+            BUILD_VERSION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
