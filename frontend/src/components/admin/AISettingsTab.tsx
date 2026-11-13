@@ -104,10 +104,6 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     try {
       const nextLogs = (await fetchAIErrorLogs(100)).logs;
       setLogs(nextLogs);
-      // Keep the selected tab aligned with the records returned by the server.
-      // Otherwise an initially selected Errors tab can remain empty even when
-      // the log contains successful requests only.
-      setLogSubtab(nextLogs.some((log) => log.errorCode !== 'AI_OK') ? 'errors' : 'completed');
       setLogsLoaded(true);
     }
     catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
