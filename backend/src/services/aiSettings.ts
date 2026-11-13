@@ -496,9 +496,10 @@ export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{
   const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || (row.requiredCase !== null && typeof row.requiredCase !== 'string' || (typeof row.requiredCase === 'string' && !valid.has(row.requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
+    const requiredCase = row.requiredCase === null || row.requiredCase === 'null' ? null : typeof row.requiredCase === 'string' ? row.requiredCase.trim().toLowerCase() : row.requiredCase;
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || (requiredCase !== null && (typeof requiredCase !== 'string' || !valid.has(requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
     seen.add(row.id);
-    return { id: row.id, requiredCase: row.requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
+    return { id: row.id, requiredCase: requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
   });
   return normalized;
 }

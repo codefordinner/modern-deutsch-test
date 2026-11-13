@@ -187,7 +187,8 @@ export const WordsTab: React.FC<WordsTabProps> = ({
                   </td>
                   <td className="cell-secondary">
                     {w.plural && <div>Pl: {w.plural}</div>}
-                    {w.praeteritum && <div>{w.praeteritum} / {w.partizip2} ({w.hilfsverb})</div>}
+                     {w.praeteritum && <div>{w.praeteritum} / {w.partizip2} ({w.hilfsverb})</div>}
+                     {w.requiredCase && <div>Падеж: {({ nominativ: 'Nominativ', akkusativ: 'Akkusativ', dativ: 'Dativ', genitiv: 'Genitiv' } as const)[w.requiredCase]}</div>}
                   </td>
                   <td className="td-actions">
                     <div className="row-actions">
