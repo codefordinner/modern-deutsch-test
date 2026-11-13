@@ -61,4 +61,15 @@ describe('dictionary entries represented in trainer card pools', () => {
     expect(cards).toEqual(['book:article', 'old-book:article']);
     expect(new Set(cards).size).toBe(cards.length);
   });
+
+  it('puts only verbs with a required case into the case quiz', () => {
+    const cards = buildVerbCards([
+      word({ id: 'helfen', de: 'helfen', ru: 'помогать', partOfSpeech: 'verb', requiredCase: 'dativ' }),
+      word({ id: 'lernen-no-case', de: 'lernen', ru: 'учить', partOfSpeech: 'verb' }),
+    ]);
+
+    const caseCards = selectVerbCards(cards, 'required_case', 'both');
+    expect(caseCards.map(({ verb }) => verb.id)).toEqual(['helfen']);
+    expect(caseCards[0]?.key).toBe('helfen:required_case');
+  });
 });
