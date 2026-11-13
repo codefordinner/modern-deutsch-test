@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, fetchAIQueue, resetAIPrompt, retryAIQueueItem, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
@@ -61,6 +61,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const [requestsPerMinute, setRequestsPerMinute] = useState(10);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<AIErrorLog[]>([]);
+  const [logsLoaded, setLogsLoaded] = useState(false);
   const [logsBusy, setLogsBusy] = useState(false);
   const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
   const [logFilter, setLogFilter] = useState('all');
@@ -98,13 +99,23 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   };
   useEffect(() => { if (showSettings) void load(); }, [showSettings]);
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLogsBusy(true);
-    try { setLogs((await fetchAIErrorLogs(100)).logs); }
+    try {
+      const nextLogs = (await fetchAIErrorLogs(100)).logs;
+      setLogs(nextLogs);
+      // Most successful AI calls are stored as AI_OK. Do not open the log
+      // page on the empty "Errors" tab when the available records are in
+      // "Completed" instead.
+      if (nextLogs.length > 0 && nextLogs.every((log) => log.errorCode === 'AI_OK')) {
+        setLogSubtab('completed');
+      }
+      setLogsLoaded(true);
+    }
     catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
     finally { setLogsBusy(false); }
-  };
-  useEffect(() => { if (!showSettings) void loadLogs(); }, [showSettings]);
+  }, []);
+  useEffect(() => { if (!showSettings) void loadLogs(); }, [showSettings, loadLogs]);
   useEffect(() => {
     if (showSettings) return undefined;
     const source = new EventSource('/api/settings/ai/queue');
@@ -260,7 +271,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
         </div>
          <p className="card-note">Сохраняются технические данные всех запросов: операция, модель, HTTP-статус и результат. Тексты ответов, изображения и API-ключи не записываются.</p>
           {logSubtab === 'errors' && failedQueueItems.length > 0 && <div className="ai-queue-list">{failedQueueItems.map((item) => <div key={item.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">ошибка</span><small>{item.model ?? 'модель не указана'}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{item.error}</div>}<button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button></div>)}</div>}
-          {!filteredLogs.length && !(logSubtab === 'errors' && failedQueueItems.length) ? <div className="muted-note">{logSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
+           {!logsLoaded ? <div className="muted-note">Загрузка журнала…</div> : !filteredLogs.length && !(logSubtab === 'errors' && failedQueueItems.length) ? <div className="muted-note">{logSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
            {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code" data-success={log.errorCode === 'AI_OK' ? 'true' : 'false'}>{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.errorCode === 'AI_OK' ? log.message : describeAIError(log.errorCode, log.message, log.providerStatus)}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl>{log.errorCode !== 'AI_OK' && log.message !== log.errorCode && <details className="ai-log-details"><summary>Техническая информация</summary><code>{log.message}</code></details>}</article>)}
         </div>}
        </section>}
