@@ -112,7 +112,8 @@
 .ai-profile-content { display: grid; gap: 10px; margin-top: 14px; }
 .ai-settings-card--settings .ai-logs-content { display: none; }
 .ai-settings-card--logs .settings-divider { display: grid; }
-.ai-settings-card--logs .settings-divider > :not(.ai-logs-content) { display: none; }
+.ai-settings-card--logs .settings-divider > :not(.ai-logs-content):not(.ai-log-subtabs) { display: none; }
+.ai-settings-card--logs .settings-divider > .ai-log-subtabs { display: flex; }
 .ai-key-status { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
 .ai-prompt-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ai-prompt-label .setting-toggle-title { margin: 0; }
