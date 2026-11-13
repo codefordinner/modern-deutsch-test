@@ -83,17 +83,8 @@ export async function recordAIRequest(input: {
   }
 }
 
-export type AIErrorLogStatus = 'all' | 'ok' | 'error';
-
-export async function readAIErrorLogs(limit = 100, status: AIErrorLogStatus = 'all') {
-  const where = status === 'ok'
-    ? { errorCode: 'AI_OK' }
-    : status === 'error'
-      ? { errorCode: { not: 'AI_OK' } }
-      : undefined;
-
+export async function readAIErrorLogs(limit = 200) {
   return prisma.aiErrorLog.findMany({
-    where,
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(500, Math.round(limit))),
     select: {

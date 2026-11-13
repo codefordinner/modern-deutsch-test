@@ -101,20 +101,20 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   };
   useEffect(() => { if (showSettings) void load(); }, [showSettings]);
 
-  const loadLogs = useCallback(async (tab: LogSubtab = logSubtab) => {
-    if (tab === 'active') return;
+  const loadLogs = useCallback(async () => {
     setLogsBusy(true);
     try {
-      const status = tab === 'completed' ? 'ok' : 'error';
-      const result = await fetchAIErrorLogs(100, status);
+      // Load one consistent snapshot. Filtering by tab on the server can
+      // cause overlapping requests to overwrite each other with stale data.
+      const result = await fetchAIErrorLogs(200);
       setLogs(result.logs);
       setLogCounts(result.counts);
       setLogsLoaded(true);
     }
     catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
     finally { setLogsBusy(false); }
-  }, [logSubtab]);
-  useEffect(() => { if (!showSettings) void loadLogs(logSubtab); }, [showSettings, logSubtab, loadLogs]);
+  }, []);
+  useEffect(() => { if (!showSettings) void loadLogs(); }, [showSettings, loadLogs]);
   useEffect(() => {
     if (!showSettings && logsLoaded && !hasChosenLogTab && logSubtab === 'errors' && logCounts.errors === 0 && logCounts.completed > 0) {
       setLogSubtab('completed');
@@ -221,8 +221,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const visibleQueueItems = (queue?.items.filter((item) => item.status !== 'completed') ?? [])
     .slice()
     .sort((a, b) => (queueStatusOrder[a.status] ?? 3) - (queueStatusOrder[b.status] ?? 3) || b.createdAt.localeCompare(a.createdAt));
+  const completedLogs = logs.filter((log) => log.errorCode === 'AI_OK');
+  const errorLogs = logs.filter((log) => log.errorCode !== 'AI_OK');
   const failedQueueItems = visibleQueueItems.filter((item) => item.status === 'failed');
-  const filteredLogs = logFilter === 'all' ? logs : logs.filter((log) => log.operation === logFilter);
+  const selectedLogs = logSubtab === 'completed' ? completedLogs : errorLogs;
+  const filteredLogs = logFilter === 'all' ? selectedLogs : selectedLogs.filter((log) => log.operation === logFilter);
   const logOperations = [...new Set(logs.map((log) => log.operation))];
 
   return <div className={`card ai-settings-card ${showSettings ? 'ai-settings-card--settings' : 'ai-settings-card--logs'}`}>
@@ -266,7 +269,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
              <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> {logSubtab === 'completed' ? 'Выполненные запросы' : 'Ошибки ИИ'}</h3>
             <div className="backup-actions">
               <select className="text-input ai-log-filter" aria-label="Фильтр операций" value={logFilter} onChange={(event) => setLogFilter(event.target.value)}><option value="all">Все операции</option>{logOperations.map((operation) => <option key={operation} value={operation}>{AI_OPERATION_LABELS[operation] ?? operation}</option>)}</select>
-             <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs(logSubtab)}><RefreshCw size={14} /> Обновить</button>
+             <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
             <button type="button" className="btn-secondary" disabled={logsBusy || !logs.length} onClick={() => void clearLogs()}><Trash2 size={14} /> Очистить</button>
           </div>
         </div>
