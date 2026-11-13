@@ -132,6 +132,10 @@
 .ai-queue-error { color: var(--error); font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
 .ai-retry-button { justify-self: start; }
 .ai-log-filter { width: auto; min-width: 180px; }
+.ai-log-subtabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
+.ai-log-subtab { padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); background: var(--bg-secondary); cursor: pointer; font: inherit; }
+.ai-log-subtab span { margin-left: 5px; color: var(--text-primary); font-size: 12px; }
+.ai-log-subtab.is-active { border-color: var(--accent-primary); color: var(--text-primary); background: var(--bg-tertiary); }
 .ai-log-card-head { justify-content: space-between; }
 .ai-log-card-head > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ai-log-message { margin: 12px 0; line-height: 1.5; overflow-wrap: anywhere; }

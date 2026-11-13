@@ -26,6 +26,8 @@ interface AISettingsTabProps {
   view?: 'settings' | 'logs';
 }
 
+type LogSubtab = 'active' | 'completed' | 'errors';
+
 interface ProfileEditors {
   model: string;
   prompt: string;
@@ -45,6 +47,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
   const [logFilter, setLogFilter] = useState('all');
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [logSubtab, setLogSubtab] = useState<LogSubtab>('active');
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
@@ -185,7 +188,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const visibleQueueItems = (queue?.items.filter((item) => item.status !== 'completed') ?? [])
     .slice()
     .sort((a, b) => (queueStatusOrder[a.status] ?? 3) - (queueStatusOrder[b.status] ?? 3) || b.createdAt.localeCompare(a.createdAt));
-  const filteredLogs = logFilter === 'all' ? logs : logs.filter((log) => log.operation === logFilter);
+  const completedLogs = logs.filter((log) => log.errorCode === 'AI_OK');
+  const errorLogs = logs.filter((log) => log.errorCode !== 'AI_OK');
+  const failedQueueItems = visibleQueueItems.filter((item) => item.status === 'failed');
+  const selectedLogs = logSubtab === 'completed' ? completedLogs : errorLogs;
+  const filteredLogs = logFilter === 'all' ? selectedLogs : selectedLogs.filter((log) => log.operation === logFilter);
   const logOperations = [...new Set(logs.map((log) => log.operation))];
 
   return <div className={`card ai-settings-card ${showSettings ? 'ai-settings-card--settings' : 'ai-settings-card--logs'}`}>
@@ -211,16 +218,22 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => void check()}><CheckCircle size={15} /> Проверить настройки</button>
       </div>
 
-       <section className="ai-logs-content" aria-labelledby="ai-queue-title">
+       <div className="ai-log-subtabs" role="tablist" aria-label="Разделы логов ИИ">
+         <button type="button" className={`ai-log-subtab ${logSubtab === 'active' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'active'} onClick={() => setLogSubtab('active')}>Текущие / Ожидание <span>{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length}</span></button>
+         <button type="button" className={`ai-log-subtab ${logSubtab === 'completed' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'completed'} onClick={() => setLogSubtab('completed')}>Выполненные <span>{completedLogs.length}</span></button>
+         <button type="button" className={`ai-log-subtab ${logSubtab === 'errors' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'errors'} onClick={() => setLogSubtab('errors')}>Ошибки <span>{errorLogs.length + failedQueueItems.length}</span></button>
+       </div>
+
+       {logSubtab === 'active' && <section className="ai-logs-content" aria-labelledby="ai-queue-title">
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
           <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
-           {!visibleQueueItems.length ? <div className="muted-note">Активных задач и ошибок нет.</div> : <div className="ai-queue-list">{visibleQueueItems.slice().reverse().map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{item.error}</div>}{item.status === 'failed' && <button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button>}</div>)}</div>}
-        </section>
-      </section>
-       <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
+            {!visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length ? <div className="muted-note">Нет текущих или ожидающих задач.</div> : <div className="ai-queue-list">{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div></div>)}</div>}
+         </section>
+       </section>}
+        {logSubtab !== 'active' && <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
           <div className="stats-header">
-             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> Журнал запросов ИИ</h3>
+             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> {logSubtab === 'completed' ? 'Выполненные запросы' : 'Ошибки ИИ'}</h3>
             <div className="backup-actions">
               <select className="text-input ai-log-filter" aria-label="Фильтр операций" value={logFilter} onChange={(event) => setLogFilter(event.target.value)}><option value="all">Все операции</option>{logOperations.map((operation) => <option key={operation} value={operation}>{AI_OPERATION_LABELS[operation] ?? operation}</option>)}</select>
             <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
@@ -228,10 +241,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
           </div>
         </div>
          <p className="card-note">Сохраняются технические данные всех запросов: операция, модель, HTTP-статус и результат. Тексты ответов, изображения и API-ключи не записываются.</p>
-         {logs.length === 0 ? <div className="muted-note">Ошибок ИИ пока нет.</div> : !filteredLogs.length ? <div className="muted-note">Для выбранной операции ошибок нет.</div> : <div className="ai-error-log-list">
+          {logSubtab === 'errors' && failedQueueItems.length > 0 && <div className="ai-queue-list">{failedQueueItems.map((item) => <div key={item.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">ошибка</span><small>{item.model ?? 'модель не указана'}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{item.error}</div>}<button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button></div>)}</div>}
+          {!filteredLogs.length && !(logSubtab === 'errors' && failedQueueItems.length) ? <div className="muted-note">{logSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
             {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code" data-success={log.errorCode === 'AI_OK' ? 'true' : 'false'}>{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.message}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl></article>)}
         </div>}
-      </section>
+       </section>}
     </div>
   </div>;
 }
