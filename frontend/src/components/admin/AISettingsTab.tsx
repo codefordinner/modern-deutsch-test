@@ -28,6 +28,24 @@ interface AISettingsTabProps {
 
 type LogSubtab = 'active' | 'completed' | 'errors';
 
+const describeAIError = (code: string, message: string, providerStatus: number | null): string => {
+  if (code === 'HTTP_404' || providerStatus === 404) return 'Модель не найдена Gemini (HTTP 404). Проверьте, что она доступна для вашего API-ключа, и выберите модель из актуального списка.';
+  if (code === 'HTTP_401' || code === 'INVALID_API_KEY') return 'Ключ Gemini недействителен или не имеет доступа к этой модели.';
+  if (code === 'HTTP_403') return 'Gemini запретил запрос. Проверьте API-ключ, проект и доступ к модели.';
+  if (code === 'HTTP_429') return 'Gemini ограничил частоту запросов (HTTP 429). Уменьшите нагрузку или подождите.';
+  if (code.startsWith('HTTP_5')) return `Gemini временно недоступен (${code}). Попробуйте повторить запрос.`;
+  return message;
+};
+
+const mergeConfiguredModels = (catalog: AIModel[], profiles: AISettingsResponse['profiles']): AIModel[] => {
+  const result = [...catalog];
+  for (const profile of Object.values(profiles)) {
+    if (!profile.model || result.some((model) => model.name === profile.model)) continue;
+    result.push({ name: profile.model, displayName: `${profile.model} (сохранённая модель)`, supportedGenerationMethods: ['generateContent'] });
+  }
+  return result;
+};
+
 interface ProfileEditors {
   model: string;
   prompt: string;
@@ -47,7 +65,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
   const [logFilter, setLogFilter] = useState('all');
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [logSubtab, setLogSubtab] = useState<LogSubtab>('active');
+  const [logSubtab, setLogSubtab] = useState<LogSubtab>('errors');
   const [profiles, setProfiles] = useState<Record<string, ProfileEditors>>({
     [PICTURE_PROFILE]: { model: '', prompt: '', severity: 3 },
     [PICTURE_FORMAT_PROFILE]: { model: '', prompt: '', severity: 3 },
@@ -75,7 +93,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
         };
       }
       setProfiles(next);
-      if (result.hasApiKey) { try { setModels((await fetchAIModels()).models); } catch { /* catalog is optional on load */ } }
+      if (result.hasApiKey) { try { setModels(mergeConfiguredModels((await fetchAIModels()).models, result.profiles)); } catch { setModels(mergeConfiguredModels([], result.profiles)); } }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { if (showSettings) void load(); }, [showSettings]);
@@ -136,7 +154,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     setBusy(true);
     try {
       const result = await checkAISettings();
-      setModels(result.models);
+      setModels(mergeConfiguredModels(result.models, result.settings.profiles));
       showToast(result.message, result.ok ? 'success' : 'error');
     } catch (error) { reportError(error, 'Не удалось проверить настройки ИИ'); }
     finally { setBusy(false); }
@@ -243,7 +261,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
          <p className="card-note">Сохраняются технические данные всех запросов: операция, модель, HTTP-статус и результат. Тексты ответов, изображения и API-ключи не записываются.</p>
           {logSubtab === 'errors' && failedQueueItems.length > 0 && <div className="ai-queue-list">{failedQueueItems.map((item) => <div key={item.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">ошибка</span><small>{item.model ?? 'модель не указана'}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{item.error}</div>}<button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button></div>)}</div>}
           {!filteredLogs.length && !(logSubtab === 'errors' && failedQueueItems.length) ? <div className="muted-note">{logSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
-            {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code" data-success={log.errorCode === 'AI_OK' ? 'true' : 'false'}>{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.message}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl></article>)}
+           {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code" data-success={log.errorCode === 'AI_OK' ? 'true' : 'false'}>{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.errorCode === 'AI_OK' ? log.message : describeAIError(log.errorCode, log.message, log.providerStatus)}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl>{log.errorCode !== 'AI_OK' && log.message !== log.errorCode && <details className="ai-log-details"><summary>Техническая информация</summary><code>{log.message}</code></details>}</article>)}
         </div>}
        </section>}
     </div>

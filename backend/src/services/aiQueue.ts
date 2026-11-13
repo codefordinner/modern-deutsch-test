@@ -56,10 +56,14 @@ async function pump(): Promise<void> {
       } else {
         task.item.status = 'completed';
       }
-      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, durationMs: Date.now() - startedAtMs, error: result instanceof Response && !result.ok ? new Error(`HTTP_${result.status}`) : undefined, success: result instanceof Response ? result.ok : true });
+      // Provider failures are converted to AIServiceError by the caller, which
+      // records the final, user-meaningful error once. Recording the raw HTTP
+      // response here as well created duplicate log rows for every failed call.
+      if (!(result instanceof Response) || result.ok) {
+        void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, durationMs: Date.now() - startedAtMs, success: true });
+      }
       task.item.finishedAt = new Date().toISOString(); task.resolve(result);
     }).catch((error) => {
-      void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, durationMs: Date.now() - startedAtMs, error, success: false });
       task.item.status = 'failed'; task.item.finishedAt = new Date().toISOString();
       const durationMs = task.item.startedAt ? Date.now() - Date.parse(task.item.startedAt) : 0;
       if (error && typeof error === 'object') {
