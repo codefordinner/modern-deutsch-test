@@ -45,7 +45,7 @@ export async function request<T>(path: string, { method = 'GET', body, auth = fa
     // Reverse proxies can return an HTML 502/504 page instead of the JSON
     // error produced by our API. Never expose that page to the application.
     if (!res.ok && (res.status === 502 || res.status === 504)) {
-      throw new ApiError('Сервер ИИ или прокси не дождался ответа. Проверьте очередь ИИ и попробуйте пакет меньшего размера.', res.status);
+      throw new ApiError('Сервер или прокси временно не отвечает. Попробуйте обновить страницу позже.', res.status);
     }
   }
 
