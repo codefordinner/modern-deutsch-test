@@ -20,9 +20,9 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
     useSRS, setUseSRS, srsMap, resetSRS,
     currentVerb, currentPronoun, currentPraesensType, currentFormText, expectedPraesens, mcOptions, currentSrsItem,
     userInput, setUserInput,
-    praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput, requiredCaseInput, setRequiredCaseInput,
+    praeteritumInput, setPraeteritumInput, partizip2Input, setPartizip2Input, hilfsverbInput, setHilfsverbInput, requiredCaseInput,
     feedback,
-    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSubmit,
+    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSelect,
   } = useVerbsQuizEngine(onAnswer);
 
   const [isTableOpen, setIsTableOpen] = useState(false);
@@ -126,7 +126,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
           onNext={nextQuestion}
         />
       ) : currentVerb && mode === 'required_case' ? (
-        <RequiredCaseQuiz verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} value={requiredCaseInput} feedback={feedback} onChange={setRequiredCaseInput} onSubmit={handleCaseSubmit} onNext={nextQuestion} />
+        <RequiredCaseQuiz verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} value={requiredCaseInput} feedback={feedback} onSelect={handleCaseSelect} onNext={nextQuestion} />
       ) : (
         <SRSIdleCard />
       )}

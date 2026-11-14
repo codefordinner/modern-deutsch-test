@@ -178,14 +178,14 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     recordResult(ok);
   };
 
-  const handleCaseSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (feedback) { nextQuestion(); return; }
+  const handleCaseSelect = (selectedCase: string) => {
+    if (feedback) return;
     if (!card || card.kind !== 'required_case' || !card.verb.requiredCase) return;
     const labels: Record<string, string> = { nominativ: 'Nominativ', akkusativ: 'Akkusativ', dativ: 'Dativ', genitiv: 'Genitiv' };
     const expected = card.verb.requiredCase;
-    const ok = requiredCaseInput === expected;
-    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[requiredCaseInput], expected: labels[expected], isCorrect: ok, userLabel: 'Вы выбрали' }] });
+    const ok = selectedCase === expected;
+    setRequiredCaseInput(selectedCase);
+    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[selectedCase], expected: labels[expected], isCorrect: ok, userLabel: 'Вы выбрали' }] });
     recordResult(ok);
   };
 
@@ -212,6 +212,6 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     requiredCaseInput, setRequiredCaseInput,
     feedback,
     // actions
-    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSubmit,
+    nextQuestion, handlePraesensSubmit, handleFormToInfinitiveSubmit, handleStammSubmit, handleSelectOption, handleCaseSelect,
   };
 }

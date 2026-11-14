@@ -90,7 +90,12 @@
   margin: 20px auto 8px;
 }
 
-.question-form:has(.case-grid) { text-align: center; }
+.case-answers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
 
 .case-btn {
   padding: 15px 10px;
