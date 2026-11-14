@@ -15,6 +15,7 @@ import {
 } from '../services/wordImport';
 import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
 import { checkWordsWithAI, detectRequiredCases, redistributeCategories } from '../services/aiSettings';
+import type { WordCheckField } from '../services/aiSettings';
 import { recordAIError } from '../services/aiErrorLog';
 import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
@@ -186,10 +187,49 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
     });
     const job = startAIBulkJob(rows.length, async (state) => {
       const ai = await checkWordsWithAI(rows.map((word) => ({ id: word.id, de: word.de, ru: word.ru, category: categoryNames.get(word.id), partOfSpeech: word.partOfSpeech, plural: word.plural, feminine: word.feminine, praeteritum: word.praeteritum, partizip2: word.partizip2, hilfsverb: word.hilfsverb, praesensIch: word.praesensIch, praesensDu: word.praesensDu, praesensErSieEs: word.praesensErSieEs, praesensWir: word.praesensWir, praesensIhr: word.praesensIhr, praesensSie: word.praesensSie, requiredCase: word.requiredCase })));
-      const byId = new Map(ai.map((item) => [item.id, item.issues]));
-      state.result = structural.map((item) => ({ ...item, issues: [...item.issues, ...(byId.get(item.id) ?? [])] }));
+      const byId = new Map(ai.map((item) => [item.id, item]));
+      const result = structural.map((item) => {
+        const checked = byId.get(item.id);
+        return { ...item, issues: [...item.issues, ...(checked?.issues ?? [])], corrections: checked?.corrections ?? [] };
+      });
+
+      // Corrections are applied by the server-side job, not by the browser.
+      // Closing the admin tab after starting the job must not interrupt saving.
+      const currentRows = await prisma.word.findMany({ where: { id: { in: rows.map((word) => word.id) } }, select: { id: true } });
+      const currentIds = new Set(currentRows.map((word) => word.id));
+      const proposedGerman = new Map<string, string>();
+      for (const item of result) {
+        if (!currentIds.has(item.id)) throw new Error('WORD_NOT_FOUND');
+        for (const correction of item.corrections) {
+          if (correction.field !== 'de' || correction.value === null) continue;
+          const normalized = duplicateKey(correction.value);
+          const previous = proposedGerman.get(normalized);
+          if (previous && previous !== item.id) throw new Error('DUPLICATE_WORD');
+          proposedGerman.set(normalized, item.id);
+          const duplicate = await prisma.word.findFirst({ where: { normalizedDe: normalized, NOT: { id: item.id } }, select: { id: true } });
+          if (duplicate) throw new Error('DUPLICATE_WORD');
+        }
+      }
+
+      const updates: Prisma.PrismaPromise<unknown>[] = [];
+      for (const item of result) {
+        if (item.corrections.length === 0) continue;
+        const data: Record<string, unknown> = {};
+        for (const correction of item.corrections) data[correction.field as WordCheckField] = correction.value;
+        if (typeof data.de === 'string') {
+          const german = data.de.trim();
+          data.de = german;
+          data.normalizedDe = duplicateKey(german);
+        }
+        for (const field of ['ru', 'hint', 'plural', 'feminine', 'praeteritum', 'partizip2', 'praesensIch', 'praesensDu', 'praesensErSieEs', 'praesensWir', 'praesensIhr', 'praesensSie']) {
+          if (typeof data[field] === 'string') data[field] = data[field].trim() || null;
+        }
+        updates.push(prisma.word.update({ where: { id: item.id }, data: data as Prisma.WordUpdateInput }));
+      }
+      if (updates.length > 0) await prisma.$transaction(updates);
+      state.result = result.map(({ id, issues, corrections }) => ({ id, issues, correctionsApplied: corrections.length }));
       state.completed = state.total;
-      return rows.length;
+      return updates.length;
     }, (error) => recordAIError({ operation: 'word-check', profileId: 'wordCheck', error }));
     return res.status(202).json(job);
   } catch (error) {

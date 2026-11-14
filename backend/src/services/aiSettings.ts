@@ -73,7 +73,7 @@ export const DEFAULT_WORD_FILL_PROMPT = [
 ].join(' ');
 export const DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT = 'Ты распределяешь слова немецкого учебного словаря по существующим категориям. Верни только JSON-массив объектов {"id":"...","categories":["точное название категории"]}. Для каждого слова выбери одну или несколько наиболее подходящих категорий только из переданного списка. Не придумывай категории, не меняй id, не пропускай слова.';
 export const DEFAULT_REQUIRED_CASE_PROMPT = 'Ты определяешь управление немецких глаголов. Верни только JSON-массив объектов {"id":"...","requiredCase":"nominativ|akkusativ|dativ|genitiv|null"}. Выбери падеж, который требует глагол в типичном значении; если глагол не требует объекта или уверенности нет, верни null. Не угадывай, не меняй id и не пропускай слова.';
-export const DEFAULT_WORD_CHECK_PROMPT = 'Ты проверяешь записи немецкого учебного словаря. Проверь именно переданные данные, не выдумывай отсутствующие формы. Для глаголов проверь Infinitiv, Präteritum, Partizip II, Hilfsverb, все Präsens-формы и управление (падеж). Проверь перевод, часть речи и смысл категории. Верни только JSON-массив объектов {"id":"...","issues":[{"field":"...","severity":"error|warning","message":"...","suggestion":"..."}]}. Если проблем нет, issues=[]; не меняй id и не пропускай записи. Сообщения на русском, немецкие формы — только если уверен.';
+export const DEFAULT_WORD_CHECK_PROMPT = 'Ты проверяешь и аккуратно исправляешь записи немецкого учебного словаря. Проверь именно переданные данные, не выдумывай отсутствующие формы. Для глаголов проверь Infinitiv, Präteritum, Partizip II, Hilfsverb, все Präsens-формы и управление (падеж). Проверь перевод и часть речи. Верни только JSON-массив объектов {"id":"...","issues":[{"field":"...","severity":"error|warning","message":"...","suggestion":"..."}],"corrections":[{"field":"...","value":"..."}]}. В corrections добавляй только исправления, в которых уверен: value — готовое новое значение поля; null разрешён только для необязательного поля, которое действительно нужно очистить. Никогда не исправляй наугад и не добавляй отсутствующие немецкие формы. Допустимые поля corrections: de, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb, praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, requiredCase. Для partOfSpeech используй noun|verb|adjective|adverb|other|null, для hilfsverb — haben|sein|null, для requiredCase — nominativ|akkusativ|dativ|genitiv|null. Если проблем нет, issues=[] и corrections=[]; не меняй id и не пропускай записи. Сообщения на русском, немецкие формы — только если уверен.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
@@ -512,24 +512,54 @@ export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{
 }
 
 export interface WordCheckIssue { field: string; severity: 'error' | 'warning'; message: string; suggestion?: string }
-export interface WordCheckResult { id: string; issues: WordCheckIssue[] }
+export type WordCheckField = 'de' | 'ru' | 'hint' | 'partOfSpeech' | 'plural' | 'feminine' | 'praeteritum' | 'partizip2' | 'hilfsverb' | 'praesensIch' | 'praesensDu' | 'praesensErSieEs' | 'praesensWir' | 'praesensIhr' | 'praesensSie' | 'requiredCase';
+export interface WordCheckCorrection { field: WordCheckField; value: string | null }
+export interface WordCheckResult { id: string; issues: WordCheckIssue[]; corrections: WordCheckCorrection[] }
+
+const WORD_CHECK_FIELDS = new Set<WordCheckField>([
+  'de', 'ru', 'hint', 'partOfSpeech', 'plural', 'feminine', 'praeteritum', 'partizip2', 'hilfsverb',
+  'praesensIch', 'praesensDu', 'praesensErSieEs', 'praesensWir', 'praesensIhr', 'praesensSie', 'requiredCase',
+]);
+const PART_OF_SPEECH_VALUES = new Set(['noun', 'verb', 'adjective', 'adverb', 'other']);
+const REQUIRED_CASE_VALUES = new Set(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
+
+function parseWordCheckCorrections(value: unknown): WordCheckCorrection[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error('INVALID_AI_RESPONSE');
+  const seen = new Set<string>();
+  return value.map((item) => {
+    if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
+    const row = item as Record<string, unknown>;
+    const field = row.field;
+    const rawValue = row.value;
+    if (typeof field !== 'string' || !WORD_CHECK_FIELDS.has(field as WordCheckField) || seen.has(field)) throw new Error('INVALID_AI_RESPONSE');
+    if (rawValue !== null && typeof rawValue !== 'string') throw new Error('INVALID_AI_RESPONSE');
+    if (typeof rawValue === 'string' && rawValue.length > 2000) throw new Error('INVALID_AI_RESPONSE');
+    if ((field === 'de' || field === 'ru') && (typeof rawValue !== 'string' || !rawValue.trim())) throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'partOfSpeech' && rawValue !== null && !PART_OF_SPEECH_VALUES.has(rawValue)) throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'hilfsverb' && rawValue !== null && rawValue !== 'haben' && rawValue !== 'sein') throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'requiredCase' && rawValue !== null && !REQUIRED_CASE_VALUES.has(rawValue)) throw new Error('INVALID_AI_RESPONSE');
+    seen.add(field);
+    return { field: field as WordCheckField, value: typeof rawValue === 'string' ? rawValue.trim() : null };
+  });
+}
 
 export async function checkWordsWithAI(words: AiWordInput[]): Promise<WordCheckResult[]> {
-  const result = await generateBatchJson(AI_PROFILE_WORD_CHECK, words, 'Проверяй каждую запись полностью, включая все переданные формы и категорию.');
+  const result = await generateBatchJson(AI_PROFILE_WORD_CHECK, words, 'Проверяй каждую запись полностью, включая все переданные формы и категорию. Помимо issues обязательно верни corrections: массив безопасных исправлений с полями field и value. Добавляй туда только изменения, в которых уверен; если уверенного исправления нет, верни corrections=[].');
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
   const seen = new Set<string>();
   return result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || !Array.isArray(row.issues)) throw new Error('INVALID_AI_RESPONSE');
-    seen.add(row.id);
+     if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || !Array.isArray(row.issues)) throw new Error('INVALID_AI_RESPONSE');
+     seen.add(row.id);
     const issues = row.issues.map((issue) => {
       if (typeof issue !== 'object' || issue === null) throw new Error('INVALID_AI_RESPONSE');
       const value = issue as Record<string, unknown>;
       if (typeof value.field !== 'string' || (value.severity !== 'error' && value.severity !== 'warning') || typeof value.message !== 'string' || (value.suggestion !== undefined && typeof value.suggestion !== 'string')) throw new Error('INVALID_AI_RESPONSE');
       return { field: value.field, severity: value.severity as 'error' | 'warning', message: value.message, ...(value.suggestion ? { suggestion: value.suggestion } : {}) };
     });
-    return { id: row.id, issues };
-  });
+     return { id: row.id, issues, corrections: parseWordCheckCorrections(row.corrections) };
+   });
 }

@@ -227,14 +227,19 @@ export const AdminPanel: React.FC = () => {
       }
       if (result.status === 'failed') throw new Error(result.error ?? 'ИИ не смог проверить слова');
       if (result.status !== 'completed') throw new Error('ИИ не завершил проверку за отведённое время');
-      const rows = (result.result ?? []) as Array<{ id: string; issues: Array<{ severity: string; field: string; message: string; suggestion?: string }> }>;
-      const problems = rows.reduce((sum, row) => sum + row.issues.length, 0);
-      const details = rows.filter((row) => row.issues.length).map((row) => {
-        const word = allWords.find((item) => item.id === row.id);
-        return `${word?.de ?? row.id}: ${row.issues.map((issue) => `${issue.severity === 'error' ? 'Ошибка' : 'Предупреждение'} (${issue.field}) — ${issue.message}${issue.suggestion ? ` Рекомендация: ${issue.suggestion}` : ''}`).join('; ')}`;
-      }).join('\n');
-      window.alert(problems ? `Найдено проблем: ${problems}\n\n${details}` : 'Проблем не найдено. Все проверенные записи выглядят корректно.');
-      return true;
+       const rows = (result.result ?? []) as Array<{ issues?: unknown[]; correctionsApplied?: number }>;
+       const corrections = rows.reduce((sum, row) => sum + (row.correctionsApplied ?? 0), 0);
+       const problems = rows.reduce((sum, row) => sum + (row.issues?.length ?? 0), 0);
+       showToast(
+         corrections > 0
+           ? `Проверка завершена: автоматически исправлено полей — ${corrections}. Найдено замечаний: ${problems}.`
+           : problems > 0
+             ? `Проверка завершена: безопасных исправлений нет, найдено замечаний — ${problems}.`
+             : 'Проверка завершена: проблем не найдено.',
+         'success',
+       );
+       refreshAll();
+       return true;
     } catch (e) { reportError(e, 'Не удалось проверить слова'); return false; }
   };
 
