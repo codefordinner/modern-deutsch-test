@@ -61,6 +61,13 @@ async function pump(): Promise<void> {
     }).then(async (result) => {
       const response = result instanceof Response ? await result.clone().text().catch(() => undefined) : undefined;
       if (result instanceof Response && !result.ok) {
+        if (task.item.operation === 'models') {
+          task.item.status = 'failed';
+          task.item.error = `HTTP_${result.status}`;
+          task.item.finishedAt = new Date().toISOString();
+          task.resolve(result);
+          return;
+        }
         throw new AIServiceError(result.status === 401 || result.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
           providerStatus: result.status,
           model: task.item.model,

@@ -108,7 +108,10 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
         };
       }
       setProfiles(next);
-      if (result.hasApiKey) { try { setModels(mergeConfiguredModels((await fetchAIModels()).models, result.profiles)); } catch { setModels(mergeConfiguredModels([], result.profiles)); } }
+       if (result.hasApiKey) {
+         try { setModels(mergeConfiguredModels((await fetchAIModels()).models, result.profiles)); }
+         catch { setModels((current) => mergeConfiguredModels(current, result.profiles)); }
+       }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
   useEffect(() => { if (showSettings) void load(); }, [showSettings]);
@@ -181,7 +184,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     setBusy(true);
     try {
       const result = await checkAISettings();
-      setModels(mergeConfiguredModels(result.models, result.settings.profiles));
+      if (result.ok) setModels(mergeConfiguredModels(result.models, result.settings.profiles));
       showToast(result.message, result.ok ? 'success' : 'error');
     } catch (error) { reportError(error, 'Не удалось проверить настройки ИИ'); }
     finally { setBusy(false); }

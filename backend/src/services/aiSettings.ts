@@ -214,7 +214,10 @@ export async function fetchGeminiModels(apiKey?: string): Promise<GeminiModelInf
       headers: { 'x-goog-api-key': key },
       signal: AbortSignal.timeout(15_000),
     }));
-    if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status });
+    if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
+      providerStatus: response.status,
+      response: await response.clone().text().catch(() => undefined),
+    });
     const body = await response.json() as { models?: Array<{ name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }> };
     return (body.models ?? []).flatMap((model) => {
       const fullName = typeof model.name === 'string' ? model.name : '';
