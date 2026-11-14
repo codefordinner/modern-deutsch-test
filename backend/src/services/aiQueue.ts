@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { recordAIRequest } from './aiErrorLog';
+import { AIServiceError, normalizeAIError, recordAIError, recordAIRequest } from './aiErrorLog';
 
 export type AIQueueStatus = 'queued' | 'running' | 'completed' | 'failed';
 export interface AIQueueItem {
@@ -20,6 +20,7 @@ const items = new Map<string, AIQueueItem>();
 const listeners = new Set<(snapshot: AIQueueItem[]) => void>();
 const MAX_HISTORY = 100;
 let active = 0;
+let starting = 0;
 const configuredConcurrency = Number(process.env.AI_QUEUE_CONCURRENCY ?? 2);
 const CONCURRENCY = Number.isFinite(configuredConcurrency) ? Math.max(1, Math.min(8, Math.floor(configuredConcurrency))) : 2;
 const DEFAULT_REQUESTS_PER_MINUTE = 10;
@@ -41,40 +42,59 @@ function trim(): void {
 }
 
 async function pump(): Promise<void> {
-  while (active < CONCURRENCY && tasks.length > 0) {
+  while (active + starting < CONCURRENCY && tasks.length > 0) {
     const task = tasks.shift();
     if (!task) return;
-    active++;
-    task.item.status = 'running';
-    task.item.startedAt = new Date().toISOString();
+    starting++;
     notify();
-    const startedAtMs = Date.now();
-    void waitForRequestSlot().then(() => task.run()).then(async (result) => {
+    let started = false;
+    let startedAtMs = 0;
+    void waitForRequestSlot().then(() => {
+      starting--;
+      active++;
+      started = true;
+      startedAtMs = Date.now();
+      task.item.status = 'running';
+      task.item.startedAt = new Date(startedAtMs).toISOString();
+      notify();
+      return task.run();
+    }).then(async (result) => {
+      const response = result instanceof Response ? await result.clone().text().catch(() => undefined) : undefined;
       if (result instanceof Response && !result.ok) {
-        task.item.status = 'failed';
-        task.item.error = `HTTP_${result.status}`;
-      } else {
-        task.item.status = 'completed';
+        throw new AIServiceError(result.status === 401 || result.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
+          providerStatus: result.status,
+          model: task.item.model,
+          prompt: task.prompt,
+          response,
+        });
       }
-      // Provider failures are converted to AIServiceError by the caller, which
-      // records the final, user-meaningful error once. Recording the raw HTTP
-      // response here as well created duplicate log rows for every failed call.
-      if (task.item.operation !== 'models' && (!(result instanceof Response) || result.ok)) {
-        const response = result instanceof Response ? await result.clone().text().catch(() => undefined) : undefined;
+
+      task.item.status = 'completed';
+      if (task.item.operation !== 'models') {
         await recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, prompt: task.prompt, response, durationMs: Date.now() - startedAtMs, success: true });
       }
       task.item.finishedAt = new Date().toISOString(); task.resolve(result);
-    }).catch((error) => {
+    }).catch(async (error) => {
       task.item.status = 'failed'; task.item.finishedAt = new Date().toISOString();
-      const durationMs = task.item.startedAt ? Date.now() - Date.parse(task.item.startedAt) : 0;
-      if (error && typeof error === 'object') {
-        const details = error as { durationMs?: number; model?: string; prompt?: string };
+      const durationMs = startedAtMs ? Date.now() - startedAtMs : Date.now() - Date.parse(task.item.createdAt);
+      const failure = normalizeAIError(error, { model: task.item.model, prompt: task.prompt });
+      if (failure && typeof failure === 'object') {
+        const details = failure as { durationMs?: number; model?: string; prompt?: string };
         details.durationMs = durationMs;
         if (!details.model && task.item.model) details.model = task.item.model;
         if (!details.prompt && task.prompt) details.prompt = task.prompt;
       }
-      task.item.error = error instanceof Error ? error.message : 'AI_ERROR'; task.reject(error);
-      }).finally(() => { active--; trim(); notify(); void pump(); });
+      if (!(failure instanceof AIServiceError) || !failure.logged) {
+        await recordAIError({ operation: task.item.operation, profileId: task.item.profileId, error: failure, durationMs });
+      }
+      task.item.error = failure instanceof Error ? failure.message : 'AI_ERROR'; task.reject(failure);
+      }).finally(() => {
+        if (started) active--;
+        else starting--;
+        trim();
+        notify();
+        void pump();
+      });
   }
 }
 
@@ -120,6 +140,6 @@ export function retryAI(id: string): AIQueueItem | null {
 }
 
 export function readAIQueue(): { items: AIQueueItem[]; active: number; waiting: number; concurrency: number } {
-  return { items: snapshot(), active, waiting: tasks.length, concurrency: CONCURRENCY };
+  return { items: snapshot(), active, waiting: tasks.length + starting, concurrency: CONCURRENCY };
 }
 export function subscribeAIQueue(listener: (items: AIQueueItem[]) => void): () => void { listeners.add(listener); return () => listeners.delete(listener); }

@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { AIServiceError } from './aiErrorLog';
+import { AIServiceError, normalizeAIError, recordAIError } from './aiErrorLog';
 import { configureAIRequestRateLimit, enqueueAI } from './aiQueue';
 
 /** Central AI configuration module. Provider calls must be added here, not in routes or UI. */
@@ -79,16 +79,6 @@ export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
 export const MAX_AI_BATCH_WORDS = 5000;
 export const DEFAULT_AI_BATCH_SIZE = 100;
-
-async function throwGeminiResponseError(response: Response, model: string, prompt?: string): Promise<never> {
-  const body = await response.text().catch(() => '');
-  throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
-    providerStatus: response.status,
-    model,
-    prompt,
-    response: body || undefined,
-  });
-}
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
@@ -219,19 +209,25 @@ async function readApiKey(): Promise<string | null> {
 export async function fetchGeminiModels(apiKey?: string): Promise<GeminiModelInfo[]> {
   const key = apiKey ?? await readApiKey();
   if (!key) throw new Error('MISSING_API_KEY');
-  const response = await enqueueAI('models', undefined, () => fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-    headers: { 'x-goog-api-key': key },
-    signal: AbortSignal.timeout(15_000),
-  }));
-  if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status });
-  const body = await response.json() as { models?: Array<{ name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }> };
-  return (body.models ?? []).flatMap((model) => {
-    const fullName = typeof model.name === 'string' ? model.name : '';
-    const name = fullName.startsWith('models/') ? fullName.slice('models/'.length) : fullName;
-    const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods.filter((item): item is string => typeof item === 'string') : [];
-    if (!isGeminiModel(name) || !methods.includes('generateContent')) return [];
-    return [{ name, displayName: typeof model.displayName === 'string' ? model.displayName : name, supportedGenerationMethods: methods }];
-  });
+  try {
+    const response = await enqueueAI('models', undefined, () => fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+      headers: { 'x-goog-api-key': key },
+      signal: AbortSignal.timeout(15_000),
+    }));
+    if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', { providerStatus: response.status });
+    const body = await response.json() as { models?: Array<{ name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }> };
+    return (body.models ?? []).flatMap((model) => {
+      const fullName = typeof model.name === 'string' ? model.name : '';
+      const name = fullName.startsWith('models/') ? fullName.slice('models/'.length) : fullName;
+      const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods.filter((item): item is string => typeof item === 'string') : [];
+      if (!isGeminiModel(name) || !methods.includes('generateContent')) return [];
+      return [{ name, displayName: typeof model.displayName === 'string' ? model.displayName : name, supportedGenerationMethods: methods }];
+    });
+  } catch (error) {
+    const normalized = normalizeAIError(error);
+    await recordAIError({ operation: 'models', error: normalized });
+    throw normalized;
+  }
 }
 
 export async function checkAISettings(): Promise<{ ok: boolean; message: string; settings: AISettingsPublic; models: GeminiModelInfo[] }> {
@@ -280,10 +276,9 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
       signal: AbortSignal.timeout(60_000),
     }), profile.model, { prompt: profile.prompt });
   } catch (error) {
-    if (error instanceof Error && error.name === 'TimeoutError') throw Object.assign(new Error('AI_TIMEOUT'), { model: profile.model, durationMs: (error as Error & { durationMs?: number }).durationMs });
-    throw error;
+    throw normalizeAIError(error, { model: profile.model, prompt: profile.prompt });
   }
-  if (!response.ok) await throwGeminiResponseError(response, profile.model, profile.prompt);
+  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt: profile.prompt });
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string') throw new Error('INVALID_AI_RESPONSE');
@@ -312,10 +307,9 @@ export async function formatPictureAnswer(answer: string): Promise<string> {
       signal: AbortSignal.timeout(120_000),
     }), profile.model, { prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
   } catch (error) {
-    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw Object.assign(new Error('AI_TIMEOUT'), { model: profile.model, durationMs: (error as Error & { durationMs?: number }).durationMs });
-    throw error;
+    throw normalizeAIError(error, { model: profile.model, prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
   }
-  if (!response.ok) await throwGeminiResponseError(response, profile.model, `${profile.prompt}\n\nТекст пользователя:\n${answer}`);
+  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string' || !text.trim()) throw new Error('INVALID_AI_RESPONSE');
@@ -340,11 +334,10 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   let response: Response;
   try {
        response = await enqueueAI('picture-check', AI_PROFILE_PICTURE_CHECK, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] }], generationConfig: { responseMimeType: 'application/json' } }), signal: AbortSignal.timeout(120_000) }), profile.model, { prompt });
-  } catch (error) {
-     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw Object.assign(new Error('AI_TIMEOUT'), { model: profile.model, durationMs: (error as Error & { durationMs?: number }).durationMs });
-    throw error;
+   } catch (error) {
+     throw normalizeAIError(error, { model: profile.model, prompt });
   }
-  if (!response.ok) await throwGeminiResponseError(response, profile.model, prompt);
+  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string') throw new Error('INVALID_AI_RESPONSE');
@@ -411,25 +404,13 @@ export async function generateWordFill(input: { words: string; categories: strin
 
   const prompt = `${profile.prompt}\n\nДоступные категории: ${categoryLine}.${input.defaultCategory ? ` Если в слове не указана категория — используй «${input.defaultCategory}».` : ''}\n\nСписок слов:\n${text}`;
 
-  let response: Response | undefined;
-  try {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await enqueueAI('word-fill', AI_PROFILE_WORD_FILL, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        signal: AbortSignal.timeout(240_000),
-      }), profile.model, { prompt });
-      const transient = response.status === 429 || response.status >= 500;
-      if (!transient || attempt === 2) break;
-      await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
-    }
-  } catch (error) {
-      if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw Object.assign(new Error('AI_TIMEOUT'), { model: profile.model, durationMs: (error as Error & { durationMs?: number }).durationMs });
-    throw error;
-  }
-  if (!response) throw new Error('GEMINI_UNAVAILABLE');
-  if (!response.ok) await throwGeminiResponseError(response, profile.model, prompt);
+  const response = await enqueueAI('word-fill', AI_PROFILE_WORD_FILL, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    signal: AbortSignal.timeout(240_000),
+  }), profile.model, { prompt });
+  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
 
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
   const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
@@ -469,7 +450,7 @@ async function generateBatchJson(profileId: string, words: AiWordInput[], contex
   for (const item of responses) {
     const response = item.response;
     const prompt = item.prompt;
-    if (!response.ok) await throwGeminiResponseError(response, profile.model, prompt);
+    if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
     const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
     const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
     if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');

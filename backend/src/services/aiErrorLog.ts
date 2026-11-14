@@ -18,6 +18,7 @@ export class AIServiceError extends Error {
   readonly model?: string;
   readonly prompt?: string;
   readonly response?: string;
+  logged = false;
   durationMs?: number;
 
   constructor(code: string, options: { providerStatus?: number; model?: string; prompt?: string; response?: string; cause?: unknown } = {}) {
@@ -30,6 +31,15 @@ export class AIServiceError extends Error {
     this.response = options.response;
     if (options.cause !== undefined) this.cause = options.cause;
   }
+}
+
+export function normalizeAIError(error: unknown, context: { model?: string; prompt?: string } = {}): unknown {
+  if (error instanceof AIServiceError) return error;
+  if (!(error instanceof Error)) return error;
+  const timedOut = error.name === 'TimeoutError'
+    || /operation was aborted due to timeout|abort(ed)? due to timeout/i.test(error.message);
+  if (!timedOut) return error;
+  return new AIServiceError('AI_TIMEOUT', { ...context, cause: error });
 }
 
 const redact = (value: string): string => value
@@ -53,8 +63,10 @@ export async function recordAIError(input: {
   error: unknown;
   durationMs?: number;
 }): Promise<void> {
+  if (input.error instanceof AIServiceError && input.error.logged) return;
   const details = input.error as { prompt?: string; response?: string } | null;
-  return recordAIRequest({ ...input, prompt: details?.prompt, response: details?.response, success: false });
+  const logged = await recordAIRequest({ ...input, prompt: details?.prompt, response: details?.response, success: false });
+  if (logged && input.error instanceof AIServiceError) input.error.logged = true;
 }
 
 /** Records every provider call, including successful calls. */
@@ -68,7 +80,7 @@ export async function recordAIRequest(input: {
   prompt?: string;
   response?: string;
   success: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const error = input.error;
     const aiError = error instanceof AIServiceError ? error : null;
@@ -95,16 +107,17 @@ export async function recordAIRequest(input: {
           durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
       },
     });
+    return true;
   } catch (loggingError) {
     // Never hide the original AI failure. This is especially important for
     // background jobs, where there is no request catch block left to report it.
     console.error('[ai] could not write AI error log:', loggingError);
+    return false;
   }
 }
 
 export async function readAIErrorLogs(limit = 200) {
   return prisma.aiErrorLog.findMany({
-    where: { operation: { not: 'models' } },
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(500, Math.round(limit))),
     select: {
@@ -126,8 +139,8 @@ export async function readAIErrorLogs(limit = 200) {
 /** Counts are calculated over the whole table, not only the visible page. */
 export async function countAIErrorLogs() {
   const [completed, errors] = await Promise.all([
-    prisma.aiErrorLog.count({ where: { operation: { not: 'models' }, errorCode: 'AI_OK' } }),
-    prisma.aiErrorLog.count({ where: { operation: { not: 'models' }, errorCode: { not: 'AI_OK' } } }),
+    prisma.aiErrorLog.count({ where: { errorCode: 'AI_OK' } }),
+    prisma.aiErrorLog.count({ where: { errorCode: { not: 'AI_OK' } } }),
   ]);
   return { completed, errors };
 }

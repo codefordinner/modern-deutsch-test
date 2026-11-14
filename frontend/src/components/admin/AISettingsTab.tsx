@@ -43,6 +43,7 @@ const describeAIError = (code: string, message: string, providerStatus: number |
   if (code === 'HTTP_401' || code === 'INVALID_API_KEY') return 'Ключ Gemini недействителен или не имеет доступа к этой модели.';
   if (code === 'HTTP_403') return 'Gemini запретил запрос. Проверьте API-ключ, проект и доступ к модели.';
   if (code === 'HTTP_429') return 'Gemini ограничил частоту запросов (HTTP 429). Уменьшите нагрузку или подождите.';
+  if (providerStatus !== null && providerStatus >= 500) return `Gemini временно недоступен (HTTP ${providerStatus}). Попробуйте повторить запрос позже.`;
   if (code.startsWith('HTTP_5')) return `Gemini временно недоступен (${code}). Попробуйте повторить запрос.`;
   return AI_ERROR_LABELS[code] ?? message;
 };
