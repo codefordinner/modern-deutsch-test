@@ -20,6 +20,7 @@ import { recordAIError } from '../services/aiErrorLog';
 import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
 import { readAIBulkJob, startAIBulkJob } from '../services/aiBulkJobs';
+import { resolveWordCheckDuplicates } from '../services/wordCheckDuplicates';
 
 /**
  * Admin-only tools for working with many words at once:
@@ -198,24 +199,13 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
 
       // Corrections are applied by the server-side job, not by the browser.
       // Closing the admin tab after starting the job must not interrupt saving.
-      const currentRows = await prisma.word.findMany({ where: { id: { in: rows.map((word) => word.id) } }, select: { id: true } });
+      const currentRows = await prisma.word.findMany({ select: { id: true, de: true } });
       const currentIds = new Set(currentRows.map((word) => word.id));
-      const proposedGerman = new Map<string, string>();
-      for (const item of result) {
-        if (!currentIds.has(item.id)) throw new Error('WORD_NOT_FOUND');
-        for (const correction of item.corrections) {
-          if (correction.field !== 'de' || correction.value === null) continue;
-          const normalized = duplicateKey(correction.value);
-          const previous = proposedGerman.get(normalized);
-          if (previous && previous !== item.id) throw new Error('DUPLICATE_WORD');
-          proposedGerman.set(normalized, item.id);
-          const duplicate = await prisma.word.findFirst({ where: { normalizedDe: normalized, NOT: { id: item.id } }, select: { id: true } });
-          if (duplicate) throw new Error('DUPLICATE_WORD');
-        }
-      }
+      for (const item of result) if (!currentIds.has(item.id)) throw new Error('WORD_NOT_FOUND');
+      const safeResult = resolveWordCheckDuplicates(result, currentRows);
 
       const updates: Prisma.PrismaPromise<unknown>[] = [];
-      for (const item of result) {
+      for (const item of safeResult) {
         if (item.corrections.length === 0) continue;
         const data: Record<string, unknown> = {};
         for (const correction of item.corrections) data[correction.field as WordCheckField] = correction.value;
@@ -229,8 +219,15 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
         }
         updates.push(prisma.word.update({ where: { id: item.id }, data: data as Prisma.WordUpdateInput }));
       }
-      if (updates.length > 0) await prisma.$transaction(updates);
-      state.result = result.map(({ id, issues, corrections }) => ({ id, issues, correctionsApplied: corrections.length }));
+      if (updates.length > 0) {
+        try {
+          await prisma.$transaction(updates);
+        } catch (error) {
+          if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') throw new Error('DUPLICATE_WORD');
+          throw error;
+        }
+      }
+      state.result = safeResult.map(({ id, issues, corrections }) => ({ id, issues, correctionsApplied: corrections.length }));
       state.completed = state.total;
       return updates.length;
     }, (error) => recordAIError({ operation: 'word-check', profileId: 'wordCheck', error }));

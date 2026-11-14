@@ -16,9 +16,7 @@ import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { ModeSwitch } from './ModeSwitch';
 import { ToolbarButton } from './ToolbarButton';
-import {
-  UNAUTHORIZED_EVENT,
-} from '../api/request';
+import { ApiError, UNAUTHORIZED_EVENT } from '../api/request';
 import { checkSession, logout } from '../api/auth';
 import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, checkWordsViaAI, detectRequiredCasesViaAI, redistributeCategoriesViaAI, getAIBulkJob } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
@@ -208,13 +206,18 @@ export const AdminPanel: React.FC = () => {
       }
       if (result.status === 'failed') {
         const messages: Record<string, string> = { MISSING_API_KEY: 'Сначала сохраните API-ключ Gemini в настройках ИИ', MISSING_MODEL: 'Для этого AI-профиля не выбрана модель Gemini', INVALID_AI_RESPONSE: 'Gemini вернул неполный или некорректный ответ для одного из пакетов', GEMINI_UNAVAILABLE: 'Gemini временно недоступен', AI_TIMEOUT: 'Один из AI-пакетов превысил время ожидания' };
-        throw new Error(messages[result.error ?? ''] ?? result.error ?? 'ИИ не смог завершить обработку');
+        throw new Error(messages[result.error ?? ''] ?? 'ИИ не смог завершить обработку. Подробности доступны в логах ИИ.');
       }
       if (result.status !== 'completed') throw new Error('ИИ не завершил обработку за отведённое время');
       showToast(`ИИ обработал слов: ${result.count ?? 0}`, 'success');
       refreshAll();
       return true;
-    } catch (e) { reportError(e, action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи'); return false; }
+    } catch (e) {
+      const fallback = action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи';
+      if (e instanceof ApiError) reportError(e, fallback);
+      else { console.error(e); showToast(e instanceof Error ? e.message : fallback); }
+      return false;
+    }
   };
 
   const handleCheckWords = async (ids: string[]): Promise<boolean> => {
@@ -225,22 +228,41 @@ export const AdminPanel: React.FC = () => {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
         result = await getAIBulkJob(started.id);
       }
-      if (result.status === 'failed') throw new Error(result.error ?? 'ИИ не смог проверить слова');
+      if (result.status === 'failed') {
+        const messages: Record<string, string> = {
+          DUPLICATE_WORD: 'ИИ предложил немецкую форму, которая уже есть в словаре. Конфликтующие исправления не применены; проверьте замечания и раздел «Дубликаты».',
+          MISSING_API_KEY: 'Сначала сохраните API-ключ Gemini в настройках ИИ',
+          MISSING_MODEL: 'Для проверки слов не выбрана модель Gemini',
+          INVALID_AI_RESPONSE: 'Gemini вернул неполный или некорректный ответ',
+          GEMINI_UNAVAILABLE: 'Gemini временно недоступен',
+          AI_TIMEOUT: 'Проверка слов превысила время ожидания',
+        };
+        throw new Error(messages[result.error ?? ''] ?? 'ИИ не смог проверить слова. Подробности доступны в логах ИИ.');
+      }
       if (result.status !== 'completed') throw new Error('ИИ не завершил проверку за отведённое время');
-       const rows = (result.result ?? []) as Array<{ issues?: unknown[]; correctionsApplied?: number }>;
-       const corrections = rows.reduce((sum, row) => sum + (row.correctionsApplied ?? 0), 0);
-       const problems = rows.reduce((sum, row) => sum + (row.issues?.length ?? 0), 0);
-       showToast(
-         corrections > 0
-           ? `Проверка завершена: автоматически исправлено полей — ${corrections}. Найдено замечаний: ${problems}.`
-           : problems > 0
-             ? `Проверка завершена: безопасных исправлений нет, найдено замечаний — ${problems}.`
-             : 'Проверка завершена: проблем не найдено.',
-         'success',
-       );
-       refreshAll();
-       return true;
-    } catch (e) { reportError(e, 'Не удалось проверить слова'); return false; }
+      const rows = (result.result ?? []) as Array<{ id: string; issues?: Array<{ field?: string; message?: string }>; correctionsApplied?: number }>;
+      const corrections = rows.reduce((sum, row) => sum + (row.correctionsApplied ?? 0), 0);
+      const problems = rows.reduce((sum, row) => sum + (row.issues?.length ?? 0), 0);
+      const wordById = new Map(allWords.map((word) => [word.id, word.de]));
+      const duplicateWords = [...new Set(rows
+        .filter((row) => row.issues?.some((issue) => issue.field === 'de' && issue.message?.toLowerCase().includes('дубликат')))
+        .map((row) => wordById.get(row.id) ?? row.id))];
+      const duplicateSummary = duplicateWords.length
+        ? ` Конфликты немецких форм (${duplicateWords.length}): ${duplicateWords.slice(0, 6).join(', ')}${duplicateWords.length > 6 ? ', …' : ''}. Исправления конфликтующих форм не применены.`
+        : '';
+      const summary = corrections > 0
+        ? `Проверка завершена: автоматически исправлено полей — ${corrections}. Найдено замечаний: ${problems}.${duplicateSummary}`
+        : problems > 0
+          ? `Проверка завершена: безопасных исправлений нет, найдено замечаний — ${problems}.${duplicateSummary}`
+          : 'Проверка завершена: проблем не найдено.';
+      showToast(summary, duplicateWords.length ? 'info' : 'success');
+      refreshAll();
+      return true;
+    } catch (e) {
+      if (e instanceof ApiError) reportError(e, 'Не удалось проверить слова');
+      else { console.error(e); showToast(e instanceof Error ? e.message : 'Не удалось проверить слова'); }
+      return false;
+    }
   };
 
   if (isAuthed === null) return <div className="centered-message">Проверка сессии...</div>;

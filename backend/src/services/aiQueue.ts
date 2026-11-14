@@ -61,7 +61,7 @@ async function pump(): Promise<void> {
       // response here as well created duplicate log rows for every failed call.
       if (task.item.operation !== 'models' && (!(result instanceof Response) || result.ok)) {
         const response = result instanceof Response ? await result.clone().text().catch(() => undefined) : undefined;
-        void recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, prompt: task.prompt, response, durationMs: Date.now() - startedAtMs, success: true });
+        await recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, prompt: task.prompt, response, durationMs: Date.now() - startedAtMs, success: true });
       }
       task.item.finishedAt = new Date().toISOString(); task.resolve(result);
     }).catch((error) => {

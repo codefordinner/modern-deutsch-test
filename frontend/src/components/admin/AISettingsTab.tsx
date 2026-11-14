@@ -22,6 +22,14 @@ const AI_OPERATION_LABELS: Record<string, string> = {
   'word-check': 'Проверка слов',
   'prompt-test': 'Тест промпта',
 };
+const AI_ERROR_LABELS: Record<string, string> = {
+  DUPLICATE_WORD: 'ИИ предложил форму, которая создаёт дубликат. Конфликтующие исправления не применены.',
+  INVALID_AI_RESPONSE: 'Gemini вернул ответ в неожиданном формате.',
+  MISSING_API_KEY: 'Не задан API-ключ Gemini.',
+  MISSING_MODEL: 'Для профиля не выбрана модель Gemini.',
+  AI_TIMEOUT: 'Gemini не ответил вовремя.',
+  GEMINI_UNAVAILABLE: 'Gemini временно недоступен.',
+};
 const AI_QUEUE_STATUS_LABELS: Record<string, string> = { queued: 'ожидает', running: 'выполняется', completed: 'завершено', failed: 'ошибка' };
 
 interface AISettingsTabProps {
@@ -36,7 +44,7 @@ const describeAIError = (code: string, message: string, providerStatus: number |
   if (code === 'HTTP_403') return 'Gemini запретил запрос. Проверьте API-ключ, проект и доступ к модели.';
   if (code === 'HTTP_429') return 'Gemini ограничил частоту запросов (HTTP 429). Уменьшите нагрузку или подождите.';
   if (code.startsWith('HTTP_5')) return `Gemini временно недоступен (${code}). Попробуйте повторить запрос.`;
-  return message;
+  return AI_ERROR_LABELS[code] ?? message;
 };
 
 const mergeConfiguredModels = (catalog: AIModel[], profiles: AISettingsResponse['profiles']): AIModel[] => {
