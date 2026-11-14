@@ -32,6 +32,8 @@ export interface AIErrorLog {
   errorCode: string;
   providerStatus: number | null;
   message: string;
+  prompt: string | null;
+  response: string | null;
   durationMs: number | null;
   createdAt: string;
 }

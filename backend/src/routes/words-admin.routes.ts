@@ -177,9 +177,12 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
       if (!text(word.de)) issues.push({ field: 'de', severity: 'error', message: 'Не заполнено немецкое слово' });
       if (!text(word.ru)) issues.push({ field: 'ru', severity: 'error', message: 'Не заполнен перевод' });
       if (!categoryNames.get(word.id)?.length) issues.push({ field: 'category', severity: 'error', message: 'Не указана категория' });
-      if (word.partOfSpeech === 'verb') {
+      const isVerb = word.partOfSpeech === 'verb' || (word.partOfSpeech === null && inferPartOfSpeech({ de: word.de, praeteritum: word.praeteritum, partizip2: word.partizip2, categoryName: categoryNames.get(word.id)?.[0] }) === 'verb');
+      if (isVerb) {
         if (!text(word.praeteritum)) issues.push({ field: 'praeteritum', severity: 'warning', message: 'Не заполнен Präteritum' });
         if (!text(word.partizip2)) issues.push({ field: 'partizip2', severity: 'warning', message: 'Не заполнен Partizip II' });
+        if (!text(word.praesensWir)) issues.push({ field: 'praesensWir', severity: 'warning', message: 'Не заполнена форма Präsens для wir' });
+        if (!text(word.praesensSie)) issues.push({ field: 'praesensSie', severity: 'warning', message: 'Не заполнена форма Präsens для sie/Sie' });
         if (word.hilfsverb && word.hilfsverb !== 'haben' && word.hilfsverb !== 'sein') issues.push({ field: 'hilfsverb', severity: 'error', message: 'Недопустимый вспомогательный глагол' });
         if (word.requiredCase && !['nominativ', 'akkusativ', 'dativ', 'genitiv'].includes(word.requiredCase)) issues.push({ field: 'requiredCase', severity: 'error', message: 'Недопустимый падеж' });
       }

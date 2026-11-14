@@ -40,7 +40,8 @@ router.get('/ai', requireAdmin, async (_req, res) => {
 router.get('/ai/models', requireAdmin, async (_req, res) => {
   try { res.setHeader('Cache-Control', 'no-store'); res.json({ models: await fetchGeminiModels() }); }
   catch (error) {
-    await recordAIError({ operation: 'models', error }).catch(() => undefined);
+    // The catalog request has no prompt and is not an AI generation operation;
+    // keep it out of the persistent prompt/response diagnostics.
     if (error instanceof Error && error.message === 'MISSING_API_KEY') return res.status(400).json({ error: 'Сначала сохраните ключ Gemini' });
     if (error instanceof Error && error.message === 'INVALID_API_KEY') return res.status(400).json({ error: 'Ключ Gemini недействителен или не имеет доступа' });
     return res.status(502).json({ error: 'Не удалось получить список моделей Gemini' });

@@ -144,6 +144,7 @@
 .ai-log-meta div { padding-top: 8px; border-top: 1px solid var(--border-color); }
 .ai-log-meta dt { color: var(--text-secondary); font-size: 12px; }
 .ai-log-meta dd { margin: 3px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.ai-log-details pre { max-height: 420px; margin: 10px 0 0; padding: 10px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-primary); background: var(--bg-primary); border-radius: 6px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 600px) { .picture-trainer-heading { align-items: flex-start; } .picture-timer { font-size: 22px; } .picture-stage { min-height: 280px; } .picture-stage-timer { top: 8px; right: 8px; padding: 6px 9px; font-size: 19px; } }
 @media (max-width: 600px) {
   .picture-upload { padding: 14px; }

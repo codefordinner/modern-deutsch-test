@@ -83,7 +83,8 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
-/// Safe diagnostic records for failed AI operations. Prompts, answers, images and API keys are never stored.
+/// Diagnostic records for AI provider calls. Prompt/response traces are stored for administrator debugging;
+/// the logging service redacts API keys and inline image data before saving them.
 model AiErrorLog {
   id             String   @id @default(cuid())
   operation      String
@@ -92,6 +93,8 @@ model AiErrorLog {
   errorCode      String
   providerStatus Int?
   message        String
+  prompt        String?
+  response      String?
   durationMs     Int?
   createdAt      DateTime @default(now())
 

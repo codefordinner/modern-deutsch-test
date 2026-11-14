@@ -9,20 +9,25 @@ export type AIErrorOperation =
   | 'word-fill'
   | 'category-redistribution'
   | 'required-case'
+  | 'word-check'
   | 'prompt-test';
 
 export class AIServiceError extends Error {
   readonly code: string;
   readonly providerStatus?: number;
   readonly model?: string;
+  readonly prompt?: string;
+  readonly response?: string;
   durationMs?: number;
 
-  constructor(code: string, options: { providerStatus?: number; model?: string; cause?: unknown } = {}) {
+  constructor(code: string, options: { providerStatus?: number; model?: string; prompt?: string; response?: string; cause?: unknown } = {}) {
     super(code);
     this.name = 'AIServiceError';
     this.code = code;
     this.providerStatus = options.providerStatus;
     this.model = options.model;
+    this.prompt = options.prompt;
+    this.response = options.response;
     if (options.cause !== undefined) this.cause = options.cause;
   }
 }
@@ -33,13 +38,23 @@ const redact = (value: string): string => value
   .trim()
   .slice(0, 1000);
 
+/** Keep provider exchanges readable, but never persist credentials or inline image bytes. */
+const redactTrace = (value: string | undefined): string | null => {
+  if (value === undefined) return null;
+  return value
+    .replace(/(x-goog-api-key|api[_-]?key|key)\s*[=:]\s*[^\s,;]+/gi, '$1=[REDACTED]')
+    .replace(/data:image\/[a-z0-9.+-]+;base64,[^\s"'}]+/gi, 'data:image/[REDACTED]')
+    .slice(0, 500_000);
+};
+
 export async function recordAIError(input: {
   operation: string;
   profileId?: string;
   error: unknown;
   durationMs?: number;
 }): Promise<void> {
-  return recordAIRequest({ ...input, success: false });
+  const details = input.error as { prompt?: string; response?: string } | null;
+  return recordAIRequest({ ...input, prompt: details?.prompt, response: details?.response, success: false });
 }
 
 /** Records every provider call, including successful calls. */
@@ -50,6 +65,8 @@ export async function recordAIRequest(input: {
   responseStatus?: number;
   durationMs?: number;
   error?: unknown;
+  prompt?: string;
+  response?: string;
   success: boolean;
 }): Promise<void> {
   try {
@@ -70,10 +87,12 @@ export async function recordAIRequest(input: {
          operation: input.operation,
         profileId: input.profileId ?? null,
         model,
-         errorCode: input.success ? 'AI_OK' : aiError?.code ?? (message || 'UNKNOWN_ERROR'),
-         providerStatus: input.responseStatus ?? aiError?.providerStatus ?? null,
-         message: redact(input.success ? 'Запрос выполнен' : message || 'Unknown error'),
-        durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
+          errorCode: input.success ? 'AI_OK' : aiError?.code ?? (message || 'UNKNOWN_ERROR'),
+          providerStatus: input.responseStatus ?? aiError?.providerStatus ?? null,
+          message: redact(input.success ? 'Запрос выполнен' : message || 'Unknown error'),
+          prompt: redactTrace(input.prompt ?? aiError?.prompt ?? (error as { prompt?: string } | null)?.prompt),
+          response: redactTrace(input.response ?? aiError?.response ?? (error as { response?: string } | null)?.response),
+          durationMs: input.durationMs === undefined ? (aiError?.durationMs ?? (error as { durationMs?: number } | null)?.durationMs ?? null) : Math.max(0, Math.round(input.durationMs)),
       },
     });
   } catch (loggingError) {
@@ -85,6 +104,7 @@ export async function recordAIRequest(input: {
 
 export async function readAIErrorLogs(limit = 200) {
   return prisma.aiErrorLog.findMany({
+    where: { operation: { not: 'models' } },
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(500, Math.round(limit))),
     select: {
@@ -95,6 +115,8 @@ export async function readAIErrorLogs(limit = 200) {
       errorCode: true,
       providerStatus: true,
       message: true,
+      prompt: true,
+      response: true,
       durationMs: true,
       createdAt: true,
     },
@@ -104,8 +126,8 @@ export async function readAIErrorLogs(limit = 200) {
 /** Counts are calculated over the whole table, not only the visible page. */
 export async function countAIErrorLogs() {
   const [completed, errors] = await Promise.all([
-    prisma.aiErrorLog.count({ where: { errorCode: 'AI_OK' } }),
-    prisma.aiErrorLog.count({ where: { errorCode: { not: 'AI_OK' } } }),
+    prisma.aiErrorLog.count({ where: { operation: { not: 'models' }, errorCode: 'AI_OK' } }),
+    prisma.aiErrorLog.count({ where: { operation: { not: 'models' }, errorCode: { not: 'AI_OK' } } }),
   ]);
   return { completed, errors };
 }
