@@ -81,14 +81,35 @@
 @media (hover: none) { .article-btn-key { display: none; } }
 
 /* ---- Required case quiz ---- */
-.case-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.case-table {
   width: 100%;
   max-width: 540px;
-  margin: 20px auto 8px;
+  margin: 20px auto 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
 }
+
+.case-table th,
+.case-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.case-table th {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.case-table tr:last-child td { border-bottom: 0; }
 
 .case-answers {
   display: flex;
@@ -97,47 +118,31 @@
   width: 100%;
 }
 
-.case-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 78px;
-  padding: 15px 10px;
+.case-table-option {
+  min-width: 132px;
+  padding: 7px 10px;
   font-size: 17px;
   font-weight: 700;
   font-family: inherit;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   color: var(--text-primary);
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
+  transition: background-color 0.15s, color 0.15s, opacity 0.15s, border-color 0.15s;
 }
 
-.case-btn-label { line-height: 1.2; }
-.case-btn-hint { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
-.case-btn.is-correct .case-btn-hint { color: rgb(255 255 255 / 0.85); }
-.case-btn.is-wrong { opacity: 0.65; text-decoration: none; border-color: var(--danger, var(--border-color)); }
-
-.case-hints-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 8px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
+.case-table-option:hover:not(:disabled) { background: var(--bg-tertiary); }
+.case-table-option:disabled { cursor: default; }
+.case-table-row.is-correct .case-table-option {
+  border-color: var(--success);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
-.case-hints-toggle input { accent-color: var(--accent); }
-
-.case-btn:hover:not(:disabled) { background: var(--bg-tertiary); transform: translateY(-1px); }
-.case-btn:disabled { cursor: default; }
-.case-btn.is-correct { background: var(--success); border-color: var(--success); color: #fff; }
-.case-btn.is-wrong { opacity: 0.55; text-decoration: line-through; }
-.case-btn.is-dim { opacity: 0.35; }
+.case-table-row.is-wrong .case-table-option { color: var(--error); border-color: var(--error); }
+.case-table-row.is-dim { opacity: 0.45; }
+.case-table-questions { color: var(--text-secondary); font-size: 15px; }
 
 /* ---- Daily goal ---- */
 .daily-chip {

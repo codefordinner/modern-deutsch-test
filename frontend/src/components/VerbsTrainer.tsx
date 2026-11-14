@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, HelpCircle, Layers, RefreshCw } from 'lucide-react';
+import { BookOpen, Layers, RefreshCw } from 'lucide-react';
 import { VerbsTableModal } from './verbs/VerbsTableModal';
 import { VerbsSRSModal } from './verbs/VerbsSRSModal';
 import { PraesensQuiz } from './verbs/PraesensQuiz';
@@ -11,7 +11,6 @@ import { SRSIdleCard } from './srs/SRSIdleCard';
 import { ModeSwitch } from './ModeSwitch';
 import { ToolbarButton } from './ToolbarButton';
 import { useVerbsQuizEngine } from '../hooks/useVerbsQuizEngine';
-import { usePersistentState } from '../hooks/usePersistentState';
 import type { PraesensSubMode, VerbQuizMode } from '../hooks/useVerbsQuizEngine';
 
 export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ onAnswer }) => {
@@ -28,7 +27,6 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
 
   const [isTableOpen, setIsTableOpen] = useState(false);
   const [isSrsOpen, setIsSrsOpen] = useState(false);
-  const [showCaseQuestions, setShowCaseQuestions] = usePersistentState('verbs_show_case_questions', false, (value) => value === true);
 
   const emptyPoolMessage: Record<VerbQuizMode, string> = {
     stammformen: 'Нет глаголов, у которых заполнены обе формы — Präteritum и Partizip II. Заполните их в «Панели управления», чтобы этот режим заработал.',
@@ -52,13 +50,6 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
           ]}
         />
         <div className="toolbar-actions">
-          {mode === 'required_case' && (
-            <label className="case-hints-toggle">
-              <input type="checkbox" checked={showCaseQuestions} onChange={(event) => setShowCaseQuestions(event.target.checked)} />
-              <HelpCircle size={15} />
-              <span>Вопросы</span>
-            </label>
-          )}
           <ToolbarButton icon={<Layers size={15} />} label="SRS" onClick={() => setIsSrsOpen(true)} />
           <ToolbarButton icon={<BookOpen size={15} />} label="Таблица глаголов" onClick={() => setIsTableOpen(true)} />
         </div>
@@ -135,7 +126,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
           onNext={nextQuestion}
         />
       ) : currentVerb && mode === 'required_case' ? (
-        <RequiredCaseQuiz verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} value={requiredCaseInput} feedback={feedback} showCaseQuestions={showCaseQuestions} onSelect={handleCaseSelect} onNext={nextQuestion} />
+        <RequiredCaseQuiz verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} value={requiredCaseInput} feedback={feedback} onSelect={handleCaseSelect} onNext={nextQuestion} />
       ) : (
         <SRSIdleCard />
       )}

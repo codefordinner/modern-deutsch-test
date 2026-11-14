@@ -23,7 +23,6 @@ export const BACKUP_KEYS = [
   'time_display_mode',
   'time_step_mode',
   'verbs_mode',
-  'verbs_show_case_questions',
   'articles_category',
   'onboarding_seen',
 ] as const;
