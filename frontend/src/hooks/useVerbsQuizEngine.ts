@@ -185,7 +185,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     const expected = card.verb.requiredCase;
     const ok = selectedCase === expected;
     setRequiredCaseInput(selectedCase);
-    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[selectedCase], expected: labels[expected], isCorrect: ok, userLabel: 'Вы выбрали' }] });
+    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[selectedCase], expected: labels[expected], isCorrect: ok, label: 'case' }] });
     recordResult(ok);
   };
 

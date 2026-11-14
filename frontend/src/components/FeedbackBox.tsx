@@ -50,6 +50,19 @@ const AnswerComparison: React.FC<{ check: AnswerCheck }> = ({ check }) => {
   );
 };
 
+const CaseAnswer: React.FC<{ check: AnswerCheck }> = ({ check }) => (
+  <div className="answer-compare">
+    <div className="answer-compare-row">
+      <span className="answer-compare-tag">Ваш ответ:</span>
+      <span className="answer-compare-text answer-compare-user">{check.user || 'ничего не выбрано'}</span>
+    </div>
+    <div className="answer-compare-row">
+      <span className="answer-compare-tag">Правильно:</span>
+      <span className="answer-compare-text answer-compare-expected">{check.expected}</span>
+    </div>
+  </div>
+);
+
 interface FeedbackBoxProps {
   feedback: Feedback;
   /** Extra control shown at the right edge (e.g. a "speak" button). */
@@ -79,6 +92,8 @@ export const FeedbackBox: React.FC<FeedbackBoxProps> = ({ feedback, action }) =>
                     <strong>{check.expected}</strong>
                   </span>
                 </div>
+              ) : check.label === 'case' ? (
+                <CaseAnswer key={i} check={check} />
               ) : (
                 <AnswerComparison key={i} check={check} />
               ),

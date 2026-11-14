@@ -11,7 +11,7 @@ export const RequiredCaseQuiz: React.FC<{ verb: Word; srsItem?: SRSRecord; useSR
   <div className="question-card">
     <div className="question-header"><div className="question-prompt-label">Управление глагола</div><LeitnerBadge box={srsItem?.box ?? 1} useSRS={useSRS} /></div>
     <div className="question-title-row"><h2 className="question-text">{verb.de}</h2><button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить"><Volume2 size={18} /></button></div>
-    <div className="question-subtext">Какой падеж обычно используется с этим глаголом?</div>
+    <div className="question-subtext">Выберите падеж, которого требует глагол</div>
     <div className="case-answers">
       <div className="case-grid" role="group" aria-label="Выберите падеж">
         {options.map(([key, label]) => {
@@ -25,7 +25,8 @@ export const RequiredCaseQuiz: React.FC<{ verb: Word; srsItem?: SRSRecord; useSR
               aria-pressed={value === key}
               onClick={() => onSelect(key)}
             >
-              {label}
+              <span className="case-btn-label">{label}</span>
+              <span className="case-btn-hint">{key === 'nominativ' ? 'кто? что?' : key === 'akkusativ' ? 'кого? что?' : key === 'dativ' ? 'кому? чему?' : 'кого? чего?'}</span>
             </button>
           );
         })}
