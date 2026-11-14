@@ -7,7 +7,7 @@ import type { Feedback, SRSRecord, Word } from '../../types';
 
 const options = [['nominativ', 'Nominativ'], ['akkusativ', 'Akkusativ'], ['dativ', 'Dativ'], ['genitiv', 'Genitiv']] as const;
 
-export const RequiredCaseQuiz: React.FC<{ verb: Word; srsItem?: SRSRecord; useSRS: boolean; value: string; feedback: Feedback | null; onSelect: (value: string) => void; onNext: () => void }> = ({ verb, srsItem, useSRS, value, feedback, onSelect, onNext }) => (
+export const RequiredCaseQuiz: React.FC<{ verb: Word; srsItem?: SRSRecord; useSRS: boolean; value: string; feedback: Feedback | null; showCaseQuestions: boolean; onSelect: (value: string) => void; onNext: () => void }> = ({ verb, srsItem, useSRS, value, feedback, showCaseQuestions, onSelect, onNext }) => (
   <div className="question-card">
     <div className="question-header"><div className="question-prompt-label">Управление глагола</div><LeitnerBadge box={srsItem?.box ?? 1} useSRS={useSRS} /></div>
     <div className="question-title-row"><h2 className="question-text">{verb.de}</h2><button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить"><Volume2 size={18} /></button></div>
@@ -26,7 +26,7 @@ export const RequiredCaseQuiz: React.FC<{ verb: Word; srsItem?: SRSRecord; useSR
               onClick={() => onSelect(key)}
             >
               <span className="case-btn-label">{label}</span>
-              <span className="case-btn-hint">{key === 'nominativ' ? 'кто? что?' : key === 'akkusativ' ? 'кого? что?' : key === 'dativ' ? 'кому? чему?' : 'кого? чего?'}</span>
+              {showCaseQuestions && <span className="case-btn-hint">{key === 'nominativ' ? 'кто? что?' : key === 'akkusativ' ? 'кого? что?' : key === 'dativ' ? 'кому? чему?' : 'кого? чего?'}</span>}
             </button>
           );
         })}

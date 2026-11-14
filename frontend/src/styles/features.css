@@ -121,6 +121,18 @@
 .case-btn.is-correct .case-btn-hint { color: rgb(255 255 255 / 0.85); }
 .case-btn.is-wrong { opacity: 0.65; text-decoration: none; border-color: var(--danger, var(--border-color)); }
 
+.case-hints-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.case-hints-toggle input { accent-color: var(--accent); }
+
 .case-btn:hover:not(:disabled) { background: var(--bg-tertiary); transform: translateY(-1px); }
 .case-btn:disabled { cursor: default; }
 .case-btn.is-correct { background: var(--success); border-color: var(--success); color: #fff; }
