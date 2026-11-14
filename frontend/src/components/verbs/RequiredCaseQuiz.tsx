@@ -6,12 +6,7 @@ import { speakGerman } from '../../utils/audio';
 import { useUISettings } from '../../hooks/useUISettings';
 import type { Feedback, SRSRecord, Word } from '../../types';
 
-const options = [
-  ['nominativ', 'Nominativ', 'кто? что?'],
-  ['akkusativ', 'Akkusativ', 'кого? что?'],
-  ['dativ', 'Dativ', 'кому? чему?'],
-  ['genitiv', 'Genitiv', 'кого? чего?'],
-] as const;
+const options = [['nominativ', 'Nominativ'], ['akkusativ', 'Akkusativ'], ['dativ', 'Dativ'], ['genitiv', 'Genitiv']] as const;
 
 interface RequiredCaseQuizProps {
   verb: Word;
@@ -50,32 +45,23 @@ export const RequiredCaseQuiz: React.FC<RequiredCaseQuizProps> = ({ verb, srsIte
       <div className="question-title-row"><h2 className="question-text">{verb.de}</h2><button type="button" className="icon-btn" onClick={() => speakGerman(verb.de)} title="Озвучить" aria-label="Озвучить"><Volume2 size={18} /></button></div>
       <div className="question-subtext">Выберите падеж, которого требует глагол</div>
       <div className="case-answers">
-        <table className="case-table">
-          <thead>
-            <tr><th scope="col">Падеж</th><th scope="col">Вопросы</th></tr>
-          </thead>
-          <tbody>
-            {options.map(([key, label, questions]) => {
-              const state = !feedback ? '' : key === verb.requiredCase ? 'is-correct' : value === key ? 'is-wrong' : 'is-dim';
-              return (
-                <tr key={key} className={`case-table-row ${state}`}>
-                  <td>
-                    <button
-                      type="button"
-                      className="case-table-option"
-                      disabled={feedback !== null}
-                      aria-pressed={value === key}
-                      onClick={() => onSelect(key)}
-                    >
-                      {label}
-                    </button>
-                  </td>
-                  <td className="case-table-questions">{questions}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="case-grid" role="group" aria-label="Выберите падеж">
+          {options.map(([key, label]) => {
+            const state = !feedback ? '' : key === verb.requiredCase ? 'is-correct' : value === key ? 'is-wrong' : 'is-dim';
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`case-btn ${state}`}
+                disabled={feedback !== null}
+                aria-pressed={value === key}
+                onClick={() => onSelect(key)}
+              >
+                <span className="case-btn-label">{label}</span>
+              </button>
+            );
+          })}
+        </div>
         {feedback && <button type="button" className="btn-primary" onClick={onNext} autoFocus={settings.autoFocus}>Дальше (Enter)</button>}
       </div>
       <FeedbackSlot feedback={feedback} />

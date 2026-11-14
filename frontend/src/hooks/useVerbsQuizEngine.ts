@@ -182,10 +182,12 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
     if (feedback) return;
     if (!card || card.kind !== 'required_case' || !card.verb.requiredCase) return;
     const labels: Record<string, string> = { nominativ: 'Nominativ', akkusativ: 'Akkusativ', dativ: 'Dativ', genitiv: 'Genitiv' };
+    const questions: Record<string, string> = { nominativ: 'кто? что?', akkusativ: 'кого? что?', dativ: 'кому? чему?', genitiv: 'кого? чего?' };
     const expected = card.verb.requiredCase;
     const ok = selectedCase === expected;
     setRequiredCaseInput(selectedCase);
-    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${labels[expected]}`, checks: [{ user: labels[selectedCase], expected: labels[expected], isCorrect: ok, label: 'case' }] });
+    const expectedWithQuestions = `${labels[expected]} — вопросы: ${questions[expected]}`;
+    setFeedback({ isCorrect: ok, message: `${card.verb.de} → ${expectedWithQuestions}`, checks: [{ user: labels[selectedCase], expected: expectedWithQuestions, isCorrect: ok, label: 'case' }] });
     recordResult(ok);
   };
 
