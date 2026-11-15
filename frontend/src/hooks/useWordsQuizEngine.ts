@@ -103,6 +103,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   /** How many times "Подсказка" was pressed on the current card. */
   const [hintLevel, setHintLevel] = useState(0);
+  const [emptySubmitCount, setEmptySubmitCount] = useState(0);
 
   const failedQuery = [wordsQuery, categoriesQuery].find((q) => !q.hasData && q.error !== undefined);
   const loadError = failedQuery ? getErrorMessage(failedQuery.error, 'Не удалось загрузить слова') : null;
@@ -124,6 +125,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
 
   const nextWord = useCallback(() => {
     setHintLevel(0);
+    setEmptySubmitCount(0);
     const chosenCard = pickCard(cards, (c) => c.key);
     if (!chosenCard) { setCurrentWord(null); return; }
 
@@ -157,12 +159,22 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     setHintLevel((level) => Math.min(level + 1, hint.maxLevel));
   }, [feedback, hint.maxLevel]);
 
+  const handleInputChange = useCallback((value: string) => {
+    setUserInput(value);
+    setEmptySubmitCount(0);
+  }, []);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (feedback) { nextWord(); return; }
     if (!currentWord) return;
-    // An accidental Enter in an empty field is not an answer: it must not reset the card or the streak.
-    if (!cleanText(userInput)) return;
+    // Ignore the first empty check; a second consecutive one is an explicit wrong answer.
+    const isEmpty = !cleanText(userInput);
+    if (isEmpty && emptySubmitCount === 0) {
+      setEmptySubmitCount(1);
+      return;
+    }
+    setEmptySubmitCount(0);
 
     const expectedTarget = germanTarget(currentWord, currentFormType);
 
@@ -176,7 +188,9 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
       isCorrect = answersMatch(userInput, splitTranslations(currentWord.ru), { foldYo: true });
     }
 
-    recordAnswer(srsKeys.word(currentWord.id, activeDirection, currentFormType), isCorrect);
+    if (!isCorrect || hintLevel === 0) {
+      recordAnswer(srsKeys.word(currentWord.id, activeDirection, currentFormType), isCorrect);
+    }
 
     // What to show as "Правильно" and what to compare the input against.
     let check: AnswerCheck;
@@ -225,7 +239,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
     useSRS, setUseSRS, srsMap, resetSRS, poolKeys,
     // current card
     currentWord, activeDirection, currentFormType, currentSrsItem,
-    userInput, setUserInput, feedback,
+    userInput, setUserInput, handleInputChange, feedback,
     hint, requestHint,
     nextWord, handleSubmit,
   };
