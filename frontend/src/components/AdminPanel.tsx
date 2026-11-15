@@ -24,6 +24,7 @@ import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/use
 import { reportError, showToast } from '../utils/toast';
 import { wordInCategory } from '../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../types';
+import { useConfirm } from '../hooks/useConfirm';
 
 type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'ai-settings' | 'ai-logs' | 'analytics';
 
@@ -40,6 +41,7 @@ const readAdminRoute = (): { tab: AdminTab; category: string } => {
 };
 
 export const AdminPanel: React.FC = () => {
+  const confirm = useConfirm();
   // The session cookie is HttpOnly (invisible to JS), so the client asks the
   // server whether it is currently signed in rather than checking local state.
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
@@ -115,7 +117,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   const handleDeleteWord = async (id: string) => {
-    if (!confirm('Удалить слово?')) return;
+    if (!await confirm('Удалить слово?', { title: 'Удалить слово', confirmLabel: 'Удалить', danger: true })) return;
     try {
       await deleteWord(id);
       // Category counters change too.
@@ -126,7 +128,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Удалить категорию? Слова, которые есть только в ней, будут удалены; слова из нескольких категорий останутся.')) return;
+    if (!await confirm('Удалить категорию? Слова, которые есть только в ней, будут удалены; слова из нескольких категорий останутся.', { title: 'Удалить категорию', confirmLabel: 'Удалить', danger: true })) return;
     try {
       await deleteCategory(id);
       refreshAll();
@@ -199,18 +201,16 @@ export const AdminPanel: React.FC = () => {
   const handleAIAction = async (action: 'categories' | 'cases', ids: string[]): Promise<boolean> => {
     try {
       const started = action === 'categories' ? await redistributeCategoriesViaAI(ids) : await detectRequiredCasesViaAI(ids);
-      let result = started;
-      for (let attempt = 0; attempt < 360 && (result.status === 'queued' || result.status === 'running'); attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        result = await getAIBulkJob(started.id);
-      }
-      if (result.status === 'failed') {
+      showToast('Задача ИИ запущена. Результат появится после завершения.', 'info');
+      void pollAIJob(started.id, (result) => {
+        if (result.status === 'failed') {
         const messages: Record<string, string> = { MISSING_API_KEY: 'Сначала сохраните API-ключ Gemini в настройках ИИ', MISSING_MODEL: 'Для этого AI-профиля не выбрана модель Gemini', INVALID_AI_RESPONSE: 'Gemini вернул неполный или некорректный ответ для одного из пакетов', GEMINI_UNAVAILABLE: 'Gemini временно недоступен', AI_TIMEOUT: 'Один из AI-пакетов превысил время ожидания' };
-        throw new Error(messages[result.error ?? ''] ?? 'ИИ не смог завершить обработку. Подробности доступны в логах ИИ.');
-      }
-      if (result.status !== 'completed') throw new Error('ИИ не завершил обработку за отведённое время');
-      showToast(`ИИ обработал слов: ${result.count ?? 0}`, 'success');
-      refreshAll();
+          showToast(messages[result.error ?? ''] ?? 'ИИ не смог завершить обработку. Подробности доступны в логах ИИ.');
+          return;
+        }
+        showToast(`ИИ обработал слов: ${result.count ?? 0}`, 'success');
+        refreshAll();
+      });
       return true;
     } catch (e) {
       const fallback = action === 'categories' ? 'Не удалось перераспределить категории' : 'Не удалось определить падежи';
@@ -223,11 +223,8 @@ export const AdminPanel: React.FC = () => {
   const handleCheckWords = async (ids: string[]): Promise<boolean> => {
     try {
       const started = await checkWordsViaAI(ids);
-      let result = started;
-      for (let attempt = 0; attempt < 360 && (result.status === 'queued' || result.status === 'running'); attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        result = await getAIBulkJob(started.id);
-      }
+      showToast('Проверка слов запущена. Результат появится после завершения.', 'info');
+      void pollAIJob(started.id, (result) => {
       if (result.status === 'failed') {
         const messages: Record<string, string> = {
           DUPLICATE_WORD: 'ИИ предложил немецкую форму, которая уже есть в словаре. Конфликтующие исправления не применены; проверьте замечания и раздел «Дубликаты».',
@@ -237,9 +234,9 @@ export const AdminPanel: React.FC = () => {
           GEMINI_UNAVAILABLE: 'Gemini временно недоступен',
           AI_TIMEOUT: 'Проверка слов превысила время ожидания',
         };
-        throw new Error(messages[result.error ?? ''] ?? 'ИИ не смог проверить слова. Подробности доступны в логах ИИ.');
+        showToast(messages[result.error ?? ''] ?? 'ИИ не смог проверить слова. Подробности доступны в логах ИИ.');
+        return;
       }
-      if (result.status !== 'completed') throw new Error('ИИ не завершил проверку за отведённое время');
       const rows = (result.result ?? []) as Array<{ id: string; issues?: Array<{ field?: string; message?: string }>; correctionsApplied?: number }>;
       const corrections = rows.reduce((sum, row) => sum + (row.correctionsApplied ?? 0), 0);
       const problems = rows.reduce((sum, row) => sum + (row.issues?.length ?? 0), 0);
@@ -257,11 +254,26 @@ export const AdminPanel: React.FC = () => {
           : 'Проверка завершена: проблем не найдено.';
       showToast(summary, duplicateWords.length ? 'info' : 'success');
       refreshAll();
+      });
       return true;
     } catch (e) {
       if (e instanceof ApiError) reportError(e, 'Не удалось проверить слова');
       else { console.error(e); showToast(e instanceof Error ? e.message : 'Не удалось проверить слова'); }
       return false;
+    }
+  };
+
+  const pollAIJob = async (id: string, onFinished: (job: Awaited<ReturnType<typeof getAIBulkJob>>) => void) => {
+    const deadline = Date.now() + 30 * 60_000;
+    try {
+      while (Date.now() < deadline) {
+        const job = await getAIBulkJob(id);
+        if (job.status === 'completed' || job.status === 'failed') { onFinished(job); return; }
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      }
+      showToast('Задача ИИ ещё выполняется. Её состояние доступно в логах ИИ.', 'info');
+    } catch (error) {
+      reportError(error, 'Не удалось обновить состояние задачи ИИ');
     }
   };
 

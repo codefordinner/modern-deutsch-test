@@ -171,12 +171,9 @@ export function useQuery<T>(
   const entry = getEntry<T>(key);
 
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
-
-  // Assign the fetcher synchronously (not in an effect): `invalidateQueries`
-  // may run between the first render and the effect (e.g. a DICTIONARY_UPDATED
-  // message from the service worker) and must not skip this entry as "no fetcher".
-  entry.fetcher = () => fetcherRef.current();
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   const subscribe = useCallback(
     (listener: () => void) => {
@@ -194,10 +191,11 @@ export function useQuery<T>(
   );
 
   useEffect(() => {
-    entry.fetcher = () => fetcherRef.current();
+    const currentEntry = getEntry<T>(key);
+    currentEntry.fetcher = () => fetcherRef.current();
     if (!enabled || entry.inFlight) return;
-    if (isStale(entry, staleTimeMs)) void runFetch(entry, entry.fetcher);
-  }, [entry, enabled, staleTimeMs]);
+    if (isStale(entry, staleTimeMs)) void runFetch(entry, currentEntry.fetcher!);
+  }, [key, entry, enabled, staleTimeMs]);
 
   const refetch = useCallback(() => runFetch(entry, () => fetcherRef.current()), [entry]);
 

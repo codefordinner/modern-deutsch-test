@@ -9,7 +9,6 @@ import type { GermanTimeOutput } from '../../utils/time-generator';
 interface TimeFlashCardProps {
   timeData: GermanTimeOutput;
   displayMode: 'analog' | 'digital' | 'both';
-  formatMode: 'informal' | 'formal' | 'both';
   isRevealed: boolean;
   onReveal: () => void;
   onNext: () => void;
@@ -18,13 +17,12 @@ interface TimeFlashCardProps {
 export const TimeFlashCard: React.FC<TimeFlashCardProps> = ({
   timeData,
   displayMode,
-  formatMode,
   isRevealed,
   onReveal,
   onNext,
 }) => {
   const [settings] = useUISettings();
-  const mainPhrase = formatMode === 'formal' ? timeData.official : timeData.colloquial;
+  const mainPhrase = timeData.colloquial;
 
   return (
     <div className="question-card flash-card">

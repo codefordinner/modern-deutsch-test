@@ -4,6 +4,7 @@ import { Scorebar } from './Scorebar';
 import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
 import type { ScoreState } from '../types';
 import type { Scores } from '../hooks/useScores';
+import { TAB_LABELS } from '../config/tabs';
 
 interface StatsPanelProps {
   score: ScoreState;
@@ -50,7 +51,7 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ score, onReset, trainerN
               const accuracy = item.total > 0 ? Math.round((item.correct / item.total) * 100) : 0;
               return (
                 <div className="learning-summary-row" key={tab}>
-                  <span>{tab === 'numbers' ? 'Числительные' : tab === 'words' ? 'Слова' : tab === 'articles' ? 'Артикли' : tab === 'verbs' ? 'Глаголы' : 'Время'}</span>
+                <span>{TAB_LABELS[tab] ?? tab}</span>
                   <strong>{item.total ? `${accuracy}% · ${item.correct}/${item.total}` : 'Пока нет ответов'}</strong>
                 </div>
               );

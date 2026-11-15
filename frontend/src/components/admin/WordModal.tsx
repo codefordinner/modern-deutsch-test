@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Modal } from '../Modal';
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
@@ -16,60 +16,43 @@ interface WordModalProps {
 const AUTO = '';
 
 export const WordModal: React.FC<WordModalProps> = ({ word, categories, onClose, onSave }) => {
-  const [de, setDe] = useState('');
-  const [ru, setRu] = useState('');
-  const [hint, setHint] = useState('');
-  const [partOfSpeech, setPartOfSpeech] = useState<PartOfSpeech | typeof AUTO>(AUTO);
-  const [plural, setPlural] = useState('');
-  const [feminine, setFeminine] = useState('');
-  const [praeteritum, setPraeteritum] = useState('');
-  const [partizip2, setPartizip2] = useState('');
-  const [hilfsverb, setHilfsverb] = useState<'haben' | 'sein'>('haben');
-  const [requiredCase, setRequiredCase] = useState<NonNullable<Word['requiredCase']> | ''>('');
-  const [praesensIch, setPraesensIch] = useState('');
-  const [praesensDu, setPraesensDu] = useState('');
-  const [praesensErSieEs, setPraesensErSieEs] = useState('');
-  const [praesensWir, setPraesensWir] = useState('');
-  const [praesensIhr, setPraesensIhr] = useState('');
-  const [praesensSie, setPraesensSie] = useState('');
-  const [showConjugation, setShowConjugation] = useState(false);
+  const [de, setDe] = useState(() => word?.de ?? '');
+  const [ru, setRu] = useState(() => word?.ru ?? '');
+  const [hint, setHint] = useState(() => word?.hint || '');
+  const [partOfSpeech, setPartOfSpeech] = useState<PartOfSpeech | typeof AUTO>(() => word?.partOfSpeech ?? AUTO);
+  const [plural, setPlural] = useState(() => word?.plural || '');
+  const [feminine, setFeminine] = useState(() => word?.feminine || '');
+  const [praeteritum, setPraeteritum] = useState(() => word?.praeteritum || '');
+  const [partizip2, setPartizip2] = useState(() => word?.partizip2 || '');
+  const [hilfsverb, setHilfsverb] = useState<'haben' | 'sein'>(() => word?.hilfsverb === 'sein' ? 'sein' : 'haben');
+  const [requiredCase, setRequiredCase] = useState<NonNullable<Word['requiredCase']> | ''>(() => word?.requiredCase || '');
+  const [praesensIch, setPraesensIch] = useState(() => word?.praesensIch || '');
+  const [praesensDu, setPraesensDu] = useState(() => word?.praesensDu || '');
+  const [praesensErSieEs, setPraesensErSieEs] = useState(() => word?.praesensErSieEs || '');
+  const [praesensWir, setPraesensWir] = useState(() => word?.praesensWir || '');
+  const [praesensIhr, setPraesensIhr] = useState(() => word?.praesensIhr || '');
+  const [praesensSie, setPraesensSie] = useState(() => word?.praesensSie || '');
+  const [showConjugation, setShowConjugation] = useState(() => Boolean(word?.praesensIch || word?.praesensDu || word?.praesensErSieEs));
   /** The word's categories in the order they were ticked; the first one is the primary one. */
-  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>(() => {
+    if (word) return wordCategoryIds(word);
+    if (!categories.length) return [];
+    let savedCategoryId: string | null = null;
+    try { savedCategoryId = localStorage.getItem('admin_last_word_category_id'); } catch { /* storage unavailable */ }
+    const savedExists = savedCategoryId !== null && categories.some((category) => category.id === savedCategoryId);
+    return [savedExists ? savedCategoryId as string : categories[0].id];
+  });
+  const categorySelectionInitialized = useRef(Boolean(word || categories.length));
   const LAST_CATEGORY_KEY = 'admin_last_word_category_id';
 
   useEffect(() => {
-    if (word) {
-      setDe(word.de);
-      setRu(word.ru);
-      setHint(word.hint || '');
-      setPartOfSpeech(word.partOfSpeech ?? AUTO);
-      setPlural(word.plural || '');
-      setFeminine(word.feminine || '');
-      setPraeteritum(word.praeteritum || '');
-      setPartizip2(word.partizip2 || '');
-      setHilfsverb(word.hilfsverb === 'sein' ? 'sein' : 'haben');
-      setRequiredCase(word.requiredCase || '');
-      setPraesensIch(word.praesensIch || '');
-      setPraesensDu(word.praesensDu || '');
-      setPraesensErSieEs(word.praesensErSieEs || '');
-      setPraesensWir(word.praesensWir || '');
-      setPraesensIhr(word.praesensIhr || '');
-      setPraesensSie(word.praesensSie || '');
-      if (word.praesensIch || word.praesensDu || word.praesensErSieEs) {
-        setShowConjugation(true);
-      }
-      setCategoryIds(wordCategoryIds(word));
-    } else if (categories.length > 0) {
-      let savedCategoryId: string | null = null;
-      try {
-        savedCategoryId = localStorage.getItem(LAST_CATEGORY_KEY);
-      } catch {
-        // storage unavailable: just take the first category
-      }
-      const savedCategoryExists = savedCategoryId && categories.some((c) => c.id === savedCategoryId);
-      setCategoryIds([savedCategoryExists ? (savedCategoryId as string) : categories[0].id]);
-    }
-  }, [word, categories]);
+    if (categorySelectionInitialized.current || word || categories.length === 0) return;
+    let savedCategoryId: string | null = null;
+    try { savedCategoryId = localStorage.getItem(LAST_CATEGORY_KEY); } catch { /* storage unavailable */ }
+    const savedExists = savedCategoryId !== null && categories.some((category) => category.id === savedCategoryId);
+    setCategoryIds([savedExists ? savedCategoryId as string : categories[0].id]);
+    categorySelectionInitialized.current = true;
+  }, [categories, word]);
 
   const toggleCategory = (id: string) =>
     setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));

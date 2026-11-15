@@ -2,6 +2,8 @@
   "name": "modern-deutsch-test",
   "version": "1.0.0",
   "type": "module",
+  "private": true,
+  "workspaces": ["frontend", "backend", "packages/shared"],
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npm --prefix frontend run build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",

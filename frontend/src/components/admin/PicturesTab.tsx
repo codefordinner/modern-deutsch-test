@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { createPicture, deletePicture, generatePictureDescription, getAdminPictures, updatePicture, type Picture } from '../../api/pictures';
 import { reportError, showToast } from '../../utils/toast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 // The API limits the resulting Base64 Data URL to 5 MiB. Base64 is larger
 // than the source file, so the practical source-file limit is lower.
@@ -40,6 +41,7 @@ async function prepareImage(file: File): Promise<string> {
 }
 
 export function PicturesTab() {
+  const confirm = useConfirm();
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [autoDescribe, setAutoDescribe] = useState(false);
@@ -62,7 +64,10 @@ export function PicturesTab() {
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const task = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(task);
+  }, []);
 
   const add = async () => {
     if (!files.length) { showToast('Выберите хотя бы одну картинку'); return; }
@@ -112,7 +117,7 @@ export function PicturesTab() {
     }
   };
   const remove = async (picture: Picture) => {
-    if (!confirm('Удалить картинку?')) return;
+    if (!await confirm('Удалить картинку?', { title: 'Удалить картинку', confirmLabel: 'Удалить', danger: true })) return;
     setBusy(true);
     try {
       await deletePicture(picture.id);

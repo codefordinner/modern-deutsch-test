@@ -57,7 +57,10 @@ export const NumbersTrainer: React.FC<NumbersTrainerProps> = ({ onAnswer }) => {
     }
   }, [settings, directionMode]);
 
-  useEffect(() => { nextQuestion(); }, [nextQuestion]);
+  useEffect(() => {
+    const task = window.setTimeout(nextQuestion, 0);
+    return () => window.clearTimeout(task);
+  }, [nextQuestion]);
 
   // All accepted spellings; the first is the canonical one (shown as the question and as "Правильно").
   const variants = germanNumberVariants(currentNum);

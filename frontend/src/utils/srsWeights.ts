@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { DEFAULT_SRS_WEIGHTS, MAX_BOX_WEIGHT as SHARED_MAX_BOX_WEIGHT, SRS_BOX_COUNT, sanitizeWeights as sanitizeSharedWeights } from '@sprachfunke/shared';
 
 // The weights of the five Leitner boxes (how often a card from each box is asked).
 // They are a server-wide setting edited in the admin panel; the app loads them on
@@ -8,18 +9,15 @@ import { useSyncExternalStore } from 'react';
 //
 // Keep DEFAULT_SRS_BOX_WEIGHTS in sync with backend/src/services/srsSettings.ts.
 
-export const SRS_WEIGHTS_BOX_COUNT = 5;
-export const MAX_BOX_WEIGHT = 1000;
+export const SRS_WEIGHTS_BOX_COUNT = SRS_BOX_COUNT;
+export const MAX_BOX_WEIGHT = SHARED_MAX_BOX_WEIGHT;
 
 /** Index 0 = box 1 (new cards and mistakes) … index 4 = box 5 (learned). */
-export const DEFAULT_SRS_BOX_WEIGHTS: readonly number[] = [60, 15, 10, 5, 10];
+export const DEFAULT_SRS_BOX_WEIGHTS: readonly number[] = DEFAULT_SRS_WEIGHTS;
 
 /** Five finite numbers in [0, MAX_BOX_WEIGHT] with at least one above zero; anything else → null. */
 export function sanitizeWeights(raw: unknown): number[] | null {
-  if (!Array.isArray(raw) || raw.length !== SRS_WEIGHTS_BOX_COUNT) return null;
-  if (!raw.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_BOX_WEIGHT)) return null;
-  const weights = raw as number[];
-  return weights.some((v) => v > 0) ? [...weights] : null;
+  return sanitizeSharedWeights(raw);
 }
 
 let current: readonly number[] = DEFAULT_SRS_BOX_WEIGHTS;

@@ -61,8 +61,11 @@ export const Modal: React.FC<ModalProps> = ({ title, onClose, size = 'lg', close
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   const pressStartedOnBackdrop = useRef(false);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const dialog = dialogRef.current;

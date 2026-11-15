@@ -3,8 +3,9 @@ import { Check, RotateCcw, Send, SkipForward } from 'lucide-react';
 import { checkPictureAnswer, formatPictureAnswer, getPictures, type Picture, type PictureCheckResult } from '../api/pictures';
 import { ApiError } from '../api/request';
 import { reportError } from '../utils/toast';
-import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictation';
 import { withRetry } from '../utils/withRetry';
+import { useAudioVisualizer } from '../hooks/useAudioVisualizer';
+import { useSpeechDictation } from '../hooks/useSpeechDictation';
 
 /**
  * Runs the picture-answer check with a short retry for transient failures.
@@ -33,21 +34,16 @@ export function PictureDescriptionTrainer() {
   const [checking, setChecking] = useState(false);
   const [formatting, setFormatting] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
-  const [speechState, setSpeechState] = useState<'idle' | 'listening'>('idle');
   const [isExamMode, setIsExamMode] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'voice' | null>(null);
   const [resumeMode, setResumeMode] = useState<'text' | 'voice' | null>(null);
-  const recognitionRef = useRef<{ stop: () => void } | null>(null);
-  const speechSessionRef = useRef(0);
-  const recognitionEndedRef = useRef<Promise<void> | null>(null);
-  const dictationBaseRef = useRef('');
   const answerRef = useRef(answer);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const microphoneStreamRef = useRef<MediaStream | null>(null);
-  const voiceActiveRef = useRef(false);
-  const waveBarRefs = useRef<HTMLElement[]>([]);
+  const { start: startAudioVisualizer, stop: stopAudioVisualizer, waveBarRefs } = useAudioVisualizer();
+  const { state: speechState, start: startSpeech, stop: stopSpeech } = useSpeechDictation({
+    getCurrentText: () => answerRef.current,
+    onText: (text) => { setAnswer(text); answerRef.current = text; },
+    onStopAudio: stopAudioVisualizer,
+  });
 
   useEffect(() => {
     getPictures().then((items) => {
@@ -77,67 +73,13 @@ export function PictureDescriptionTrainer() {
     if (!draftLoaded || !pictureId) return;
     try { if (answer) localStorage.setItem('picture_draft', JSON.stringify({ pictureId, answer })); else localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
   }, [answer, draftLoaded, pictureId]);
-  const stopAudioVisualizer = useCallback(() => {
-    voiceActiveRef.current = false;
-    if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = null;
-    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-    microphoneStreamRef.current = null;
-    analyserRef.current?.disconnect();
-    analyserRef.current = null;
-    audioContextRef.current?.close().catch(() => undefined);
-    audioContextRef.current = null;
-    waveBarRefs.current.forEach((bar) => { bar.style.height = '4px'; });
-  }, []);
-  const startAudioVisualizer = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) return;
-    let stream: MediaStream | null = null;
-    let context: AudioContext | null = null;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextConstructor) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      context = new AudioContextConstructor();
-      microphoneStreamRef.current = stream;
-      voiceActiveRef.current = true;
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.72;
-      context.createMediaStreamSource(stream).connect(analyser);
-      audioContextRef.current = context;
-      analyserRef.current = analyser;
-      const values = new Uint8Array(analyser.frequencyBinCount);
-      const animate = () => {
-        analyser.getByteFrequencyData(values);
-        const bars = waveBarRefs.current;
-        const step = Math.max(1, Math.floor(values.length / bars.length));
-        bars.forEach((bar, index) => {
-          const value = values[Math.min(values.length - 1, index * step)] ?? 0;
-          bar.style.height = `${4 + (value / 255) * 14}px`;
-        });
-        animationFrameRef.current = requestAnimationFrame(animate);
-      };
-      animate();
-    } catch {
-      stream?.getTracks().forEach((track) => track.stop());
-      if (context) void context.close().catch(() => undefined);
-      // Speech recognition can still work when microphone visualisation is unavailable.
-    }
-  }, []);
-  useEffect(() => () => { recognitionRef.current?.stop(); stopAudioVisualizer(); }, [stopAudioVisualizer]);
-  const stopSpeech = useCallback(() => {
-    speechSessionRef.current += 1;
-    recognitionRef.current?.stop();
-    stopAudioVisualizer();
-    setSpeechState('idle');
-  }, [stopAudioVisualizer]);
   useEffect(() => {
     if (!isExamMode || startedAt === null || elapsed < 90) return;
-    stopSpeech();
-    setStartedAt(null); setIsFinished(true); setHasTimedOut(true);
+    const task = window.setTimeout(() => {
+      stopSpeech();
+      setStartedAt(null); setIsFinished(true); setHasTimedOut(true);
+    }, 0);
+    return () => window.clearTimeout(task);
   }, [elapsed, isExamMode, startedAt, stopSpeech]);
   const resetDescription = () => { setStartedAt(Date.now()); setElapsed(0); setIsFinished(false); setHasTimedOut(false); setAnswer(''); setResult(null); setSelectedSegment(null); };
   const skip = () => {
@@ -190,94 +132,21 @@ export function PictureDescriptionTrainer() {
     setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
     if (nextMode) setResumeMode(nextMode);
   };
-  const startSpeech = useCallback(async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
-    const session = ++speechSessionRef.current;
-    const previousRecognition = recognitionRef.current;
-    if (previousRecognition) {
-      previousRecognition.stop();
-      const ended = recognitionEndedRef.current;
-      if (ended) {
-        await Promise.race([ended, new Promise<void>((resolve) => window.setTimeout(resolve, 1500))]);
-      }
-      if (session !== speechSessionRef.current) return;
-      if (recognitionRef.current === previousRecognition) recognitionRef.current = null;
-    }
-    const recognition = new Recognition(); recognition.lang = 'de-DE'; recognition.continuous = true;
-    recognition.interimResults = true;
-    recognitionRef.current = recognition;
-    let resolveEnded!: () => void;
-    const ended = new Promise<void>((resolve) => { resolveEnded = resolve; });
-    recognitionEndedRef.current = ended;
-    setSpeechState('listening');
-    dictationBaseRef.current = answerRef.current.trim();
-    recognition.onresult = (event) => {
-      if (session !== speechSessionRef.current) return;
-      let finalText = '';
-      let interimText = '';
-      for (let index = 0; index < event.results.length; index += 1) {
-        const result = event.results[index]?.[0];
-        if (!result) continue;
-        if (result.isFinal) finalText += `${finalText ? ' ' : ''}${result.transcript.trim()}`;
-        else interimText += `${interimText ? ' ' : ''}${result.transcript.trim()}`;
-      }
-      // Assemble the recognised speech (spoken punctuation -> real marks) and
-      // append it to what the learner had already typed before dictating.
-      const raw = `${finalText} ${interimText}`.trim();
-      const base = dictationBaseRef.current;
-      // Capitalise the first dictated word only at the start of a new answer or
-      // right after a sentence end; otherwise keep it lowercase as a mid-sentence.
-      const capitalizeFirst = !base || /[.!?]\s*$/.test(base);
-      const spokenText = addDictationPunctuation(raw, capitalizeFirst);
-      const separator = base && spokenText && /^[,.;:!?]/u.test(spokenText) ? '' : base ? ' ' : '';
-      const newAnswer = spokenText ? `${base}${separator}${spokenText}` : base;
-      setAnswer(newAnswer);
-      answerRef.current = newAnswer;
-    };
-    recognition.onerror = (event) => {
-      if (session !== speechSessionRef.current) return;
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        reportError(new Error(event.error), 'Нет доступа к микрофону. Разрешите доступ к микрофону в настройках браузера.');
-      } else if (event.error === 'audio-capture' || event.error === 'no-speech') {
-        reportError(new Error(event.error), event.error === 'audio-capture' ? 'Не удалось включить микрофон.' : 'Речь не распознана. Попробуйте ещё раз.');
-      }
-      stopAudioVisualizer();
-      setSpeechState('idle');
-    };
-    recognition.onend = () => {
-      resolveEnded();
-      // An older recognition instance can finish after a new one has started.
-      // Only let the current instance clear the shared lifecycle references.
-      if (recognitionRef.current === recognition) {
-        recognitionRef.current = null;
-        if (recognitionEndedRef.current === ended) recognitionEndedRef.current = null;
-      }
-      if (session === speechSessionRef.current) setSpeechState('idle');
-    };
-    recognition.onstart = () => { if (session === speechSessionRef.current) setSpeechState('listening'); };
-    try { recognition.start(); }
-    catch (error) {
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
-      setSpeechState('idle');
-      reportError(error, 'Не удалось запустить диктовку. Проверьте доступ к микрофону.');
-    }
-  }, [stopAudioVisualizer]);
   const start = useCallback((mode: 'text' | 'voice') => {
     setIsRevealed(true);
     setInputMode(mode);
     resetDescription();
     if (mode !== 'voice') return;
-    const Recognition = getSpeechRecognition();
-    if (!Recognition) {
-      reportError(new Error('Распознавание речи не поддерживается'), 'Голосовой ввод недоступен в Firefox. Микрофон работает, но Firefox не поддерживает встроенное распознавание речи. Используйте Chrome/Edge или введите текст вручную.');
-      return;
-    }
-    void startAudioVisualizer();
-    void startSpeech(Recognition);
-  }, [startAudioVisualizer, startSpeech]);
+    void startSpeech().then((started) => { if (started) void startAudioVisualizer(); });
+  }, [startSpeech, startAudioVisualizer]);
   useEffect(() => {
     if (!resumeMode || loading) return;
-    start(resumeMode);
-    setResumeMode(null);
+    const mode = resumeMode;
+    const task = window.setTimeout(() => {
+      start(mode);
+      setResumeMode(null);
+    }, 0);
+    return () => window.clearTimeout(task);
   }, [loading, resumeMode, start]);
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
   const answerReadOnly = inputMode === 'voice' && (speechState === 'listening' || formatting);

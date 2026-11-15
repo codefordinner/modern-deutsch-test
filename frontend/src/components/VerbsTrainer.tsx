@@ -107,7 +107,7 @@ export const VerbsTrainer: React.FC<{ onAnswer: (ok: boolean) => void }> = ({ on
         <StammformenQuiz
           verb={currentVerb} srsItem={currentSrsItem} useSRS={useSRS} praeteritumInput={praeteritumInput} partizip2Input={partizip2Input} hilfsverbInput={hilfsverbInput} feedback={feedback}
           onPraeteritumChange={setPraeteritumInput} onPartizip2Change={setPartizip2Input} onHilfsverbChange={setHilfsverbInput}
-          onSubmit={handleStammSubmit} onNext={nextQuestion} onInsertChar={(c) => setPraeteritumInput((p) => p + c)}
+          onSubmit={handleStammSubmit} onNext={nextQuestion}
         />
       ) : currentVerb && mode === 'praesens' && currentPraesensType === 'praesens' ? (
         <PraesensQuiz

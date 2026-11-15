@@ -4,10 +4,9 @@ import { requireAdmin } from '../middleware/auth.middleware';
 import { isPrismaError } from '../middleware/errorHandler';
 import { validate } from '../middleware/validate';
 import { createCategorySchema, updateCategorySchema } from '../validation';
+import { normalizeCategoryName } from '../services/wordCategories';
 
 const router = Router();
-const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
-
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const categories = await prisma.category.findMany({

@@ -54,7 +54,9 @@ export function useSRSProgress(storagePrefix: string) {
   const [{ dueOnly }] = useStudyPrefs();
 
   const srsMapRef = useRef(srsMap);
-  srsMapRef.current = srsMap;
+  useEffect(() => {
+    srsMapRef.current = srsMap;
+  }, [srsMap]);
 
   const lastKeyRef = useRef<string | undefined>(undefined);
 

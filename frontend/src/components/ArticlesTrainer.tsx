@@ -74,7 +74,8 @@ export const ArticlesTrainer: React.FC<{ onAnswer: (isCorrect: boolean) => void 
 
   // `nextWord` changes exactly when the pool or the SRS switches change, so a fresh card is dealt then.
   useEffect(() => {
-    nextWord();
+    const task = window.setTimeout(nextWord, 0);
+    return () => window.clearTimeout(task);
   }, [nextWord]);
 
   const parts = current ? splitArticle(current.de) : null;

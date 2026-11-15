@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { countDue, isDue } from '../../utils/srsDue';
 import { SRS_BOX_COUNT } from '../../utils/srs';
 import { useStudyPrefs } from '../../utils/studyPrefs';
 import type { SRSRecord } from '../../types';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface SRSToggleProps {
   checked: boolean;
@@ -73,8 +74,12 @@ interface SRSPoolProgressProps {
  * are fully learned (box 5).
  */
 export const SRSPoolProgress: React.FC<SRSPoolProgressProps> = ({ keys, srsState, scope }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const { done, learned, total } = useMemo(() => {
-    const now = Date.now();
     let doneCount = 0;
     let learnedCount = 0;
     for (const key of keys) {
@@ -83,7 +88,7 @@ export const SRSPoolProgress: React.FC<SRSPoolProgressProps> = ({ keys, srsState
       if ((record?.box ?? 1) >= SRS_BOX_COUNT) learnedCount += 1;
     }
     return { done: doneCount, learned: learnedCount, total: keys.length };
-  }, [keys, srsState]);
+  }, [keys, srsState, now]);
   const percent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
@@ -114,16 +119,15 @@ interface SRSResetButtonProps {
   onReset: () => void;
 }
 
-export const SRSResetButton: React.FC<SRSResetButtonProps> = ({ confirmText, onReset }) => (
-  <div className="srs-actions">
+export const SRSResetButton: React.FC<SRSResetButtonProps> = ({ confirmText, onReset }) => {
+  const confirm = useConfirm();
+  return <div className="srs-actions">
     <button
       type="button"
       className="btn-secondary btn-danger-text"
-      onClick={() => {
-        if (confirm(confirmText)) onReset();
-      }}
+      onClick={() => void confirm(confirmText, { title: 'Сбросить прогресс', confirmLabel: 'Сбросить', danger: true }).then((ok) => { if (ok) onReset(); })}
     >
       <RotateCcw size={14} /> Сбросить прогресс SRS
     </button>
-  </div>
-);
+  </div>;
+};

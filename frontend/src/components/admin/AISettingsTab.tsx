@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
-import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, fetchAIQueue, resetAIPrompt, retryAIQueueItem, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
+import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, retryAIQueueItem, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { getAIBulkJobs, type AIBulkJob } from '../../api/adminWords';
 
 const PICTURE_PROFILE = 'pictureDescription';
 const PICTURE_FORMAT_PROFILE = 'pictureAnswerFormat';
@@ -31,6 +33,7 @@ const AI_ERROR_LABELS: Record<string, string> = {
   GEMINI_UNAVAILABLE: 'Gemini временно недоступен.',
 };
 const AI_QUEUE_STATUS_LABELS: Record<string, string> = { queued: 'ожидает', running: 'выполняется', completed: 'завершено', failed: 'ошибка' };
+const AI_JOB_ERROR_LABELS: Record<string, string> = { AI_JOB_INTERRUPTED: 'Задача прервана перезапуском сервера. Запустите её повторно.' };
 
 interface AISettingsTabProps {
   view?: 'settings' | 'logs';
@@ -65,6 +68,7 @@ interface ProfileEditors {
 }
 
 export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
+  const confirm = useConfirm();
   const showSettings = view === 'settings';
   const [settings, setSettings] = useState<AISettingsResponse | null>(null);
   const [models, setModels] = useState<AIModel[]>([]);
@@ -76,6 +80,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const [logsBusy, setLogsBusy] = useState(false);
   const [logCounts, setLogCounts] = useState({ completed: 0, errors: 0 });
   const [queue, setQueue] = useState<AIQueueSnapshot | null>(null);
+  const [bulkJobs, setBulkJobs] = useState<AIBulkJob[]>([]);
   const [logFilter, setLogFilter] = useState('all');
   const [retrying, setRetrying] = useState<string | null>(null);
   const [logSubtab, setLogSubtab] = useState<LogSubtab>('errors');
@@ -114,7 +119,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
        }
     } catch (error) { reportError(error, 'Не удалось загрузить настройки ИИ'); }
   };
-  useEffect(() => { if (showSettings) void load(); }, [showSettings]);
+  useEffect(() => {
+    if (!showSettings) return;
+    const task = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(task);
+  }, [showSettings]);
 
   const loadLogs = useCallback(async () => {
     setLogsBusy(true);
@@ -129,38 +138,27 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     catch (error) { reportError(error, 'Не удалось загрузить журнал ошибок ИИ'); }
     finally { setLogsBusy(false); }
   }, []);
-  useEffect(() => { if (!showSettings) void loadLogs(); }, [showSettings, loadLogs]);
   useEffect(() => {
-    if (!showSettings && logsLoaded && !hasChosenLogTab && logSubtab === 'errors' && logCounts.errors === 0 && logCounts.completed > 0) {
-      setLogSubtab('completed');
-    }
-  }, [showSettings, logsLoaded, hasChosenLogTab, logSubtab, logCounts]);
+    if (showSettings) return;
+    const task = window.setTimeout(() => void loadLogs(), 0);
+    return () => window.clearTimeout(task);
+  }, [showSettings, loadLogs]);
   useEffect(() => {
     if (showSettings) return undefined;
     const source = new EventSource('/api/settings/ai/queue');
     source.onmessage = (event) => { try { setQueue(JSON.parse(event.data) as AIQueueSnapshot); } catch { /* ignore malformed event */ } };
-    void fetchAIQueue().then(setQueue).catch(() => undefined);
-    const fallback = window.setInterval(() => { void fetchAIQueue().then(setQueue).catch(() => undefined); }, 5000);
+    const refresh = () => {
+      void getAIBulkJobs().then((result) => setBulkJobs(result.jobs)).catch(() => undefined);
+    };
+    refresh();
+    const fallback = window.setInterval(refresh, 5000);
     return () => { source.close(); window.clearInterval(fallback); };
   }, [showSettings]);
 
   const save = async () => {
     setBusy(true);
     try {
-      // Save the API key once (with the first profile), then each profile separately.
-      let last: AISettingsResponse | null = null;
-      for (const [id, editor] of Object.entries(profiles)) {
-        const hasSeverity = id === CHECK_PROFILE;
-        last = await saveAISettings(
-          id,
-          editor.model,
-          last ? undefined : apiKey,
-          editor.prompt,
-          hasSeverity ? editor.severity : undefined,
-            id === CATEGORY_PROFILE || id === REQUIRED_CASE_PROFILE || id === WORD_CHECK_PROFILE ? editor.batchSize : undefined,
-           id === PICTURE_PROFILE ? requestsPerMinute : undefined
-        );
-      }
+      const last = await saveAISettings(profiles, apiKey, requestsPerMinute);
       setApiKey('');
       setSettings(last);
       showToast('Настройки ИИ сохранены', 'success');
@@ -169,7 +167,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   };
 
   const resetPrompt = async (profileId: string, label: string) => {
-    if (!confirm(`Сбросить промпт «${label}» к исходному тексту?`)) return;
+    if (!await confirm(`Сбросить промпт «${label}» к исходному тексту?`, { title: 'Сбросить промпт', confirmLabel: 'Сбросить' })) return;
     setBusy(true);
     try {
       const result = await resetAIPrompt(profileId);
@@ -191,7 +189,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   };
 
   const clearLogs = async () => {
-    if (!confirm('Очистить журнал ошибок ИИ?')) return;
+    if (!await confirm('Очистить журнал ошибок ИИ?', { title: 'Очистить журнал', confirmLabel: 'Очистить', danger: true })) return;
     setLogsBusy(true);
     try { await clearAIErrorLogs(); setLogs([]); setLogCounts({ completed: 0, errors: 0 }); showToast('Журнал ошибок ИИ очищен', 'success'); }
     catch (error) { reportError(error, 'Не удалось очистить журнал ошибок ИИ'); }
@@ -239,7 +237,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
   const completedLogs = logs.filter((log) => log.errorCode === 'AI_OK');
   const errorLogs = logs.filter((log) => log.errorCode !== 'AI_OK');
   const failedQueueItems = visibleQueueItems.filter((item) => item.status === 'failed');
-  const selectedLogs = logSubtab === 'completed' ? completedLogs : errorLogs;
+  const failedBulkJobs = bulkJobs.filter((job) => job.status === 'failed');
+  const effectiveLogSubtab = !hasChosenLogTab && logSubtab === 'errors' && logCounts.errors === 0 && logCounts.completed > 0
+    ? 'completed'
+    : logSubtab;
+  const selectedLogs = effectiveLogSubtab === 'completed' ? completedLogs : errorLogs;
   const filteredLogs = logFilter === 'all' ? selectedLogs : selectedLogs.filter((log) => log.operation === logFilter);
   const logOperations = [...new Set(logs.map((log) => log.operation))];
 
@@ -268,21 +270,22 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
       </div>
 
        <div className="ai-log-subtabs" role="tablist" aria-label="Разделы логов ИИ">
-         <button type="button" className={`ai-log-subtab ${logSubtab === 'active' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'active'} onClick={() => setLogSubtab('active')}>Текущие / Ожидание <span>{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length}</span></button>
-          <button type="button" className={`ai-log-subtab ${logSubtab === 'completed' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'completed'} onClick={() => { setHasChosenLogTab(true); setLogSubtab('completed'); }}>Выполненные <span>{logCounts.completed}</span></button>
-          <button type="button" className={`ai-log-subtab ${logSubtab === 'errors' ? 'is-active' : ''}`} role="tab" aria-selected={logSubtab === 'errors'} onClick={() => { setHasChosenLogTab(true); setLogSubtab('errors'); }}>Ошибки <span>{logCounts.errors + failedQueueItems.length}</span></button>
+          <button type="button" className={`ai-log-subtab ${effectiveLogSubtab === 'active' ? 'is-active' : ''}`} role="tab" aria-selected={effectiveLogSubtab === 'active'} onClick={() => setLogSubtab('active')}>Текущие / Ожидание <span>{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length + bulkJobs.filter((job) => job.status === 'running' || job.status === 'queued').length}</span></button>
+          <button type="button" className={`ai-log-subtab ${effectiveLogSubtab === 'completed' ? 'is-active' : ''}`} role="tab" aria-selected={effectiveLogSubtab === 'completed'} onClick={() => { setHasChosenLogTab(true); setLogSubtab('completed'); }}>Выполненные <span>{logCounts.completed}</span></button>
+          <button type="button" className={`ai-log-subtab ${effectiveLogSubtab === 'errors' ? 'is-active' : ''}`} role="tab" aria-selected={effectiveLogSubtab === 'errors'} onClick={() => { setHasChosenLogTab(true); setLogSubtab('errors'); }}>Ошибки <span>{logCounts.errors + failedQueueItems.length + failedBulkJobs.length}</span></button>
        </div>
 
-       {logSubtab === 'active' && <section className="ai-logs-content" aria-labelledby="ai-queue-title">
+       {effectiveLogSubtab === 'active' && <section className="ai-logs-content" aria-labelledby="ai-queue-title">
         <section className="ai-error-log" aria-labelledby="ai-queue-title">
           <h3 id="ai-queue-title" className="card-title"><Bot size={18} /> Очередь ИИ</h3>
-          <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
-            {!visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length ? <div className="muted-note">Нет текущих или ожидающих задач.</div> : <div className="ai-queue-list">{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div></div>)}</div>}
+         <p className="card-note">Выполняется: {queue?.active ?? 0} · ожидает: {queue?.waiting ?? 0} · параллельно: {queue?.concurrency ?? '—'}</p>
+            {bulkJobs.some((job) => job.status === 'running' || job.status === 'queued') && <div className="ai-queue-list">{bulkJobs.filter((job) => job.status === 'running' || job.status === 'queued').map((job) => <div key={job.id} className={`ai-queue-item ai-queue-item--${job.status}`}><div className="ai-queue-item-main"><strong>Массовая задача слов</strong><span className="ai-status">{job.status === 'running' ? 'выполняется' : 'ожидает'}</span><small>Обработано: {job.completed} из {job.total}</small><code className="ai-queue-id" title={job.id}>ID: {job.id.slice(0, 8)}</code></div></div>)}</div>}
+            {!visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').length && !bulkJobs.some((job) => job.status === 'running' || job.status === 'queued') ? <div className="muted-note">Нет текущих или ожидающих задач.</div> : <div className="ai-queue-list">{visibleQueueItems.filter((item) => item.status === 'running' || item.status === 'queued').map((item) => <div key={item.id} className={`ai-queue-item ai-queue-item--${item.status}`}><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">{AI_QUEUE_STATUS_LABELS[item.status] ?? item.status}</span><small>{item.model ?? (item.operation === 'models' ? 'служебный запрос' : 'модель не указана')}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div></div>)}</div>}
          </section>
        </section>}
-        {logSubtab !== 'active' && <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
+        {effectiveLogSubtab !== 'active' && <section className="ai-error-log ai-logs-content" aria-labelledby="ai-error-log-title">
           <div className="stats-header">
-             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> {logSubtab === 'completed' ? 'Выполненные запросы' : 'Ошибки ИИ'}</h3>
+             <h3 id="ai-error-log-title" className="card-title"><Bot size={18} /> {effectiveLogSubtab === 'completed' ? 'Выполненные запросы' : 'Ошибки ИИ'}</h3>
             <div className="backup-actions">
               <select className="text-input ai-log-filter" aria-label="Фильтр операций" value={logFilter} onChange={(event) => setLogFilter(event.target.value)}><option value="all">Все операции</option>{logOperations.map((operation) => <option key={operation} value={operation}>{AI_OPERATION_LABELS[operation] ?? operation}</option>)}</select>
              <button type="button" className="btn-secondary" disabled={logsBusy} onClick={() => void loadLogs()}><RefreshCw size={14} /> Обновить</button>
@@ -290,11 +293,11 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
           </div>
         </div>
           <p className="card-note">Сохраняются данные всех запросов: операция, модель, HTTP-статус, отправленный промпт и ответ Gemini. API-ключи и данные изображений перед сохранением удаляются.</p>
-          {logSubtab === 'errors' && failedQueueItems.length > 0 && <div className="ai-queue-list">{failedQueueItems.map((item) => <div key={item.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">ошибка</span><small>{item.model ?? 'модель не указана'}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{item.error}</div>}<button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button></div>)}</div>}
-           {!logsLoaded ? <div className="muted-note">Загрузка журнала…</div> : !filteredLogs.length && !(logSubtab === 'errors' && failedQueueItems.length) ? <div className="muted-note">{logSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
+          {effectiveLogSubtab === 'errors' && (failedQueueItems.length > 0 || failedBulkJobs.length > 0) && <div className="ai-queue-list">{failedQueueItems.map((item) => <div key={item.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>{AI_OPERATION_LABELS[item.operation] ?? item.operation}</strong><span className="ai-status">ошибка</span><small>{item.model ?? 'модель не указана'}</small><code className="ai-queue-id" title={item.id}>ID: {item.id.slice(0, 8)}</code></div>{item.error && <div className="ai-queue-error">{AI_JOB_ERROR_LABELS[item.error] ?? item.error}</div>}{item.error !== 'AI_JOB_INTERRUPTED' && <button type="button" className="btn-secondary ai-retry-button" disabled={retrying === item.id} onClick={() => void retry(item.id)}><RotateCcw size={14} /> {retrying === item.id ? 'Ставим…' : 'Повторить запрос'}</button>}</div>)}{failedBulkJobs.map((job) => <div key={job.id} className="ai-queue-item ai-queue-item--failed"><div className="ai-queue-item-main"><strong>Массовая задача слов</strong><span className="ai-status">ошибка</span><small>{job.error === 'AI_JOB_INTERRUPTED' ? AI_JOB_ERROR_LABELS.AI_JOB_INTERRUPTED : job.error ?? 'Задача не завершена'}</small><code className="ai-queue-id" title={job.id}>ID: {job.id.slice(0, 8)}</code></div></div>)}</div>}
+           {!logsLoaded ? <div className="muted-note">Загрузка журнала…</div> : !filteredLogs.length && !(effectiveLogSubtab === 'errors' && (failedQueueItems.length || failedBulkJobs.length)) ? <div className="muted-note">{effectiveLogSubtab === 'completed' ? 'Выполненных запросов пока нет.' : 'Ошибок ИИ пока нет.'}</div> : <div className="ai-error-log-list">
             {filteredLogs.map((log) => <article key={log.id} className="ai-log-card"><div className="ai-log-card-head"><div><strong>{AI_OPERATION_LABELS[log.operation] ?? log.operation}</strong><span className="ai-log-code" data-success={log.errorCode === 'AI_OK' ? 'true' : 'false'}>{log.errorCode}</span></div><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString('ru-RU')}</time></div><p className="ai-log-message">{log.errorCode === 'AI_OK' ? log.message : describeAIError(log.errorCode, log.message, log.providerStatus)}</p><dl className="ai-log-meta"><div><dt>Модель</dt><dd>{log.model ?? '—'}</dd></div><div><dt>HTTP</dt><dd>{log.providerStatus ?? '—'}</dd></div><div><dt>Время</dt><dd>{log.durationMs === null ? '—' : `${log.durationMs} мс`}</dd></div><div><dt>Профиль</dt><dd>{log.profileId ?? '—'}</dd></div></dl>{log.prompt && <details className="ai-log-details"><summary>Отправленный промпт</summary><pre>{log.prompt}</pre></details>}{log.response && <details className="ai-log-details"><summary>Ответ Gemini</summary><pre>{log.response}</pre></details>}{log.errorCode !== 'AI_OK' && log.message !== log.errorCode && <details className="ai-log-details"><summary>Техническая информация</summary><code>{log.message}</code></details>}</article>)}
         </div>}
-       </section>}
+      </section>}
     </div>
   </div>;
 }

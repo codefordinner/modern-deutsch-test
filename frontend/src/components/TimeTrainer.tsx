@@ -28,7 +28,8 @@ export const TimeTrainer: React.FC = () => {
   }, [stepMode]);
 
   useEffect(() => {
-    nextQuestion();
+    const task = window.setTimeout(nextQuestion, 0);
+    return () => window.clearTimeout(task);
   }, [nextQuestion]);
 
   // Keyboard shortcut listener for space/enter
@@ -77,7 +78,6 @@ export const TimeTrainer: React.FC = () => {
       <TimeFlashCard
         timeData={timeData}
         displayMode={displayMode}
-        formatMode="both"
         isRevealed={isRevealed}
         onReveal={() => setIsRevealed(true)}
         onNext={nextQuestion}

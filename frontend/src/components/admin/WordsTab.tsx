@@ -3,6 +3,7 @@ import { Plus, Edit2, Trash2, Search, Sparkles, CheckCircle } from 'lucide-react
 import { PART_OF_SPEECH_OPTIONS } from '../../utils/partOfSpeech';
 import { wordCategories } from '../../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../../types';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface WordsTabProps {
   words: Word[];
@@ -38,6 +39,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
   onAIAction,
   onCheckWords,
 }) => {
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetCategory, setTargetCategory] = useState('');
   const [targetPos, setTargetPos] = useState('');
@@ -138,11 +140,7 @@ export const WordsTab: React.FC<WordsTabProps> = ({
             type="button"
             className="btn-secondary btn-danger-text"
             disabled={busy}
-            onClick={() => {
-              if (confirm(`Удалить выбранные слова (${selectedIds.length})? Это нельзя отменить.`)) {
-                void run(() => onBulkDelete(selectedIds));
-              }
-            }}
+            onClick={() => void confirm(`Удалить выбранные слова (${selectedIds.length})? Это нельзя отменить.`, { title: 'Удалить слова', confirmLabel: 'Удалить', danger: true }).then((ok) => { if (ok) void run(() => onBulkDelete(selectedIds)); })}
           >
             <Trash2 size={14} /> Удалить
           </button>

@@ -21,7 +21,7 @@ export interface AISettingsResponse { provider: 'gemini'; hasApiKey: boolean; is
 export interface AICheckResponse { ok: boolean; message: string; settings: AISettingsResponse }
 export const fetchAISettings = () => request<AISettingsResponse>('/settings/ai', { auth: true });
 export const fetchAIModels = () => request<{ models: AIModel[] }>('/settings/ai/models', { auth: true });
-export const saveAISettings = (profileId: string, model: string, apiKey: string | undefined, prompt: string, severity?: number, batchSize?: number, requestsPerMinute?: number) => request<AISettingsResponse>('/settings/ai', { method: 'PUT', body: { profileId, model, prompt, ...(severity === undefined ? {} : { severity }), ...(batchSize === undefined ? {} : { batchSize }), ...(requestsPerMinute === undefined ? {} : { requestsPerMinute }), ...(apiKey ? { apiKey } : {}) }, auth: true });
+export const saveAISettings = (profiles: Record<string, AIProfile>, apiKey: string | undefined, requestsPerMinute: number) => request<AISettingsResponse>('/settings/ai', { method: 'PUT', body: { profiles, requestsPerMinute, ...(apiKey ? { apiKey } : {}) }, auth: true });
 export const checkAISettings = () => request<AICheckResponse & { models: AIModel[] }>('/settings/ai/check', { method: 'POST', auth: true });
 export const resetAIPrompt = (profileId: string) => request<AISettingsResponse>(`/settings/ai/profile/${encodeURIComponent(profileId)}`, { method: 'DELETE', auth: true });
 export interface AIErrorLog {

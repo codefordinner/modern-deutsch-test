@@ -82,7 +82,8 @@ export const AnalyticsTab: React.FC = () => {
   }, [days]);
 
   useEffect(() => {
-    void load();
+    const task = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(task);
   }, [load]);
 
   if (!stats) {

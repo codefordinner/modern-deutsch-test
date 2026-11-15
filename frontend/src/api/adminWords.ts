@@ -14,11 +14,11 @@ export const bulkSetCategory = (ids: string[], categoryId: string) => request<Bu
 export const bulkSetPartOfSpeech = (ids: string[], partOfSpeech: PartOfSpeech | null) => request<BulkResult>('/words/bulk/part-of-speech', { method: 'POST', body: { ids, partOfSpeech }, auth: true });
 export const bulkDeleteWords = (ids: string[]) => request<BulkResult>('/words/bulk/delete', { method: 'POST', body: { ids }, auth: true });
 export interface AIBulkJob { id: string; status: 'queued' | 'running' | 'completed' | 'failed'; total: number; completed: number; count?: number; result?: unknown; error?: string }
+export const getAIBulkJobs = () => request<{ jobs: AIBulkJob[] }>('/words/ai/jobs', { auth: true });
 export const redistributeCategoriesViaAI = (ids: string[]) => request<AIBulkJob>('/words/ai/redistribute-categories', { method: 'POST', body: { ids }, auth: true });
 export const detectRequiredCasesViaAI = (ids: string[]) => request<AIBulkJob>('/words/ai/required-case', { method: 'POST', body: { ids }, auth: true });
 export const checkWordsViaAI = (ids: string[]) => request<AIBulkJob>('/words/ai/check', { method: 'POST', body: { ids }, auth: true });
 export const getAIBulkJob = (id: string) => request<AIBulkJob>(`/words/ai/jobs/${encodeURIComponent(id)}`, { auth: true });
-
 export interface DuplicateGroup { key: string; words: Word[] }
 export const getDuplicates = () => request<{ groups: DuplicateGroup[]; total: number }>('/words/duplicates', { auth: true });
 export const mergeDuplicates = (keepId: string, removeIds: string[]) => request<{ success: boolean; removed: number; filledFields: string[] }>('/words/duplicates/merge', { method: 'POST', body: { keepId, removeIds }, auth: true });

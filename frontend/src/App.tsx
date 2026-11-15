@@ -13,6 +13,7 @@ import { useSrsSync } from './hooks/useSrsSync';
 import type { ScoredTab } from './config/tabs';
 import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 export function App() {
   const activeTab = useHashRoute();
@@ -91,6 +92,7 @@ export function App() {
   };
 
   return (
+    <ConfirmProvider>
     <div className="app-shell">
       <Navbar
         activeTab={activeTab}
@@ -121,6 +123,7 @@ export function App() {
       <UpdateBanner />
       <ToastHost />
     </div>
+    </ConfirmProvider>
   );
 }
 

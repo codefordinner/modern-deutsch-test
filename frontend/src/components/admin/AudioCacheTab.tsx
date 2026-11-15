@@ -5,10 +5,12 @@ import { fetchAudioSettings, resetAudioSettings, saveAudioSettings } from '../..
 import type { AudioCacheStats, AudioRegenerationJob } from '../../api/audio';
 import type { AudioSettings } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const DEFAULTS: AudioSettings = { voice: 'de_DE-thorsten-medium', lengthScale: 1, noiseScale: 0.667, noiseWScale: 0.8, sentenceSilence: 0 };
 
 export const AudioCacheTab: React.FC = () => {
+  const confirm = useConfirm();
   const [stats, setStats] = useState<AudioCacheStats | null>(null);
   const [settings, setSettings] = useState<AudioSettings>(DEFAULTS);
   const [saved, setSaved] = useState<AudioSettings>(DEFAULTS);
@@ -114,6 +116,6 @@ export const AudioCacheTab: React.FC = () => {
       <label className="setting-toggle-title" htmlFor="audio-preview-text">Проверить настройки</label>
       <div className="backup-actions"><input id="audio-preview-text" className="text-input w-full" value={sample} maxLength={10_000} onChange={(e) => setSample(e.target.value)} placeholder="Введите немецкое слово или фразу" /><button type="button" className="btn-primary" disabled={playing || !sample.trim()} onClick={() => void preview()}><Play size={14} /> {playing ? 'Воспроизведение…' : 'Прослушать'}</button></div>
     </div>
-    <div className="import-actions"><button type="button" className="btn-secondary" disabled={busy || regeneration?.status === 'running'} onClick={() => { if (confirm('Удалить весь кэш озвучки у всех слов и фраз?')) void runCache(async () => { await clearAudioCache(); setRegeneration(null); }, 'Кэш озвучки очищен'); }}><Trash2 size={16} /> Очистить весь кэш</button><button type="button" className="btn-primary" disabled={busy || regeneration?.status === 'running'} onClick={() => void startRegeneration()}><RefreshCw size={16} /> {regeneration?.status === 'running' ? 'Генерация выполняется…' : 'Заново сгенерировать слова'}</button></div>
+    <div className="import-actions"><button type="button" className="btn-secondary" disabled={busy || regeneration?.status === 'running'} onClick={() => void confirm('Удалить весь кэш озвучки у всех слов и фраз?', { title: 'Очистить кэш озвучки', confirmLabel: 'Очистить', danger: true }).then((ok) => { if (ok) void runCache(async () => { await clearAudioCache(); setRegeneration(null); }, 'Кэш озвучки очищен'); })}><Trash2 size={16} /> Очистить весь кэш</button><button type="button" className="btn-primary" disabled={busy || regeneration?.status === 'running'} onClick={() => void startRegeneration()}><RefreshCw size={16} /> {regeneration?.status === 'running' ? 'Генерация выполняется…' : 'Заново сгенерировать слова'}</button></div>
   </div>;
 };

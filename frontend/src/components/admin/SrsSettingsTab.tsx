@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle, Layers, RotateCcw, Save } from 'lucide-react';
 import { fetchSrsWeights, resetSrsWeights, saveSrsWeights } from '../../api/settings';
 import type { SrsWeightsResponse } from '../../api/settings';
@@ -6,6 +6,7 @@ import { invalidateQueries, useQuery } from '../../api/queryCache';
 import { SRS_WEIGHTS_KEY } from '../../hooks/useSrsWeightsSync';
 import { DEFAULT_SRS_BOX_WEIGHTS, MAX_BOX_WEIGHT, sanitizeWeights, setSrsWeights } from '../../utils/srsWeights';
 import { reportError, showToast } from '../../utils/toast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const BOX_NAMES = ['Ящик 1 (новые и ошибки)', 'Ящик 2', 'Ящик 3', 'Ящик 4', 'Ящик 5 (изучено)'];
 
@@ -15,19 +16,17 @@ const BOX_NAMES = ['Ящик 1 (новые и ошибки)', 'Ящик 2', 'Я�
  * Saved on the server, so it applies to every learner.
  */
 export const SrsSettingsTab: React.FC = () => {
+  const confirm = useConfirm();
   const { data, isLoading } = useQuery(SRS_WEIGHTS_KEY, fetchSrsWeights);
-  const [values, setValues] = useState<string[]>(() => DEFAULT_SRS_BOX_WEIGHTS.map(String));
+  const [values, setValues] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (data) setValues(data.weights.map(String));
-  }, [data]);
-
-  const parsed = useMemo(() => values.map((v) => (v.trim() === '' ? NaN : Number(v))), [values]);
+  const currentValues = values ?? data?.weights.map(String) ?? DEFAULT_SRS_BOX_WEIGHTS.map(String);
+  const parsed = useMemo(() => currentValues.map((v) => (v.trim() === '' ? NaN : Number(v))), [currentValues]);
   const valid = sanitizeWeights(parsed);
   const total = valid ? valid.reduce((sum, w) => sum + w, 0) : 0;
-  const dirty = data ? values.join(',') !== data.weights.join(',') : false;
-  const isDefaultShown = values.join(',') === DEFAULT_SRS_BOX_WEIGHTS.join(',');
+  const dirty = data ? currentValues.join(',') !== data.weights.join(',') : false;
+  const isDefaultShown = currentValues.join(',') === DEFAULT_SRS_BOX_WEIGHTS.join(',');
 
   const apply = async (action: () => Promise<SrsWeightsResponse>, message: string) => {
     setBusy(true);
@@ -49,8 +48,8 @@ export const SrsSettingsTab: React.FC = () => {
     void apply(() => saveSrsWeights(valid), 'Вероятности ящиков сохранены');
   };
 
-  const handleReset = () => {
-    if (busy || !confirm('Вернуть вероятности ящиков по умолчанию (60 / 15 / 10 / 5 / 10)?')) return;
+  const handleReset = async () => {
+    if (busy || !await confirm('Вернуть вероятности ящиков по умолчанию (60 / 15 / 10 / 5 / 10)?', { title: 'Сбросить вероятности', confirmLabel: 'Сбросить' })) return;
     void apply(resetSrsWeights, 'Возвращены значения по умолчанию');
   };
 
@@ -82,8 +81,8 @@ export const SrsSettingsTab: React.FC = () => {
                 min={0}
                 max={MAX_BOX_WEIGHT}
                 step="any"
-                value={values[i]}
-                onChange={(e) => setValues((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                value={currentValues[i]}
+                onChange={(e) => setValues(currentValues.map((v, j) => (j === i ? e.target.value : v)))}
               />
               <span className="srs-weights-percent">{share === null ? '—' : `${share}%`}</span>
             </div>

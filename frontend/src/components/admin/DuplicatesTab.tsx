@@ -5,6 +5,7 @@ import type { DuplicateGroup } from '../../api/adminWords';
 import { reportError, showToast } from '../../utils/toast';
 import { formatCategories } from '../../utils/wordCategories';
 import type { Word } from '../../types';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface DuplicatesTabProps {
   /** Called after words were merged/deleted so the shared dictionary caches are refreshed. */
@@ -24,6 +25,7 @@ function defaultKeeper(words: Word[]): string {
 }
 
 export const DuplicatesTab: React.FC<DuplicatesTabProps> = ({ onChanged }) => {
+  const confirm = useConfirm();
   const [groups, setGroups] = useState<DuplicateGroup[] | null>(null);
   const [keep, setKeep] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,8 @@ export const DuplicatesTab: React.FC<DuplicatesTabProps> = ({ onChanged }) => {
   }, []);
 
   useEffect(() => {
-    void load();
+    const task = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(task);
   }, [load]);
 
   const mergeGroup = async (group: DuplicateGroup): Promise<boolean> => {
@@ -86,9 +89,7 @@ export const DuplicatesTab: React.FC<DuplicatesTabProps> = ({ onChanged }) => {
             <button
               className="btn-primary"
               disabled={busy}
-              onClick={() => {
-                if (confirm(`Объединить все группы (${groups.length}), оставив отмеченные слова?`)) void run(groups);
-              }}
+              onClick={() => void confirm(`Объединить все группы (${groups.length}), оставив отмеченные слова?`, { title: 'Объединить дубликаты', confirmLabel: 'Объединить' }).then((ok) => { if (ok) void run(groups); })}
             >
               Объединить все
             </button>

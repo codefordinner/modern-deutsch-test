@@ -1,6 +1,7 @@
 import { prisma } from '../db';
 import { AIServiceError, normalizeAIError, recordAIError } from './aiErrorLog';
 import { configureAIRequestRateLimit, enqueueAI } from './aiQueue';
+import { normalizeCategoryName } from './wordCategories';
 
 /** Central AI configuration module. Provider calls must be added here, not in routes or UI. */
 export const AI_SETTINGS_KEY = 'aiSettings';
@@ -80,6 +81,17 @@ export const MAX_WORD_FILL_WORDS = 1000;
 export const MAX_AI_BATCH_WORDS = 5000;
 export const DEFAULT_AI_BATCH_SIZE = 100;
 
+export const PROFILES = {
+  [AI_PROFILE_PICTURE_DESCRIPTION]: { defaultPrompt: DEFAULT_PICTURE_PROMPT, hasSeverity: false, hasBatch: false },
+  [AI_PROFILE_PICTURE_FORMAT]: { defaultPrompt: DEFAULT_PICTURE_FORMAT_PROMPT, hasSeverity: false, hasBatch: false },
+  [AI_PROFILE_PICTURE_CHECK]: { defaultPrompt: DEFAULT_PICTURE_CHECK_PROMPT, hasSeverity: true, hasBatch: false },
+  [AI_PROFILE_WORD_FILL]: { defaultPrompt: DEFAULT_WORD_FILL_PROMPT, hasSeverity: false, hasBatch: false },
+  [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { defaultPrompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT, hasSeverity: false, hasBatch: true },
+  [AI_PROFILE_REQUIRED_CASE]: { defaultPrompt: DEFAULT_REQUIRED_CASE_PROMPT, hasSeverity: false, hasBatch: true },
+  [AI_PROFILE_WORD_CHECK]: { defaultPrompt: DEFAULT_WORD_CHECK_PROMPT, hasSeverity: false, hasBatch: true },
+} as const;
+export type AIProfileId = keyof typeof PROFILES;
+
 export function isGeminiModel(value: unknown): value is GeminiModel {
   return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
 }
@@ -88,112 +100,97 @@ function isValidApiKey(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length >= 10 && value.length <= 500;
 }
 
+function defaultProfiles(): StoredAISettings['profiles'] {
+  return Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => [id, {
+    model: DEFAULT_MODEL,
+    prompt: config.defaultPrompt,
+    ...(config.hasSeverity ? { severity: 3 } : {}),
+    ...(config.hasBatch ? { batchSize: DEFAULT_AI_BATCH_SIZE } : {}),
+  }])) as StoredAISettings['profiles'];
+}
+
 function sanitizeStored(value: unknown): StoredAISettings | null {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Record<string, unknown>;
   if (raw.provider !== 'gemini' || (raw.model !== undefined && raw.model !== '' && !isGeminiModel(raw.model)) || !isValidApiKey(raw.apiKey)) return null;
   const legacyPrompt = typeof raw.prompt === 'string' && raw.prompt.trim() ? raw.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_PROMPT;
-  const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, { model: string; prompt: string; severity?: number; batchSize?: number }> : {};
-  const pictureProfile = profiles[AI_PROFILE_PICTURE_DESCRIPTION];
-  const pictureModel = typeof pictureProfile?.model === 'string' && isGeminiModel(pictureProfile.model) ? pictureProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const picturePrompt = typeof pictureProfile?.prompt === 'string' && pictureProfile.prompt.trim() ? pictureProfile.prompt.trim().slice(0, 10_000) : legacyPrompt;
-  const formatProfile = profiles[AI_PROFILE_PICTURE_FORMAT];
-  const formatModel = typeof formatProfile?.model === 'string' && isGeminiModel(formatProfile.model) ? formatProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const formatPrompt = typeof formatProfile?.prompt === 'string' && formatProfile.prompt.trim() ? formatProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_FORMAT_PROMPT;
-  const checkProfile = profiles[AI_PROFILE_PICTURE_CHECK];
-  const checkModel = typeof checkProfile?.model === 'string' && isGeminiModel(checkProfile.model) ? checkProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const checkPrompt = typeof checkProfile?.prompt === 'string' && checkProfile.prompt.trim() ? checkProfile.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_CHECK_PROMPT;
-  const wordFillProfile = profiles[AI_PROFILE_WORD_FILL];
-  const wordFillModel = typeof wordFillProfile?.model === 'string' && isGeminiModel(wordFillProfile.model) ? wordFillProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const wordFillPrompt = typeof wordFillProfile?.prompt === 'string' && wordFillProfile.prompt.trim() ? wordFillProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_FILL_PROMPT;
-  const categoryProfile = profiles[AI_PROFILE_CATEGORY_REDISTRIBUTION];
-  const categoryModel = typeof categoryProfile?.model === 'string' && isGeminiModel(categoryProfile.model) ? categoryProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const categoryPrompt = typeof categoryProfile?.prompt === 'string' && categoryProfile.prompt.trim() ? categoryProfile.prompt.trim().slice(0, 10_000) : DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT;
-  const caseProfile = profiles[AI_PROFILE_REQUIRED_CASE];
-  const caseModel = typeof caseProfile?.model === 'string' && isGeminiModel(caseProfile.model) ? caseProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const casePrompt = typeof caseProfile?.prompt === 'string' && caseProfile.prompt.trim() ? caseProfile.prompt.trim().slice(0, 10_000) : DEFAULT_REQUIRED_CASE_PROMPT;
-  const wordCheckProfile = profiles[AI_PROFILE_WORD_CHECK];
-  const wordCheckModel = typeof wordCheckProfile?.model === 'string' && isGeminiModel(wordCheckProfile.model) ? wordCheckProfile.model.trim() : typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const wordCheckPrompt = typeof wordCheckProfile?.prompt === 'string' && wordCheckProfile.prompt.trim() ? wordCheckProfile.prompt.trim().slice(0, 10_000) : DEFAULT_WORD_CHECK_PROMPT;
+  const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, Record<string, unknown>> : {};
+  const legacyModel = typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
   const batchSizeOf = (profile: { batchSize?: number } | undefined) => Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
   const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(raw.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
-  return { provider: 'gemini', apiKey: raw.apiKey.trim(), requestsPerMinute, profiles: {
-    [AI_PROFILE_PICTURE_DESCRIPTION]: {
-      model: pictureModel,
-      prompt: picturePrompt,
-    },
-    [AI_PROFILE_PICTURE_FORMAT]: { model: formatModel, prompt: formatPrompt },
-    [AI_PROFILE_PICTURE_CHECK]: {
-      model: checkModel,
-      prompt: checkPrompt,
-      severity: Math.max(1, Math.min(5, Math.round(Number(checkProfile?.severity) || 3))),
-    },
-    [AI_PROFILE_WORD_FILL]: {
-      model: wordFillModel,
-      prompt: wordFillPrompt,
-    },
-    [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: categoryModel, prompt: categoryPrompt, batchSize: batchSizeOf(categoryProfile) },
-    [AI_PROFILE_REQUIRED_CASE]: { model: caseModel, prompt: casePrompt, batchSize: batchSizeOf(caseProfile) },
-    [AI_PROFILE_WORD_CHECK]: { model: wordCheckModel, prompt: wordCheckPrompt, batchSize: batchSizeOf(wordCheckProfile) },
-  } };
+  const cleanProfiles = Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => {
+    const profile = profiles[id];
+    const model = typeof profile?.model === 'string' && isGeminiModel(profile.model) ? profile.model.trim() : legacyModel;
+    const prompt = typeof profile?.prompt === 'string' && profile.prompt.trim() ? profile.prompt.trim().slice(0, 10_000) : id === AI_PROFILE_PICTURE_DESCRIPTION ? legacyPrompt : config.defaultPrompt;
+    return [id, {
+      model,
+      prompt,
+      ...(config.hasSeverity ? { severity: Math.max(1, Math.min(5, Math.round(Number(profile?.severity) || 3))) } : {}),
+      ...(config.hasBatch ? { batchSize: batchSizeOf(profile) } : {}),
+    }];
+  }));
+  return { provider: 'gemini', apiKey: raw.apiKey.trim(), requestsPerMinute, profiles: cleanProfiles as StoredAISettings['profiles'] };
 }
 
 async function readStored(): Promise<StoredAISettings | null> {
   const row = await prisma.setting.findUnique({ where: { key: AI_SETTINGS_KEY } });
-  if (!row) { configureAIRequestRateLimit(DEFAULT_AI_REQUESTS_PER_MINUTE); return null; }
-  try { const value = sanitizeStored(JSON.parse(row.value)); configureAIRequestRateLimit(value?.requestsPerMinute ?? DEFAULT_AI_REQUESTS_PER_MINUTE); return value; } catch { configureAIRequestRateLimit(DEFAULT_AI_REQUESTS_PER_MINUTE); return null; }
+  if (!row) return null;
+  try { return sanitizeStored(JSON.parse(row.value)); } catch { return null; }
+}
+
+async function readConfigured(): Promise<StoredAISettings | null> {
+  const value = await readStored();
+  configureAIRequestRateLimit(value?.requestsPerMinute ?? DEFAULT_AI_REQUESTS_PER_MINUTE);
+  return value;
 }
 
 export async function readAISettings(): Promise<AISettingsPublic> {
-  const stored = await readStored();
+  const stored = await readConfigured();
   return {
     provider: 'gemini',
     hasApiKey: Boolean(stored?.apiKey),
     isDefault: !stored,
     requestsPerMinute: stored?.requestsPerMinute ?? DEFAULT_AI_REQUESTS_PER_MINUTE,
-    profiles: stored?.profiles ?? {
-      [AI_PROFILE_PICTURE_DESCRIPTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_PROMPT },
-      [AI_PROFILE_PICTURE_FORMAT]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_FORMAT_PROMPT },
-      [AI_PROFILE_PICTURE_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_PICTURE_CHECK_PROMPT, severity: 3 },
-      [AI_PROFILE_WORD_FILL]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_FILL_PROMPT },
-      [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { model: DEFAULT_MODEL, prompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
-      [AI_PROFILE_REQUIRED_CASE]: { model: DEFAULT_MODEL, prompt: DEFAULT_REQUIRED_CASE_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
-      [AI_PROFILE_WORD_CHECK]: { model: DEFAULT_MODEL, prompt: DEFAULT_WORD_CHECK_PROMPT, batchSize: DEFAULT_AI_BATCH_SIZE },
-    },
+    profiles: stored?.profiles ?? defaultProfiles(),
   };
 }
 
-export async function writeAISettings(input: { profileId: string; model: unknown; apiKey: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown; requestsPerMinute?: unknown }): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE, AI_PROFILE_WORD_CHECK].includes(input.profileId)) throw new Error('INVALID_PROFILE');
-  if (input.model !== '' && !isGeminiModel(input.model)) throw new Error('INVALID_MODEL');
+export async function writeAISettings(input: { apiKey?: unknown; profiles: Record<string, { model?: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown }>; requestsPerMinute?: unknown }): Promise<AISettingsPublic> {
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
-  const currentProfile = current?.profiles[input.profileId];
-  const defaultPrompt = input.profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : input.profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : input.profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : input.profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : input.profileId === AI_PROFILE_WORD_CHECK ? DEFAULT_WORD_CHECK_PROMPT : DEFAULT_PICTURE_PROMPT;
-  const prompt = input.prompt === undefined ? currentProfile?.prompt ?? defaultPrompt : input.prompt;
-  if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
-  const batchProfile = input.profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || input.profileId === AI_PROFILE_REQUIRED_CASE || input.profileId === AI_PROFILE_WORD_CHECK;
-  const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(input.batchSize ?? currentProfile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
-  const profile = { model: input.model || currentProfile?.model || '', prompt: prompt.trim(), ...(input.severity !== undefined ? { severity: Math.max(1, Math.min(5, Math.round(Number(input.severity) || 3))) } : currentProfile?.severity !== undefined ? { severity: currentProfile.severity } : {}), ...(batchProfile ? { batchSize } : {}) };
+  const profiles = Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => {
+    const supplied = input.profiles[id];
+    const old = current?.profiles[id];
+    const model = supplied?.model === undefined ? old?.model ?? '' : supplied.model;
+    if (model !== '' && !isGeminiModel(model)) throw new Error('INVALID_MODEL');
+    const prompt = supplied?.prompt === undefined ? old?.prompt ?? config.defaultPrompt : supplied.prompt;
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
+    return [id, {
+      model,
+      prompt: prompt.trim(),
+      ...(config.hasSeverity ? { severity: Math.max(1, Math.min(5, Math.round(Number(supplied?.severity ?? old?.severity) || 3))) } : {}),
+      ...(config.hasBatch ? { batchSize: Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(supplied?.batchSize ?? old?.batchSize) || DEFAULT_AI_BATCH_SIZE))) } : {}),
+    }];
+  }));
   const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(input.requestsPerMinute ?? current?.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
-  const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), requestsPerMinute, profiles: { ...(current?.profiles ?? {}), [input.profileId]: profile } };
+  const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), requestsPerMinute, profiles: profiles as StoredAISettings['profiles'] };
   configureAIRequestRateLimit(requestsPerMinute);
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
   return { provider: 'gemini', hasApiKey: true, isDefault: false, requestsPerMinute, profiles: value.profiles };
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
-  if (![AI_PROFILE_PICTURE_DESCRIPTION, AI_PROFILE_PICTURE_FORMAT, AI_PROFILE_PICTURE_CHECK, AI_PROFILE_WORD_FILL, AI_PROFILE_CATEGORY_REDISTRIBUTION, AI_PROFILE_REQUIRED_CASE, AI_PROFILE_WORD_CHECK].includes(profileId)) throw new Error('INVALID_PROFILE');
+  if (!(profileId in PROFILES)) throw new Error('INVALID_PROFILE');
   const current = await readStored();
   if (!current) return readAISettings();
   const currentProfile = current.profiles[profileId];
-  const defaultPrompt = profileId === AI_PROFILE_PICTURE_CHECK ? DEFAULT_PICTURE_CHECK_PROMPT : profileId === AI_PROFILE_PICTURE_FORMAT ? DEFAULT_PICTURE_FORMAT_PROMPT : profileId === AI_PROFILE_WORD_FILL ? DEFAULT_WORD_FILL_PROMPT : profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION ? DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT : profileId === AI_PROFILE_REQUIRED_CASE ? DEFAULT_REQUIRED_CASE_PROMPT : profileId === AI_PROFILE_WORD_CHECK ? DEFAULT_WORD_CHECK_PROMPT : DEFAULT_PICTURE_PROMPT;
+  const config = PROFILES[profileId as AIProfileId];
   const profile = {
     model: currentProfile?.model ?? '',
-    prompt: defaultPrompt,
-    ...(profileId === AI_PROFILE_PICTURE_CHECK ? { severity: currentProfile?.severity ?? 3 } : {}),
-    ...((profileId === AI_PROFILE_CATEGORY_REDISTRIBUTION || profileId === AI_PROFILE_REQUIRED_CASE || profileId === AI_PROFILE_WORD_CHECK) ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
+    prompt: config.defaultPrompt,
+    ...(config.hasSeverity ? { severity: currentProfile?.severity ?? 3 } : {}),
+    ...(config.hasBatch ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
   };
   const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
   await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
@@ -201,7 +198,7 @@ export async function resetAIProfile(profileId: string): Promise<AISettingsPubli
 }
 
 async function readApiKey(): Promise<string | null> {
-  const stored = await readStored();
+  const stored = await readConfigured();
   return stored?.apiKey ?? null;
 }
 
@@ -468,7 +465,6 @@ async function generateBatchJson(profileId: string, words: AiWordInput[], contex
 
 export async function redistributeCategories(words: AiWordInput[], categories: string[]): Promise<Array<{ id: string; categories: string[] }>> {
   const result = await generateBatchJson(AI_PROFILE_CATEGORY_REDISTRIBUTION, words, `Разрешённые категории: ${JSON.stringify(categories)}`);
-  const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
   const allowed = new Map(categories.map((category) => [normalizeCategoryName(category), category]));
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');

@@ -137,7 +137,9 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
   // `nextWord` changes exactly when the dictionary, the filters or the SRS
   // switch change, so this re-deals a card whenever any of them does.
   useEffect(() => {
-    if (words.length > 0) nextWord();
+    if (words.length === 0) return;
+    const task = window.setTimeout(nextWord, 0);
+    return () => window.clearTimeout(task);
   }, [words.length, nextWord]);
 
   // ---- hint: article first (when the answer has one), then one more letter per press ----

@@ -7,6 +7,7 @@ import { applyBackup, downloadBackup, parseBackup } from '../utils/progressBacku
 import { useSyncStatus } from '../hooks/useSrsSync';
 import { markSyncSettingsChanged, syncNow } from '../utils/srsSync';
 import { MAX_SYNC_KEY_LENGTH, MIN_SYNC_KEY_LENGTH, readSyncKey } from '../utils/srsSyncData';
+import { useConfirm } from '../hooks/useConfirm';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
@@ -19,6 +20,7 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
   const [importError, setImportError] = useState<string | null>(null);
   const [keyDraft, setKeyDraft] = useState(settings.syncKey);
   const syncStatus = useSyncStatus();
+  const confirm = useConfirm();
 
   const draftTrimmed = keyDraft.trim();
   const draftValid = draftTrimmed === '' || readSyncKey(draftTrimmed) !== null;
@@ -36,7 +38,7 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
     try {
       const backup = parseBackup(await file.text());
       const when = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ru-RU') : 'неизвестно';
-      if (!confirm(`Заменить весь текущий прогресс и настройки данными из файла (сохранён: ${when})?`)) return;
+      if (!await confirm(`Заменить весь текущий прогресс и настройки данными из файла (сохранён: ${when})?`, { title: 'Заменить прогресс', confirmLabel: 'Заменить', danger: true })) return;
       applyBackup(backup);
       window.location.reload();
     } catch (e) {

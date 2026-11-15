@@ -3,6 +3,7 @@ import { tuneSqlite } from './db';
 import { backfillPartOfSpeech } from './services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './services/backfillNormalizedKeys';
 import { resumeAudioRegeneration } from './services/audio';
+import { recoverAIBulkJobs } from './services/aiBulkJobs';
 
 const PORT = process.env.PORT || 3001;
 
@@ -22,5 +23,6 @@ app.listen(PORT, () => {
       backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
       backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
       resumeAudioRegeneration().catch((error) => console.error('[audio] regeneration resume failed:', error));
+      recoverAIBulkJobs().catch((error) => console.error('[ai] bulk job recovery failed:', error));
     });
 });

@@ -19,8 +19,9 @@ import type { WordCheckField } from '../services/aiSettings';
 import { recordAIError } from '../services/aiErrorLog';
 import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
-import { readAIBulkJob, startAIBulkJob } from '../services/aiBulkJobs';
+import { listAIBulkJobs, readAIBulkJob, startAIBulkJob } from '../services/aiBulkJobs';
 import { resolveWordCheckDuplicates } from '../services/wordCheckDuplicates';
+import { normalizeCategoryName } from '../services/wordCategories';
 
 /**
  * Admin-only tools for working with many words at once:
@@ -34,8 +35,6 @@ const router = Router();
 const MAX_IDS = 5000;
 const CHUNK = 500; // stays well below SQLite's bound-variable limit
 const aiBulkLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Слишком много запросов к ИИ. Подождите минуту.' } });
-
-const normalizeCategoryName = (value: string): string => value.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
 
 function readIds(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
@@ -238,8 +237,12 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
   }
 });
 
-router.get('/ai/jobs/:jobId', requireAdmin, (req: Request, res: Response) => {
-  const job = readAIBulkJob(req.params.jobId);
+router.get('/ai/jobs', requireAdmin, async (_req: Request, res: Response) => {
+  res.json({ jobs: await listAIBulkJobs() });
+});
+
+router.get('/ai/jobs/:jobId', requireAdmin, async (req: Request, res: Response) => {
+  const job = await readAIBulkJob(req.params.jobId);
   if (!job) return res.status(404).json({ error: 'Задание ИИ не найдено' });
   return res.json(job);
 });

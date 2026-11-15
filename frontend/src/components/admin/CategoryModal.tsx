@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Modal } from '../Modal';
 import type { Category } from '../../types';
 
@@ -9,17 +9,9 @@ interface CategoryModalProps {
 }
 
 export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose, onSave }) => {
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('📌');
-  const [color, setColor] = useState('#6366f1');
-
-  useEffect(() => {
-    if (category) {
-      setName(category.name);
-      setIcon(category.icon || '📌');
-      setColor(category.color || '#6366f1');
-    }
-  }, [category]);
+  const [name, setName] = useState(() => category?.name ?? '');
+  const [icon, setIcon] = useState(() => category?.icon || '📌');
+  const [color, setColor] = useState(() => category?.color || '#6366f1');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

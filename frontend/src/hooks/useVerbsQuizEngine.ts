@@ -92,7 +92,9 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
   // `nextQuestion` changes exactly when the verbs, the mode, the sub-mode or
   // the SRS switch change, so this re-deals a question whenever any of them does.
   useEffect(() => {
-    if (verbs.length > 0) nextQuestion();
+    if (verbs.length === 0) return;
+    const task = window.setTimeout(nextQuestion, 0);
+    return () => window.clearTimeout(task);
   }, [verbs.length, nextQuestion]);
 
   // Right after a mode switch the old card is still in state for one render; never show it in the new mode.

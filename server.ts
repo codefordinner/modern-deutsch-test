@@ -8,6 +8,7 @@ import { tuneSqlite } from './backend/src/db';
 import { backfillPartOfSpeech } from './backend/src/services/backfillPartOfSpeech';
 import { backfillNormalizedKeys } from './backend/src/services/backfillNormalizedKeys';
 import { resumeAudioRegeneration } from './backend/src/services/audio';
+import { recoverAIBulkJobs } from './backend/src/services/aiBulkJobs';
 
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = 'file:./dev.db';
@@ -80,6 +81,7 @@ async function startServer() {
           backfillPartOfSpeech().catch((error) => console.error('[partOfSpeech] backfill failed:', error));
           backfillNormalizedKeys().catch((error) => console.error('[normalizedKeys] backfill failed:', error));
           resumeAudioRegeneration().catch((error) => console.error('[audio] regeneration resume failed:', error));
+          recoverAIBulkJobs().catch((error) => console.error('[ai] bulk job recovery failed:', error));
         });
     });
   } catch (err) {

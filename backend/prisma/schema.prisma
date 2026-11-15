@@ -132,6 +132,23 @@ model AudioRegenerationJob {
   @@index([status, updatedAt])
 }
 
+/// Durable status for administrator AI bulk jobs. Job input is deliberately not
+/// persisted because it may contain user-provided text; interrupted work is
+/// retained as a visible failed record after restart.
+model AiBulkJob {
+  id         String   @id
+  status     String
+  total      Int
+  completed  Int      @default(0)
+  count      Int?
+  result     String?
+  error      String?
+  createdAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
 /// SRS progress shared between a learner's devices through a sync key.
 /// `keyHash` = sha256 of the key (the key itself is never stored); `data` = JSON snapshot,
 /// see src/services/srsSync.ts.

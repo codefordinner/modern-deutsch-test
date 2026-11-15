@@ -1,4 +1,6 @@
 import { prisma } from '../db';
+import { DEFAULT_SRS_WEIGHTS, MAX_BOX_WEIGHT, SRS_BOX_COUNT, sanitizeWeights } from '@sprachfunke/shared';
+export { DEFAULT_SRS_WEIGHTS, MAX_BOX_WEIGHT, SRS_BOX_COUNT, sanitizeWeights } from '@sprachfunke/shared';
 
 /**
  * Relative weights of the five Leitner boxes: how often a card from box N is asked.
@@ -6,18 +8,6 @@ import { prisma } from '../db';
  * Keep DEFAULT_WEIGHTS in sync with frontend/src/utils/srsWeights.ts.
  */
 export const SRS_WEIGHTS_SETTING_KEY = 'srsBoxWeights';
-export const DEFAULT_SRS_WEIGHTS: readonly number[] = [60, 15, 10, 5, 10];
-export const SRS_BOX_COUNT = 5;
-export const MAX_BOX_WEIGHT = 1000;
-
-/** Five finite numbers in [0, MAX_BOX_WEIGHT], at least one above zero; anything else → null. */
-export function sanitizeWeights(raw: unknown): number[] | null {
-  if (!Array.isArray(raw) || raw.length !== SRS_BOX_COUNT) return null;
-  if (!raw.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX_BOX_WEIGHT)) return null;
-  const weights = raw as number[];
-  return weights.some((v) => v > 0) ? [...weights] : null;
-}
-
 export interface SrsWeightsState {
   weights: number[];
   /** true = nothing saved, the built-in defaults are in use. */
