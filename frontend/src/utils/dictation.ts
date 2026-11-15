@@ -48,7 +48,6 @@ const PUNCTUATION_WORDS = new Map<string, string>([
   ['strichpunkt', ';'],
   ['bindestrich', '-'],
   ['gedankenstrich', '–'],
-  ['pause', ','],
   ['pumpt', '.'],
   ['punkt.', '.'],
   ['komma,', ','],
@@ -86,10 +85,16 @@ export function addDictationPunctuation(text: string, capitalizeFirst = true): s
       if (SENTENCE_END.has(exactPunctuation)) capitalizeNext = true;
       continue;
     }
+    // Mobile recognizers may join a spoken marker as `HundPunkt`. Requiring
+    // the marker's capital letter avoids splitting compounds such as `Zeitpunkt`.
     const glued = [...PUNCTUATION_WORDS.keys()].sort((a, b) => b.length - a.length)
-      .find((word) => cleaned.toLowerCase().endsWith(word) && cleaned.length > word.length);
+      .find((word) => {
+        const marker = word.charAt(0).toUpperCase() + word.slice(1);
+        return cleaned.endsWith(marker) && cleaned.length > marker.length;
+      });
     if (glued) {
-      cleaned = cleaned.slice(0, -glued.length);
+      const marker = glued.charAt(0).toUpperCase() + glued.slice(1);
+      cleaned = cleaned.slice(0, -marker.length);
       out += `${cleaned} `;
       const punctuation = PUNCTUATION_WORDS.get(glued)!;
       out = `${out.replace(/\s+$/, '')}${punctuation} `;

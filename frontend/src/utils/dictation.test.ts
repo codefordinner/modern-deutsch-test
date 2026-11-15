@@ -31,6 +31,15 @@ describe('addDictationPunctuation', () => {
     expect(addDictationPunctuation('und dann gehen wir weg punkt')).toBe('Und dann gehen wir weg.');
   });
 
+  it('does not split ordinary compounds or the word Pause', () => {
+    expect(addDictationPunctuation('zeitpunkt mittagspause')).toBe('Zeitpunkt mittagspause');
+    expect(addDictationPunctuation('ich mache pause')).toBe('Ich mache pause');
+  });
+
+  it('handles a punctuation marker joined by the speech engine', () => {
+    expect(addDictationPunctuation('ich sehe einen HundPunkt dann')).toBe('Ich sehe einen Hund. Dann');
+  });
+
   it('returns empty for empty input', () => {
     expect(addDictationPunctuation('')).toBe('');
   });

@@ -32,10 +32,15 @@ export function usePersistentState<T>(
   }, [key, value]);
 
   useEffect(() => {
-    const onSynced = () => {
+    const onSynced = (event: Event) => {
+      const keys = (event as CustomEvent<{ keys?: unknown }>).detail?.keys;
+      if (Array.isArray(keys) && !keys.includes(key)) return;
       try {
         const raw = localStorage.getItem(key);
-        if (raw !== null) setValue(sanitize(JSON.parse(raw)));
+        if (raw !== null) {
+          const next = sanitize(JSON.parse(raw));
+          setValue((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+        }
       } catch {
         // ignore unavailable or malformed storage
       }

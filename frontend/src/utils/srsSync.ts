@@ -101,7 +101,9 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData): boolean {
       localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(data.settings.updatedAt));
       // Writes app_study_prefs itself (keeping this device's dueOnly) and notifies subscribers.
       applySyncedDailyGoal(data.settings.dailyGoal);
-      window.dispatchEvent(new Event('app-storage-updated'));
+      window.dispatchEvent(new CustomEvent('app-storage-updated', {
+        detail: { keys: ['words_settings', 'articles_category', 'app_study_prefs'] },
+      }));
       changed = true;
     }
   } catch {

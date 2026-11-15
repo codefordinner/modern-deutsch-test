@@ -12,13 +12,11 @@ import { buildHint } from '../utils/wordHint';
 import type { DirectionMode } from '../utils/wordCards';
 import type { Word, Feedback, AnswerCheck, WordDirection, WordFormType, SRSRecord } from '../types';
 import { markSyncSettingsChanged } from '../utils/srsSync';
+import { splitTranslations } from '../utils/translations';
 
 export type { DirectionMode } from '../utils/wordCards';
 
 const ARTICLE_PREFIX = /^(der|die|das)\s+/i;
-
-/** "a, b / c" → ["a", "b", "c"]: any of the listed translations is accepted. */
-const splitTranslations = (ru: string): string[] => ru.split(/[,;/]/).map((v) => v.trim()).filter(Boolean);
 
 /** The German text the learner has to produce for this form of the word. */
 function germanTarget(word: Word, formType: WordFormType): string {

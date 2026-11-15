@@ -11,6 +11,7 @@ import './styles/pictures.css'
 import './styles/layout.css'
 import './styles/mobile.css'
 import App from './App.tsx'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { installEnterScrollGuard } from './utils/scrollGuard'
 
 installEnterScrollGuard()
@@ -25,7 +26,9 @@ try {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )
 

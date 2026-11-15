@@ -4,6 +4,7 @@ import { checkPictureAnswer, formatPictureAnswer, getPictures, type Picture, typ
 import { ApiError } from '../api/request';
 import { reportError } from '../utils/toast';
 import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictation';
+import { withRetry } from '../utils/withRetry';
 
 /**
  * Runs the picture-answer check with a short retry for transient failures.
@@ -11,40 +12,10 @@ import { addDictationPunctuation, getSpeechRecognition } from '../utils/dictatio
  * single lost request meant the learner's answer was simply gone. Retrying the
  * same request makes those drops recover without bothering the learner.
  */
-const CHECK_ATTEMPTS = 3;
-const CHECK_RETRY_DELAY_MS = 1200;
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
-async function checkPictureAnswerWithRetry(id: string, answer: string): Promise<PictureCheckResult> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= CHECK_ATTEMPTS; attempt += 1) {
-    try {
-      return await checkPictureAnswer(id, answer);
-    } catch (error) {
-      lastError = error;
-      // Never retry a rejection we know the user caused (validation) — only
-      // network drops, timeouts and server-side hiccups are worth another try.
-      const retryable = error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
-      if (!retryable || attempt === CHECK_ATTEMPTS) break;
-      await new Promise((resolve) => setTimeout(resolve, CHECK_RETRY_DELAY_MS * attempt));
-    }
-  }
-  throw lastError;
-}
-
-async function formatPictureAnswerWithRetry(id: string, answer: string): Promise<string> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try { return (await formatPictureAnswer(id, answer)).answer; }
-    catch (error) {
-      lastError = error;
-      const retryable = error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
-      if (!retryable || attempt === 3) break;
-      await new Promise((resolve) => setTimeout(resolve, 900 * attempt));
-    }
-  }
-  throw lastError;
-}
+const isRetryablePictureError = (error: unknown): boolean =>
+  error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
 
 export function PictureDescriptionTrainer() {
   const [pictures, setPictures] = useState<Picture[]>([]);
@@ -84,17 +55,10 @@ export function PictureDescriptionTrainer() {
       setLoadError(false);
       let draft: { pictureId?: string; answer?: string } | null = null;
       try { draft = JSON.parse(localStorage.getItem('picture_draft') || 'null') as { pictureId?: string; answer?: string } | null; } catch { /* storage unavailable */ }
-      let pendingNext: { pictureId?: string; mode?: 'text' | 'voice' } | null = null;
-      try {
-        pendingNext = JSON.parse(sessionStorage.getItem('picture_next') || 'null') as { pictureId?: string; mode?: 'text' | 'voice' } | null;
-        sessionStorage.removeItem('picture_next');
-      } catch { /* storage unavailable */ }
-      const pendingIndex = pendingNext?.pictureId ? items.findIndex((item) => item.id === pendingNext?.pictureId) : -1;
       const draftIndex = draft?.pictureId ? items.findIndex((item) => item.id === draft?.pictureId) : -1;
-      const nextIndex = pendingIndex >= 0 ? pendingIndex : draftIndex >= 0 ? draftIndex : items.length > 1 ? Math.floor(Math.random() * items.length) : 0;
+      const nextIndex = draftIndex >= 0 ? draftIndex : items.length > 1 ? Math.floor(Math.random() * items.length) : 0;
       setIndex(nextIndex);
       if (draft?.pictureId && items[nextIndex]?.id === draft.pictureId && draft.answer) setAnswer(draft.answer);
-      if (pendingIndex >= 0 && (pendingNext?.mode === 'text' || pendingNext?.mode === 'voice')) setResumeMode(pendingNext.mode);
       setDraftLoaded(true);
     }).catch((error) => { setLoadError(true); reportError(error, 'Не удалось загрузить картинки'); }).finally(() => setLoading(false));
   }, []);
@@ -189,7 +153,10 @@ export function PictureDescriptionTrainer() {
     stopSpeech(); setStartedAt(null); setIsFinished(true); setHasTimedOut(false);
     if (inputMode !== 'voice' || !answer.trim()) return;
     setFormatting(true);
-    void formatPictureAnswerWithRetry(picture?.id ?? '', answer)
+    void withRetry(() => formatPictureAnswer(picture?.id ?? '', answer).then((response) => response.answer), {
+      delayMs: 900,
+      shouldRetry: isRetryablePictureError,
+    })
       .then((formatted) => { setAnswer(formatted); answerRef.current = formatted; })
       .catch((error) => { reportError(error, 'Не удалось расставить знаки препинания. Текст можно исправить вручную.'); })
       .finally(() => setFormatting(false));
@@ -200,7 +167,10 @@ export function PictureDescriptionTrainer() {
     try {
       // Mobile networks drop requests from time to time: retry transient failures
       // instead of silently eating the learner's answer once in every few checks.
-      const result = await checkPictureAnswerWithRetry(picture.id, answer);
+      const result = await withRetry(() => checkPictureAnswer(picture.id, answer), {
+        delayMs: 1200,
+        shouldRetry: isRetryablePictureError,
+      });
       setResult(result);
       try { localStorage.removeItem('picture_draft'); } catch { /* storage unavailable */ }
     }
@@ -214,10 +184,11 @@ export function PictureDescriptionTrainer() {
     if (pictures.length > 1) {
       while (nextIndex === index) nextIndex = Math.floor(Math.random() * pictures.length);
     }
-    try {
-      sessionStorage.setItem('picture_next', JSON.stringify({ pictureId: pictures[nextIndex].id, mode: inputMode }));
-    } catch { /* storage unavailable */ }
-    window.location.reload();
+    const nextMode = inputMode;
+    setIndex(nextIndex);
+    setIsRevealed(false); setStartedAt(null); setElapsed(0); setIsFinished(false); setHasTimedOut(false);
+    setAnswer(''); setResult(null); setSelectedSegment(null); setInputMode(null);
+    if (nextMode) setResumeMode(nextMode);
   };
   const startSpeech = useCallback(async (Recognition: NonNullable<ReturnType<typeof getSpeechRecognition>>) => {
     const session = ++speechSessionRef.current;
