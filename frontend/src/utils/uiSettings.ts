@@ -44,6 +44,8 @@ export interface UISettings {
   syncKey: string;
   /** Playback volume for generated speech, from 0 to 1. */
   audioVolume: number;
+  /** Use the administrator's correct-answer threshold before promoting SRS cards. */
+  useAdminSrsPromotionThreshold: boolean;
 }
 
 const STORAGE_KEY = 'app_ui_settings';
@@ -58,6 +60,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   highlightArticles: true,
   syncKey: '',
   audioVolume: 1,
+  useAdminSrsPromotionThreshold: false,
 };
 
 export function getUISettings(): UISettings {
@@ -69,6 +72,7 @@ export function getUISettings(): UISettings {
     const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
     if (typeof merged.syncKey !== 'string') merged.syncKey = '';
     if (typeof merged.highlightArticles !== 'boolean') merged.highlightArticles = true;
+    if (typeof merged.useAdminSrsPromotionThreshold !== 'boolean') merged.useAdminSrsPromotionThreshold = false;
     if (typeof merged.audioVolume !== 'number' || !Number.isFinite(merged.audioVolume)) merged.audioVolume = 1;
     merged.audioVolume = Math.min(1, Math.max(0, merged.audioVolume));
     return merged;

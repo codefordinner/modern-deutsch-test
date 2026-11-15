@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, Layers, RotateCcw, Save } from 'lucide-react';
+import { AlertCircle, Layers, RotateCcw, Save, Target } from 'lucide-react';
 import { fetchSrsWeights, resetSrsWeights, saveSrsWeights } from '../../api/settings';
 import type { SrsWeightsResponse } from '../../api/settings';
 import { invalidateQueries, useQuery } from '../../api/queryCache';
@@ -19,14 +19,19 @@ export const SrsSettingsTab: React.FC = () => {
   const confirm = useConfirm();
   const { data, isLoading } = useQuery(SRS_WEIGHTS_KEY, fetchSrsWeights);
   const [values, setValues] = useState<string[] | null>(null);
+  const [thresholdValue, setThresholdValue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const currentValues = values ?? data?.weights.map(String) ?? DEFAULT_SRS_BOX_WEIGHTS.map(String);
+  const currentThreshold = thresholdValue ?? String(data?.promotionThreshold ?? 1);
   const parsed = useMemo(() => currentValues.map((v) => (v.trim() === '' ? NaN : Number(v))), [currentValues]);
   const valid = sanitizeWeights(parsed);
   const total = valid ? valid.reduce((sum, w) => sum + w, 0) : 0;
-  const dirty = data ? currentValues.join(',') !== data.weights.join(',') : false;
+  const threshold = currentThreshold.trim() === '' ? NaN : Number(currentThreshold);
+  const thresholdValid = Number.isInteger(threshold) && threshold >= 1 && threshold <= 10;
+  const dirty = data ? currentValues.join(',') !== data.weights.join(',') || threshold !== data.promotionThreshold : false;
   const isDefaultShown = currentValues.join(',') === DEFAULT_SRS_BOX_WEIGHTS.join(',');
+  const defaultsSelected = isDefaultShown && threshold === 1;
 
   const apply = async (action: () => Promise<SrsWeightsResponse>, message: string) => {
     setBusy(true);
@@ -34,6 +39,7 @@ export const SrsSettingsTab: React.FC = () => {
       const result = await action();
       setSrsWeights(result.weights);
       setValues(result.weights.map(String));
+      setThresholdValue(String(result.promotionThreshold));
       invalidateQueries(SRS_WEIGHTS_KEY);
       showToast(message, 'success');
     } catch (e) {
@@ -44,8 +50,8 @@ export const SrsSettingsTab: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (!valid || busy) return;
-    void apply(() => saveSrsWeights(valid), 'Вероятности ящиков сохранены');
+    if (!valid || !thresholdValid || busy) return;
+    void apply(() => saveSrsWeights(valid, threshold), 'Настройки SRS сохранены');
   };
 
   const handleReset = async () => {
@@ -57,7 +63,7 @@ export const SrsSettingsTab: React.FC = () => {
 
   return (
     <div className="card card--flush">
-      <h3 className="card-title"><Layers size={20} /> Вероятности ящиков SRS</h3>
+      <h3 className="card-title"><Layers size={20} /> Настройки SRS</h3>
       <p className="card-note">
         Чем больше число, тем чаще выпадает карточка из этого ящика. Числа — относительные веса, в сумме они не обязаны
         давать 100: справа показана итоговая доля. Если в выбранном наборе карточек ящик пуст, он пропускается, а доли
@@ -90,6 +96,20 @@ export const SrsSettingsTab: React.FC = () => {
         })}
       </div>
 
+      <div className="srs-promotion-threshold">
+        <label className="setting-toggle-title" htmlFor="srs-promotion-threshold"><Target size={14} /> Верных ответов для повышения ящика: {currentThreshold}</label>
+        <input
+          id="srs-promotion-threshold"
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={thresholdValid ? threshold : 1}
+          onChange={(e) => setThresholdValue(e.target.value)}
+        />
+        <span className="setting-toggle-desc">Сколько раз подряд нужно правильно ответить на карточку. Повышение по-прежнему возможно не чаще раза в день. Настройка применяется только у учеников, включивших её в общих настройках.</span>
+      </div>
+
       {!valid && (
         <div className="form-error" role="alert">
           <AlertCircle size={16} /> Введите пять чисел от 0 до {MAX_BOX_WEIGHT}, хотя бы одно больше нуля.
@@ -97,10 +117,10 @@ export const SrsSettingsTab: React.FC = () => {
       )}
 
       <div className="import-actions">
-        <button type="button" className="btn-secondary" disabled={busy || (isDefaultShown && data?.isDefault === true)} onClick={handleReset}>
+        <button type="button" className="btn-secondary" disabled={busy || (defaultsSelected && data?.isDefault === true)} onClick={handleReset}>
           <RotateCcw size={16} /> По умолчанию
         </button>
-        <button type="button" className="btn-primary" disabled={busy || !valid || !dirty} onClick={handleSave}>
+        <button type="button" className="btn-primary" disabled={busy || !valid || !thresholdValid || !dirty} onClick={handleSave}>
           <Save size={16} /> {busy ? 'Подождите…' : 'Сохранить'}
         </button>
       </div>

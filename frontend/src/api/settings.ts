@@ -1,8 +1,8 @@
 import { request } from './request';
 
-export interface SrsWeightsResponse { weights: number[]; isDefault: boolean }
+export interface SrsWeightsResponse { weights: number[]; promotionThreshold: number; isDefault: boolean }
 export const fetchSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights');
-export const saveSrsWeights = (weights: number[]) => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'PUT', body: { weights }, auth: true });
+export const saveSrsWeights = (weights: number[], promotionThreshold: number) => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'PUT', body: { weights, promotionThreshold }, auth: true });
 export const resetSrsWeights = () => request<SrsWeightsResponse>('/settings/srs-weights', { method: 'DELETE', auth: true });
 
 export interface AudioVoiceResponse { voice: string; isDefault: boolean }

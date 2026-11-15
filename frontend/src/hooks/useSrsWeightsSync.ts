@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { fetchSrsWeights } from '../api/settings';
 import { useQuery } from '../api/queryCache';
-import { setSrsWeights } from '../utils/srsWeights';
+import { setSrsPromotionThreshold, setSrsWeights } from '../utils/srsWeights';
 
 export const SRS_WEIGHTS_KEY = 'settings:srs-weights';
 
@@ -14,6 +14,9 @@ export function useSrsWeightsSync(): void {
   const { data } = useQuery(SRS_WEIGHTS_KEY, fetchSrsWeights);
 
   useEffect(() => {
-    if (data) setSrsWeights(data.weights);
+    if (data) {
+      setSrsWeights(data.weights);
+      setSrsPromotionThreshold(data.promotionThreshold);
+    }
   }, [data]);
 }

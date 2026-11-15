@@ -21,11 +21,20 @@ export function sanitizeWeights(raw: unknown): number[] | null {
 }
 
 let current: readonly number[] = DEFAULT_SRS_BOX_WEIGHTS;
+let promotionThreshold = 1;
 const listeners = new Set<() => void>();
 
 const sameWeights = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 export const getSrsWeights = (): readonly number[] => current;
+export const getSrsPromotionThreshold = (): number => promotionThreshold;
+
+export function setSrsPromotionThreshold(value: number): void {
+  const next = Number.isInteger(value) && value >= 1 && value <= 10 ? value : 1;
+  if (promotionThreshold === next) return;
+  promotionThreshold = next;
+  listeners.forEach((listener) => listener());
+}
 
 /** Applies weights from the server; invalid input falls back to the defaults. */
 export function setSrsWeights(raw: unknown): void {

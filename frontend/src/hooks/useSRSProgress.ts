@@ -4,6 +4,8 @@ import type { SRSMap } from '../utils/srs';
 import { isDue } from '../utils/srsDue';
 import { useStudyPrefs } from '../utils/studyPrefs';
 import { pickRandom } from '../utils/random';
+import { getSrsPromotionThreshold } from '../utils/srsWeights';
+import { useUISettings } from './useUISettings';
 import { markSrsReset, scheduleSync, SRS_SYNCED_EVENT, toSrsTrainer } from '../utils/srsSync';
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -52,6 +54,7 @@ export function useSRSProgress(storagePrefix: string) {
   });
   const [srsMap, setSrsMap] = useState<SRSMap>(() => sanitizeSRSMap(readJSON<unknown>(stateKey, {})));
   const [{ dueOnly }] = useStudyPrefs();
+  const [uiSettings] = useUISettings();
 
   const srsMapRef = useRef(srsMap);
   useEffect(() => {
@@ -82,13 +85,14 @@ export function useSRSProgress(storagePrefix: string) {
   const recordAnswer = useCallback(
     (key: string, isCorrect: boolean) => {
       if (!useSRS) return;
-      const next = updateSRS(srsMapRef.current, key, isCorrect);
+      const threshold = uiSettings.useAdminSrsPromotionThreshold ? getSrsPromotionThreshold() : 1;
+      const next = updateSRS(srsMapRef.current, key, isCorrect, new Date(), threshold);
       srsMapRef.current = next;
       setSrsMap(next);
       writeJSON(stateKey, next);
       scheduleSync();
     },
-    [useSRS, stateKey]
+    [useSRS, stateKey, uiSettings.useAdminSrsPromotionThreshold]
   );
 
   const resetSRS = useCallback(() => {

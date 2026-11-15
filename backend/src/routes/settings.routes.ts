@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../middleware/auth.middleware';
 import {
   MAX_BOX_WEIGHT,
+  sanitizePromotionThreshold,
   readSrsWeights,
   resetSrsWeights,
   sanitizeWeights,
@@ -204,13 +205,14 @@ router.get('/srs-weights', async (_req: Request, res: Response) => {
 router.put('/srs-weights', requireAdmin, async (req: Request, res: Response) => {
   try {
     const weights = sanitizeWeights(req.body?.weights);
-    if (!weights) {
+    const promotionThreshold = sanitizePromotionThreshold(req.body?.promotionThreshold);
+    if (!weights || promotionThreshold === null) {
       return res.status(400).json({
-        error: `Нужно ровно 5 чисел от 0 до ${MAX_BOX_WEIGHT}, хотя бы одно больше нуля`,
+        error: `Нужно ровно 5 чисел от 0 до ${MAX_BOX_WEIGHT}, хотя бы одно больше нуля; порог — целое число от 1 до 10`,
       });
     }
-    await writeSrsWeights(weights);
-    res.json({ weights, isDefault: false });
+    await writeSrsWeights(weights, promotionThreshold);
+    res.json({ weights, promotionThreshold, isDefault: false });
   } catch (error) {
     res.status(500).json({ error: 'Не удалось сохранить настройки SRS' });
   }

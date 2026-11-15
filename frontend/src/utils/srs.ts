@@ -120,27 +120,38 @@ export const srsKeys = {
  *    further correct answers the same day keep the box, so a card can never jump
  *    from box 1 to box 5 in a single day.
  */
-export function updateSRS(records: SRSMap, id: string, isCorrect: boolean, now: Date = new Date()): SRSMap {
+export function updateSRS(
+  records: SRSMap,
+  id: string,
+  isCorrect: boolean,
+  now: Date = new Date(),
+  promotionThreshold = 1
+): SRSMap {
   const current = records[id];
   const currentBox = boxOf(current);
   const today = localDayKey(now);
 
   let box = 1;
   let promotedOn: string | undefined;
+  const streak = isCorrect
+    ? (current?.promotedOn === today ? 0 : current?.streak || 0) + 1
+    : 0;
+  let nextStreak = streak;
   if (isCorrect) {
-    if (current?.promotedOn === today || currentBox >= SRS_BOX_COUNT) {
+    if (streak < Math.max(1, Math.floor(promotionThreshold)) || current?.promotedOn === today || currentBox >= SRS_BOX_COUNT) {
       box = currentBox; // already promoted today (or nowhere higher to go)
       promotedOn = current?.promotedOn;
     } else {
       box = currentBox + 1;
       promotedOn = today;
+      nextStreak = 0;
     }
   }
 
   const daysUntilNext = SRS_INTERVALS_DAYS[box] ?? 1;
   const record: SRSRecord = {
     box,
-    streak: isCorrect ? (current?.streak || 0) + 1 : 0,
+    streak: nextStreak,
     mistakes: (current?.mistakes || 0) + (isCorrect ? 0 : 1),
     lastReviewed: now.toISOString(),
     nextReview: new Date(now.getTime() + daysUntilNext * DAY_MS).toISOString(),

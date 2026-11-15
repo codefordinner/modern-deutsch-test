@@ -17,6 +17,17 @@ describe('Leitner SRS algorithm', () => {
     expect(first.card.nextReview).toBe(new Date(now.getTime() + 3 * day).toISOString());
   });
 
+  it('promotes only after the configured consecutive-correct threshold', () => {
+    const first = updateSRS({}, 'card', true, now, 3);
+    const second = updateSRS(first, 'card', true, new Date(now.getTime() + 60_000), 3);
+    const third = updateSRS(second, 'card', true, new Date(now.getTime() + 120_000), 3);
+
+    expect(first.card).toMatchObject({ box: 1, streak: 1 });
+    expect(second.card).toMatchObject({ box: 1, streak: 2 });
+    expect(third.card).toMatchObject({ box: 2, streak: 0 });
+    expect(updateSRS(third, 'card', false, now, 3).card).toMatchObject({ box: 1, streak: 0 });
+  });
+
   it('resets a failed card to box one and increments mistakes without mutating the source', () => {
     const original = { card: { box: 4, streak: 3, mistakes: 1, lastReviewed: now.toISOString(), nextReview: now.toISOString() } };
     const failed = updateSRS(original, 'card', false, now);

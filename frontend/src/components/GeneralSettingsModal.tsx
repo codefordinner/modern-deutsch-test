@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Upload, Volume2 } from 'lucide-react';
+import { Download, Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Upload, Volume2, Layers } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
@@ -66,6 +66,22 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
           />
           <span className="setting-toggle-desc">Считаются ответы во всех тренажёрах. 0 — без цели.</span>
         </div>
+
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={settings.useAdminSrsPromotionThreshold}
+            onChange={(e) => updateSettings({ useAdminSrsPromotionThreshold: e.target.checked })}
+          />
+          <div>
+            <span className="setting-toggle-title">
+              <Layers size={14} /> Учитывать порог повышения ящика из админки
+            </span>
+            <span className="setting-toggle-desc">
+              Для повышения карточки потребуется несколько правильных ответов подряд, если такой порог задан администратором.
+            </span>
+          </div>
+        </label>
 
         <label className="setting-toggle">
           <input
