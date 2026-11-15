@@ -1,14 +1,15 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { getSyncStatus, subscribeSyncStatus, syncNow } from '../utils/srsSync';
+import { flushPendingSync, getSyncStatus, subscribeSyncStatus, syncNow } from '../utils/srsSync';
 import type { SyncStatus } from '../utils/srsSync';
 import { readSyncKey } from '../utils/srsSyncData';
 import { useUISettings } from './useUISettings';
 
 /**
- * Keeps SRS progress in step with the learner's other devices (same sync key).
- * Mount once, near the app root. Pulls on start, when the key changes, when the
- * tab becomes visible again and when the connection returns; pushes after answers
- * (see useSRSProgress). Without a key it does nothing.
+ * Keeps progress (SRS, scores, answers today) in step with the learner's other devices (same sync key).
+ * Mount once, near the app root. Pulls on start, when the key changes, when the tab
+ * becomes visible again and when the connection returns; pushes after answers
+ * (see useSRSProgress / useScores) and right away when the tab is hidden, so answers given in the
+ * last couple of seconds are not left behind. Without a key it does nothing.
  */
 export function useSrsSync(): void {
   const [{ syncKey }] = useUISettings();
@@ -21,15 +22,19 @@ export function useSrsSync(): void {
     }
     void syncNow();
 
-    const onVisible = () => {
+    const onVisibility = () => {
       if (document.visibilityState === 'visible') void syncNow();
+      else flushPendingSync();
     };
     const onOnline = () => void syncNow();
-    document.addEventListener('visibilitychange', onVisible);
+    const onPageHide = () => flushPendingSync();
+    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
-      document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
+      window.removeEventListener('pagehide', onPageHide);
     };
   }, [key]);
 }

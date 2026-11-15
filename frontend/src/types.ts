@@ -54,11 +54,31 @@ export interface SRSRecord {
 /** Trainers whose SRS progress can be synced between devices (see utils/srsSync.ts). */
 export type SrsTrainer = 'words' | 'verbs' | 'articles';
 
+/** Trainers that keep a score and whose score is synced (the scored tabs of config/tabs.ts). */
+export type ScoreTrainer = 'numbers' | 'words' | 'articles' | 'verbs';
+
+/** A trainer's score as exchanged with the server; `updatedAt` (ms) decides which device's score wins. */
+export interface SyncScore {
+  correct: number;
+  total: number;
+  streak: number;
+  bestStreak: number;
+  updatedAt: number;
+}
+
+/** "Answers today": the learner's local day (YYYY-MM-DD) and the counter; '' = no data. */
+export interface SyncDaily {
+  day: string;
+  count: number;
+}
+
 /** The SRS snapshot exchanged with the server: progress per trainer + the time of its last reset (ms, 0 = never). */
 export interface SrsSyncData {
   srs: Record<SrsTrainer, Record<string, SRSRecord>>;
   resetAt: Record<SrsTrainer, number>;
   settings: SyncSettings;
+  scores: Record<ScoreTrainer, SyncScore>;
+  daily: SyncDaily;
 }
 
 /** Learner settings shared by devices using the same sync key. */
@@ -81,6 +101,8 @@ export interface ScoreState {
   total: number;
   streak: number;
   bestStreak: number;
+  /** When the score last changed (ms); used by the cross-device sync. Absent = never synced. */
+  updatedAt?: number;
 }
 
 /**

@@ -106,20 +106,42 @@ function loadDaily(): DailyProgress {
 
 let daily: DailyProgress = loadDaily();
 
+function persistDaily(): void {
+  try {
+    localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
+  } catch {
+    // Non-blocking
+  }
+}
+
 /** Answers given today (the counter starts over at local midnight). */
 export function getDailyCount(): number {
   if (daily.day !== localDayKey(new Date())) daily = { day: localDayKey(new Date()), count: 0 };
   return daily.count;
 }
 
+/** Today's counter together with its day, for the cross-device sync. */
+export function getDailyProgress(): { day: string; count: number } {
+  const count = getDailyCount(); // rolls the day over first
+  return { day: daily.day, count };
+}
+
 export function incrementDailyCount(): void {
   const count = getDailyCount() + 1;
   daily = { day: daily.day, count };
-  try {
-    localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
-  } catch {
-    // Non-blocking
-  }
+  persistDaily();
+  notify();
+}
+
+/**
+ * Applies "answers today" received from another device: only for the current local day and only
+ * upwards (the counter never decreases), so answers given here are never lost.
+ */
+export function applySyncedDailyProgress(day: string, count: number): void {
+  if (day !== localDayKey(new Date())) return;
+  if (count <= getDailyCount()) return;
+  daily = { day, count };
+  persistDaily();
   notify();
 }
 

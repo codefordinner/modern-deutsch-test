@@ -15,3 +15,47 @@ describe('SRS sync data', () => {
     expect(sanitizeSyncData({ srs: { words: { bad: { box: 99 } } } }).srs.words).toEqual({});
   });
 });
+
+describe('score and daily counter sync', () => {
+  const withScore = (score: Partial<ReturnType<typeof emptySyncData>['scores']['words']>) => {
+    const data = emptySyncData();
+    data.scores.words = { ...data.scores.words, ...score };
+    return data;
+  };
+
+  it('takes the score that changed later, including a reset to zero', () => {
+    const old = withScore({ correct: 8, total: 10, streak: 3, bestStreak: 5, updatedAt: 1000 });
+    const fresh = withScore({ correct: 9, total: 11, streak: 4, bestStreak: 5, updatedAt: 2000 });
+    expect(mergeSyncData(old, fresh).scores.words.total).toBe(11);
+    expect(mergeSyncData(fresh, old).scores.words.total).toBe(11);
+    expect(mergeSyncData(fresh, withScore({ updatedAt: 3000 })).scores.words.total).toBe(0);
+  });
+
+  it('on equal timestamps the score with more answers wins in either order', () => {
+    const a = withScore({ correct: 1, total: 2 });
+    const b = withScore({ correct: 5, total: 9 });
+    expect(mergeSyncData(a, b).scores.words.total).toBe(9);
+    expect(mergeSyncData(b, a).scores.words.total).toBe(9);
+  });
+
+  it('daily counter: same day keeps the maximum, a later day wins', () => {
+    const a = emptySyncData();
+    a.daily = { day: '2026-03-10', count: 4 };
+    const b = emptySyncData();
+    b.daily = { day: '2026-03-10', count: 7 };
+    const next = emptySyncData();
+    next.daily = { day: '2026-03-11', count: 1 };
+    expect(mergeSyncData(a, b).daily).toEqual({ day: '2026-03-10', count: 7 });
+    expect(mergeSyncData(next, a).daily).toEqual({ day: '2026-03-11', count: 1 });
+  });
+
+  it('clamps impossible scores and ignores junk', () => {
+    const data = sanitizeSyncData({
+      scores: { words: { correct: 50, total: 10, streak: 7, bestStreak: 2, updatedAt: 5 }, verbs: 'junk' },
+      daily: { day: 'yesterday', count: 3 },
+    });
+    expect(data.scores.words).toEqual({ correct: 10, total: 10, streak: 7, bestStreak: 7, updatedAt: 5 });
+    expect(data.scores.verbs).toEqual(emptySyncData().scores.verbs);
+    expect(data.daily).toEqual({ day: '', count: 0 });
+  });
+});

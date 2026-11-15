@@ -1,18 +1,26 @@
 import crypto from 'crypto';
 
 /**
- * Синхронизация прогресса SRS между устройствами по общему ключу.
+ * Синхронизация прогресса между устройствами по общему ключу.
  *
  * Сервер хранит снимок прогресса под хэшем ключа (сам ключ не сохраняется) и при каждом
- * обмене сливает его с присланным: для каждой карточки побеждает запись с более поздним
- * `lastReviewed`. Сброс прогресса передаётся отметкой `resetAt` (мс): записи, последний
- * ответ по которым был не позже этой отметки, отбрасываются.
+ * обмене сливает его с присланным:
+ *  - SRS: для каждой карточки побеждает запись с более поздним `lastReviewed`. Сброс прогресса
+ *    передаётся отметкой `resetAt` (мс): записи, последний ответ по которым был не позже этой
+ *    отметки, отбрасываются;
+ *  - счёт (`scores`): для каждого тренажёра побеждает запись с более поздним `updatedAt`
+ *    (при равенстве — с большим `total`). Сброс счёта — это просто запись с нулями и новым `updatedAt`;
+ *  - ответы за сегодня (`daily`): за один и тот же день берётся максимум, более поздний день побеждает.
  *
  * Держите логику слияния в синхронизации с frontend/src/utils/srsSyncData.ts.
  */
 
 export const SYNC_TRAINERS = ['words', 'verbs', 'articles'] as const;
 export type SyncTrainer = (typeof SYNC_TRAINERS)[number];
+
+/** Тренажёры со счётом (см. SCORED_TABS во frontend/src/config/tabs.ts). */
+export const SYNC_SCORE_TRAINERS = ['numbers', 'words', 'articles', 'verbs'] as const;
+export type SyncScoreTrainer = (typeof SYNC_SCORE_TRAINERS)[number];
 
 export interface SyncRecord {
   box: number;
@@ -24,10 +32,27 @@ export interface SyncRecord {
 }
 export type SyncMap = Record<string, SyncRecord>;
 
+export interface SyncScore {
+  correct: number;
+  total: number;
+  streak: number;
+  bestStreak: number;
+  /** Когда счёт менялся в последний раз (мс); 0 — никогда / до появления синхронизации счёта. */
+  updatedAt: number;
+}
+
+export interface SyncDaily {
+  /** Локальный день ученика, YYYY-MM-DD; пусто — нет данных. */
+  day: string;
+  count: number;
+}
+
 export interface SyncData {
   srs: Record<SyncTrainer, SyncMap>;
   resetAt: Record<SyncTrainer, number>;
   settings: SyncSettings;
+  scores: Record<SyncScoreTrainer, SyncScore>;
+  daily: SyncDaily;
 }
 
 export interface SyncSettings {
@@ -41,12 +66,18 @@ export const MIN_SYNC_KEY_LENGTH = 6;
 export const MAX_SYNC_KEY_LENGTH = 200;
 const MAX_CARDS_PER_TRAINER = 200_000;
 const MAX_CARD_KEY_LENGTH = 200;
+const MAX_COUNTER = 1_000_000_000;
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const emptyScore = (): SyncScore => ({ correct: 0, total: 0, streak: 0, bestStreak: 0, updatedAt: 0 });
 
 export const emptySyncData = (): SyncData => ({
   srs: { words: {}, verbs: {}, articles: {} },
   resetAt: { words: 0, verbs: 0, articles: 0 },
   settings: { dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0 },
+  scores: { numbers: emptyScore(), words: emptyScore(), articles: emptyScore(), verbs: emptyScore() },
+  daily: { day: '', count: 0 },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -54,6 +85,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const count = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+
+const counter = (value: unknown): number => Math.min(MAX_COUNTER, count(value));
 
 const categoryList = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 200).slice(0, 1000) : ['all'];
@@ -75,6 +108,19 @@ function sanitizeRecord(raw: unknown): SyncRecord | null {
   return record;
 }
 
+function sanitizeScore(raw: unknown): SyncScore {
+  if (!isRecord(raw)) return emptyScore();
+  const total = counter(raw.total);
+  const correct = Math.min(counter(raw.correct), total);
+  const streak = counter(raw.streak);
+  return { correct, total, streak, bestStreak: Math.max(counter(raw.bestStreak), streak), updatedAt: count(raw.updatedAt) };
+}
+
+function sanitizeDaily(raw: unknown): SyncDaily {
+  if (!isRecord(raw) || typeof raw.day !== 'string' || !DAY_KEY.test(raw.day)) return { day: '', count: 0 };
+  return { day: raw.day, count: counter(raw.count) };
+}
+
 /** Whatever arrived (request body / stored JSON) → a well-formed SyncData; junk is dropped. */
 export function sanitizeSyncData(raw: unknown): SyncData {
   const result = emptySyncData();
@@ -82,12 +128,15 @@ export function sanitizeSyncData(raw: unknown): SyncData {
   const srs = isRecord(raw.srs) ? raw.srs : {};
   const resetAt = isRecord(raw.resetAt) ? raw.resetAt : {};
   const settings = isRecord(raw.settings) ? raw.settings : {};
+  const scores = isRecord(raw.scores) ? raw.scores : {};
   result.settings = {
     dailyGoal: Math.min(1000, count(settings.dailyGoal)),
     wordsCategories: categoryList(settings.wordsCategories),
     articlesCategories: categoryList(settings.articlesCategories),
     updatedAt: count(settings.updatedAt),
   };
+  for (const trainer of SYNC_SCORE_TRAINERS) result.scores[trainer] = sanitizeScore(scores[trainer]);
+  result.daily = sanitizeDaily(raw.daily);
 
   for (const trainer of SYNC_TRAINERS) {
     const reset = resetAt[trainer];
@@ -108,6 +157,18 @@ export function sanitizeSyncData(raw: unknown): SyncData {
   return result;
 }
 
+/** The score changed later wins; on a tie the one with more answers (so legacy scores don't wipe each other). */
+function pickScore(a: SyncScore, b: SyncScore): SyncScore {
+  if (a.updatedAt !== b.updatedAt) return { ...(a.updatedAt > b.updatedAt ? a : b) };
+  return { ...(b.total > a.total ? b : a) };
+}
+
+/** Same day: the larger counter (it only ever grows); different days: the later day. */
+function mergeDaily(a: SyncDaily, b: SyncDaily): SyncDaily {
+  if (a.day === b.day) return { day: a.day, count: Math.max(a.count, b.count) };
+  return { ...(a.day > b.day ? a : b) };
+}
+
 /** Union of two snapshots: the newer answer wins per card; a reset wipes older answers. */
 export function mergeSyncData(a: SyncData, b: SyncData): SyncData {
   const merged = emptySyncData();
@@ -125,6 +186,8 @@ export function mergeSyncData(a: SyncData, b: SyncData): SyncData {
     }
   }
   merged.settings = a.settings.updatedAt >= b.settings.updatedAt ? a.settings : b.settings;
+  for (const trainer of SYNC_SCORE_TRAINERS) merged.scores[trainer] = pickScore(a.scores[trainer], b.scores[trainer]);
+  merged.daily = mergeDaily(a.daily, b.daily);
   return merged;
 }
 
