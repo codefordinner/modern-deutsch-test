@@ -29,24 +29,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace dependencies
+        run: npm ci
 
       - name: Check backend
-        working-directory: backend
-        run: |
-          npm ci
-          npm run build
+        run: npm --prefix backend run build
 
       - name: Check frontend
-        working-directory: frontend
         run: |
-          npm ci
-          npm run typecheck
-          npm run lint
-          npm run test
-          npm run build
+          npm --prefix frontend run typecheck
+          npm --prefix frontend run lint
+          npm --prefix frontend run test
+          npm --prefix frontend run build
 
   docker:
     name: Build and push Docker images
@@ -80,7 +76,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
+          file: ./backend/Dockerfile
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -91,7 +88,8 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
+          file: ./frontend/Dockerfile
           push: true
           build-args: |
             BUILD_VERSION=${{ github.sha }}

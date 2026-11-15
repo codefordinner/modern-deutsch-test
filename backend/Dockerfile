@@ -3,29 +3,35 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl libc6-compat
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
+COPY frontend/package.json ./frontend/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN npm ci
 
-COPY prisma ./prisma
-RUN npx prisma generate
-
-COPY . .
-RUN npm run build
+COPY backend ./backend
+COPY packages/shared ./packages/shared
+RUN npm --prefix backend run build
 
 FROM node:22-alpine
 WORKDIR /app
 
 RUN apk add --no-cache openssl libc6-compat
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
+COPY frontend/package.json ./frontend/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN npm ci --omit=dev
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+WORKDIR /app/backend
+COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/prisma ./prisma
+COPY --from=builder /app/packages/shared /app/packages/shared
+COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 
-COPY entrypoint.sh ./entrypoint.sh
+COPY backend/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
 EXPOSE 3000
