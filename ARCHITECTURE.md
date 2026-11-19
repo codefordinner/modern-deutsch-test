@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, SyncProfile (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, SyncProfile, TelegramUser, TelegramChallenge, UserSession (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -17,9 +17,11 @@
 │     ├─ api.ts              сборка роутера /api (порядок монтирования важен)
 │     ├─ db.ts               PrismaClient
 │     ├─ middleware/         auth (JWT, cookie), csrf (Origin/Referer), normalizeWordBody
-│     ├─ routes/             auth, words, words-admin, categories, pictures, audio, analytics, settings, sync
+│     ├─ routes/             auth, telegram-auth, words, words-admin, categories, pictures, audio, analytics, settings, sync
 │     └─ services/           audio, audioSettings, aiSettings, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
 ├─ packages/shared/            @sprachfunke/shared: общая чистая логика SRS-синхронизации и веса по умолчанию
+├─ packages/telegram-bot/       общий long-polling бот; auth handler сейчас, без доступа к SQLite
+├─ deploy/                       примеры Quadlet и runbook (не применяются автоматически)
 └─ frontend/
    ├─ nginx.conf, Dockerfile статика + прокси /api → app-backend:3001
    ├─ public/                favicon, manifest.webmanifest, sw.js, icons/
@@ -63,6 +65,14 @@
 | `TRUST_PROXY` | число прокси перед приложением | `backend/`: 1; `server.ts`: 0 |
 | `STATS_TIMEZONE` | часовой пояс «дня» в статистике | часовой пояс сервера |
 | `HERMES_WORD_IMPORT_TOKEN` | Bearer-токен локального endpoint `/api/internal/word-import` | не задан (endpoint выключен) |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token для проверки Mini App initData и работы общего Sprachfunke-бота | не задан |
+| `TELEGRAM_BOT_USERNAME` | публичный username общего Sprachfunke-бота без `@` | не задан |
+| `TELEGRAM_AUTH_REQUIRED` | обязательный вход перед тренажёрами; включается после настройки secrets | `false` |
+| `TELEGRAM_BOT_API_SECRET` | отдельная runtime-аутентификация bot → backend; не bot token | не задан |
+| `TELEGRAM_AUTH_PEPPER` | HMAC pepper для digest кодов и browser binding | не задан |
+| `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS` | максимальный возраст Mini App initData | `300` |
+| `TELEGRAM_SESSION_TTL_SECONDS` | срок сессии ученика в секундах | `2592000` |
+| `TELEGRAM_COOKIE_SECURE` | принудительный `Secure` для ученических cookie за HTTPS tunnel (`true` в production) | авто по запросу |
 | `PORT` | порт отдельного backend | 3001 (`server.ts` — всегда 3000) |
 | `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
  | `PIPER_VOICE` | голос Piper по умолчанию | `de_DE-thorsten-medium` |
@@ -73,6 +83,12 @@
 ## Backend
 - Express 4, JSON-лимит 5 МБ (массовый импорт); nginx — `client_max_body_size 6m`.
 - **Аутентификация админа**: пароль → JWT (HS256, 24 ч) только в HttpOnly-cookie. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
+- **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. Админская авторизация и cookie остаются независимыми.
+- `GET /learner-auth/config` сообщает frontend, включён ли обязательный вход. На production после подготовки secrets установить `TELEGRAM_AUTH_REQUIRED=true`; выключенный флаг сохраняет совместимость со старой версией до согласованной выкладки.
+- **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
+- **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут, в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение.
+- **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
+- **Доступ**: Telegram-вход обязателен для тренажёров; вкладка админки продолжает использовать отдельный admin login. Прогресс, SRS, настройки и статистика аккаунту не привязаны.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `POST /words/ai/check` (фоновая проверка выбранных слов; безопасные исправления сохраняются сервером даже после закрытия вкладки; конфликты немецких форм отображаются как замечания к словам и не отменяют остальные исправления), `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
@@ -165,7 +181,7 @@
 Новый воркер сам не активируется: `useServiceWorkerUpdates` + `UpdateBanner` предлагают «Обновить», после согласия страница перезагружается.
 
 ## Сборка и деплой
-- Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), образы собирает GitHub Actions (`deploy.yml`). На pull request выполняются `npm ci`, typecheck, ESLint, тесты frontend и сборка backend/frontend; при push в `main` после успешных проверок образы собираются и публикуются в GHCR с тегами `latest` и SHA коммита. Сборочные образы используют `node:22-alpine`; это согласовано с `.nvmrc` и требованием `engines` в корневом `package.json`.
+- Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), `packages/telegram-bot/Dockerfile` (long polling, без опубликованных портов). Образы собирает GitHub Actions (`deploy.yml`): PR выполняет backend build/tests, frontend typecheck/lint/tests/build и bot build/tests; push в `main` публикует все образы в GHCR с тегами `latest` и SHA коммита. Сервер получает готовые образы; секреты не являются build args.
 - nginx: `/api/` → `app-backend:3001` (имя резолвится на каждый запрос), `client_max_body_size 6m`, таймауты прокси `proxy_connect_timeout 10s` / `proxy_send_timeout 120s` / `proxy_read_timeout 120s` (проверка описания картинки через Gemini может идти до ~60 с — без этого Cloudflare возвращал 502), `sw.js`/manifest без кэша, `/assets/` — год и `immutable`, остальное — SPA-fallback.
 - Корневой `server.ts` — для dev и «одного процесса»: поднимает БД (`prisma db push` + seed в пустую), API, Vite или статику. Prisma-клиент берётся из `backend/node_modules`: в `backend/` выполните `npm install && npx prisma generate` (после любого изменения схемы — снова `prisma generate`; `npm run build` в `backend/` делает это сам).
 - Новые таблицы (`Setting`, `SyncProfile`, `Picture`) создаются автоматически через `prisma db push` при старте.

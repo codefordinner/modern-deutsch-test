@@ -1,0 +1,23 @@
+# Example only. The inspected server uses Podman 5.8.4,
+# app-net and backend.service; re-check these before installation.
+[Unit]
+Description=Sprachfunke Telegram bot
+Wants=network-online.target
+After=network-online.target backend.service
+Requires=backend.service
+
+[Container]
+Image=ghcr.io/codefordinner/my-trainer-app-telegram-bot:latest
+ContainerName=app-telegram-bot
+Network=app-net
+Environment=BACKEND_URL=http://app-backend:3001
+Secret=sprachfunke_telegram_bot_token,type=env,target=TELEGRAM_BOT_TOKEN
+Secret=sprachfunke_telegram_backend_secret,type=env,target=TELEGRAM_BOT_API_SECRET
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

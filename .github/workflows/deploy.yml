@@ -37,12 +37,20 @@ jobs:
       - name: Check backend
         run: npm --prefix backend run build
 
+      - name: Test backend
+        run: npm --prefix backend test
+
       - name: Check frontend
         run: |
           npm --prefix frontend run typecheck
           npm --prefix frontend run lint
           npm --prefix frontend run test
           npm --prefix frontend run build
+
+      - name: Check Telegram bot
+        run: |
+          npm --workspace @sprachfunke/telegram-bot run build
+          npm --workspace @sprachfunke/telegram-bot test
 
   docker:
     name: Build and push Docker images
@@ -98,3 +106,15 @@ jobs:
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/my-trainer-app-frontend:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/my-trainer-app-frontend:${{ github.sha }}
+
+      - name: Build and push Telegram bot
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/telegram-bot/Dockerfile
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/my-trainer-app-telegram-bot:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/my-trainer-app-telegram-bot:${{ github.sha }}

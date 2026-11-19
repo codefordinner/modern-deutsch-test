@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/package.json
 COPY frontend/package.json ./frontend/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/telegram-bot/package.json ./packages/telegram-bot/package.json
 RUN npm ci
 
 COPY backend ./backend
@@ -22,6 +23,7 @@ COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/package.json
 COPY frontend/package.json ./frontend/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/telegram-bot/package.json ./packages/telegram-bot/package.json
 RUN npm ci --omit=dev
 
 WORKDIR /app/backend

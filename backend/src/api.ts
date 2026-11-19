@@ -11,6 +11,7 @@ import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
 import audioRoutes from './routes/audio.routes';
 import picturesRoutes from './routes/pictures.routes';
 import internalRoutes from './routes/internal.routes';
+import telegramAuthRoutes from './routes/telegram-auth.routes';
 
 const router = Router();
 
@@ -19,6 +20,8 @@ router.use(requireSameOrigin);
 
 router.use('/auth', authRoutes);
 router.use('/admin', authRoutes); // alias for admin login
+// Learner auth is isolated from the legacy admin auth cookie and route paths.
+router.use('/learner-auth', telegramAuthRoutes);
 router.use('/words', normalizeWordBody);
 // Admin-only bulk tools; mounted before the CRUD router (their paths never clash with it).
 router.use('/words', wordsAdminRoutes);

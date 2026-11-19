@@ -14,6 +14,9 @@ export function createApp() {
   // TRUST_PROXY is configured by the caller BEFORE createApp, because each entry
   // point has a different default (0 for server.ts, 1 behind nginx in index.ts).
   app.use(cors());
+  // The bot confirmation endpoint has a tiny fixed payload; keep it from using
+  // the much larger import limit below.
+  app.use('/api/internal/telegram/confirm', express.json({ limit: '1kb' }));
   // Bulk word import sends a whole list in one request body (the default limit is only 100 kb).
   app.use(express.json({ limit: '6mb' }));
 

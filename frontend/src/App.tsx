@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
@@ -14,9 +14,24 @@ import type { ScoredTab } from './config/tabs';
 import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
 import { ConfirmProvider } from './components/ConfirmProvider';
+import { TelegramLogin } from './components/TelegramLogin';
+import {
+  getLearnerSession,
+  getLearnerAuthConfig,
+  loginWithMiniApp,
+  logoutLearner,
+} from './api/telegramAuth';
+import { ApiError, getErrorMessage } from './api/request';
+import type { LearnerSession } from './api/telegramAuth';
 
 export function App() {
   const activeTab = useHashRoute();
+  const [learner, setLearner] = useState<LearnerSession['user'] | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
+  const [logoutError, setLogoutError] = useState('');
+  const miniAppAttempted = useRef(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     try {
@@ -35,6 +50,76 @@ export function App() {
     try { localStorage.setItem('onboarding_seen', '1'); } catch { /* storage unavailable */ }
     setIsOnboardingOpen(false);
   };
+
+  const handleLearnerAuthenticated = useCallback((user: LearnerSession['user']) => {
+    setLearner(user);
+    setAuthError('');
+    setAuthLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const webApp = window.Telegram?.WebApp;
+    if (webApp?.initData) {
+      webApp.ready?.();
+      webApp.expand?.();
+    }
+    const authenticate = async () => {
+      try {
+        let config: { required: boolean };
+        try {
+          config = await getLearnerAuthConfig();
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 404) {
+            // Compatibility with an older backend during a rolling deployment.
+            if (active) setAuthRequired(false);
+            return;
+          }
+          throw error;
+        }
+        if (!config.required) {
+          if (active) setAuthRequired(false);
+          return;
+        }
+        if (active) setAuthRequired(true);
+        try {
+          const session = await getLearnerSession();
+          if (active) setLearner(session.user);
+        } catch {
+          if (!active) return;
+          const initData = window.Telegram?.WebApp?.initData;
+          if (initData && !miniAppAttempted.current) {
+            miniAppAttempted.current = true;
+            try {
+              const session = await loginWithMiniApp(initData);
+              if (active) setLearner(session.user);
+            } catch (error) {
+              if (active) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
+            }
+          }
+        }
+      } catch (error) {
+        if (active) {
+          setAuthRequired(true);
+          setAuthError(getErrorMessage(error, 'Не удалось проверить состояние входа.'));
+        }
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    };
+    void authenticate();
+    return () => { active = false; };
+  }, []);
+
+  const handleLearnerLogout = useCallback(async () => {
+    setLogoutError('');
+    try {
+      await logoutLearner();
+      setLearner(null);
+    } catch (error) {
+      setLogoutError(getErrorMessage(error, 'Не удалось завершить сеанс. Попробуйте ещё раз.'));
+    }
+  }, []);
 
   const { scores, recordAnswer, resetScore } = useScores();
   const scoredTab: ScoredTab | null = getTabDefinition(activeTab).scored ? activeTab as ScoredTab : null;
@@ -91,6 +176,15 @@ export function App() {
     recordAnswer(scoredTab, isCorrect);
   };
 
+  // Learner accounts gate training only. The existing admin area keeps its
+  // independent cookie-based authentication and can still be opened directly.
+  if (activeTab !== 'admin' && authRequired && !learner) {
+    if (authLoading) {
+      return <main className="telegram-login" id="main" aria-live="polite">Проверяем вход…</main>;
+    }
+    return <TelegramLogin onAuthenticated={handleLearnerAuthenticated} initialError={authError} />;
+  }
+
   return (
     <ConfirmProvider>
     <div className="app-shell">
@@ -101,6 +195,8 @@ export function App() {
         onOpenStats={() => setIsStatsOpen(true)}
         showStats={scoredTab !== null}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isLearnerSignedIn={Boolean(learner)}
+        onLearnerLogout={handleLearnerLogout}
       />
 
        <main className="app-container" id="main">
@@ -119,6 +215,7 @@ export function App() {
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
       {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
+      {logoutError && <p className="telegram-login-error" role="alert">{logoutError}</p>}
 
       <UpdateBanner />
       <ToastHost />

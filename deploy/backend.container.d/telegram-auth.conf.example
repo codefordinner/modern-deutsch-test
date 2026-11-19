@@ -1,0 +1,11 @@
+# Copy to ~/.config/containers/systemd/backend.container.d/telegram-auth.conf
+# only after creating the Podman secrets and agreeing on a deployment window.
+[Container]
+Environment=TELEGRAM_AUTH_REQUIRED=true
+Secret=sprachfunke_telegram_bot_token,type=env,target=TELEGRAM_BOT_TOKEN
+Secret=sprachfunke_telegram_backend_secret,type=env,target=TELEGRAM_BOT_API_SECRET
+Secret=sprachfunke_telegram_auth_pepper,type=env,target=TELEGRAM_AUTH_PEPPER
+Environment=TELEGRAM_BOT_USERNAME=REPLACE_WITH_PUBLIC_BOT_USERNAME
+Environment=TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=300
+Environment=TELEGRAM_SESSION_TTL_SECONDS=2592000
+Environment=TELEGRAM_COOKIE_SECURE=true

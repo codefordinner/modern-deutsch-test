@@ -3,7 +3,7 @@ import { APP_TABS } from '../config/tabs';
 import type { AppTab } from '../config/tabs';
 import { tabHref } from '../hooks/useHashRoute';
 import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
-import { Sun, Moon, Settings, BarChart3 } from 'lucide-react';
+import { Sun, Moon, Settings, BarChart3, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: AppTab;
@@ -12,6 +12,8 @@ interface NavbarProps {
   onOpenStats: () => void;
   showStats: boolean;
   onOpenSettings: () => void;
+  isLearnerSignedIn?: boolean;
+  onLearnerLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -21,6 +23,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenStats,
   showStats,
   onOpenSettings,
+  isLearnerSignedIn = false,
+  onLearnerLogout,
 }) => {
   const themeLabel = isDark ? 'Включить светлую тему' : 'Включить тёмную тему';
   const [{ dailyGoal }] = useStudyPrefs();
@@ -69,6 +73,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 🎯 {answeredToday}/{dailyGoal}
               </span>
+            )}
+            {isLearnerSignedIn && onLearnerLogout && (
+              <button
+                className="icon-btn"
+                type="button"
+                onClick={onLearnerLogout}
+                title="Выйти из аккаунта"
+                aria-label="Выйти из аккаунта"
+              >
+                <LogOut size={18} />
+              </button>
             )}
             {showStats && (
               <button
