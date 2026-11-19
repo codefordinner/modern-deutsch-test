@@ -155,7 +155,7 @@ router.post('/telegram/challenge/complete', completeLimiter, asyncRoute(async (r
   setUserSessionCookie(req, res, token);
   clearChallengeCookie(req, res);
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ authenticated: true });
+  return res.json({ authenticated: true, user: { id: userId } });
 }));
 
 router.get('/me', asyncRoute(async (req, res) => {

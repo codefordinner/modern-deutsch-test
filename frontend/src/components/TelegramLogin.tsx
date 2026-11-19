@@ -72,14 +72,26 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
         if (!active) return;
         if (status.status === 'confirmed') {
           setConfirmed(true);
-          const session = await completeTelegramChallenge();
-          if (active && session.authenticated) onAuthenticated(session.user);
+          try {
+            const session = await completeTelegramChallenge();
+            if (active && session.authenticated) onAuthenticated(session.user);
+          } catch (completionError) {
+            if (!active) return;
+            if (completionError instanceof ApiError && [401, 409, 410].includes(completionError.status)) {
+              setRemainingSeconds(0);
+              setConfirmed(false);
+              setError('Срок входа истёк. Запросите новый код.');
+              return;
+            }
+            throw completionError;
+          }
           return;
         }
       } catch (pollError) {
         if (!active) return;
-        if (pollError instanceof ApiError && pollError.status === 410) {
+        if (pollError instanceof ApiError && [401, 410].includes(pollError.status)) {
           setRemainingSeconds(0);
+          setError(getErrorMessage(pollError, 'Срок входа истёк. Запросите новый код.'));
           return;
         }
         if (!(pollError instanceof ApiError) || pollError.status !== 429) {

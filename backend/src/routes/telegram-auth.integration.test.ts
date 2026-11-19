@@ -117,6 +117,9 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.deepEqual(completionResponses.map((response) => response.status).sort(), [200, 409]);
   const successfulResponse = completionResponses.find((response) => response.status === 200);
   assert.ok(successfulResponse);
+  const completionBody = await successfulResponse.json() as { authenticated: boolean; user: { id: string } };
+  assert.equal(completionBody.authenticated, true);
+  assert.equal(typeof completionBody.user.id, 'string');
   const sessionCookie = `learner_session=${cookieValue(successfulResponse.headers.get('set-cookie'), 'learner_session')}`;
 
   const meResponse = await fetch(`${base}/api/learner-auth/me`, { headers: { Cookie: sessionCookie } });
