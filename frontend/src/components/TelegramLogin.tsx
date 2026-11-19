@@ -26,11 +26,13 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const started = useRef(false);
+  const completing = useRef(false);
 
   const issueChallenge = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError(initialError ?? '');
     setConfirmed(false);
+    completing.current = false;
     try {
       const result = await requestTelegramChallenge();
       setChallenge(result);
@@ -41,7 +43,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [initialError]);
 
   useEffect(() => {
     if (started.current) return;
@@ -59,7 +61,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
   }, [challenge]);
 
   useEffect(() => {
-    if (!challenge || confirmed) return;
+    if (!challenge) return;
     let active = true;
     let timeoutId = 0;
     const poll = async () => {
@@ -71,11 +73,14 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
         const status = await getTelegramChallengeStatus();
         if (!active) return;
         if (status.status === 'confirmed') {
+          if (completing.current) return;
+          completing.current = true;
           setConfirmed(true);
           try {
             const session = await completeTelegramChallenge();
             if (active && session.authenticated) onAuthenticated(session.user);
           } catch (completionError) {
+            completing.current = false;
             if (!active) return;
             if (completionError instanceof ApiError && [401, 409, 410].includes(completionError.status)) {
               setRemainingSeconds(0);
@@ -105,7 +110,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [challenge, confirmed, onAuthenticated]);
+  }, [challenge, onAuthenticated]);
 
   const formattedTime = `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
 

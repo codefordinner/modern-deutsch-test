@@ -42,12 +42,23 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   const authConfig = await fetch(`${base}/api/learner-auth/config`);
   assert.deepEqual(await authConfig.json(), { required: true });
 
-  const issueResponse = await fetch(`${base}/api/learner-auth/telegram/challenge`, {
-    method: 'POST',
-    headers: { ...headerOrigin(base), 'content-type': 'application/json' },
-    body: '{}',
-  });
+  const previousCookieSecure = process.env.TELEGRAM_COOKIE_SECURE;
+  process.env.TELEGRAM_COOKIE_SECURE = 'true';
+  let issueResponse: Response;
+  try {
+    issueResponse = await fetch(`${base}/api/learner-auth/telegram/challenge`, {
+      method: 'POST',
+      headers: { ...headerOrigin(base), 'content-type': 'application/json' },
+      body: '{}',
+    });
+  } finally {
+    if (previousCookieSecure === undefined) delete process.env.TELEGRAM_COOKIE_SECURE;
+    else process.env.TELEGRAM_COOKIE_SECURE = previousCookieSecure;
+  }
   assert.equal(issueResponse.status, 200);
+  assert.match(issueResponse.headers.get('set-cookie') ?? '', /SameSite=None/i);
+  assert.match(issueResponse.headers.get('set-cookie') ?? '', /;\s*Secure/i);
+  assert.match(issueResponse.headers.get('set-cookie') ?? '', /;\s*Partitioned/i);
   const issue = await issueResponse.json() as { code: string; botUrl: string };
   assert.match(issue.code, /^\d{6}$/);
   assert.equal(issue.botUrl, 'https://t.me/test_sprachfunke_bot');

@@ -83,7 +83,7 @@
 ## Backend
 - Express 4, JSON-лимит 5 МБ (массовый импорт); nginx — `client_max_body_size 6m`.
 - **Аутентификация админа**: пароль → JWT (HS256, 24 ч) только в HttpOnly-cookie. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
-- **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. Админская авторизация и cookie остаются независимыми.
+- **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. По HTTPS cookies имеют `SameSite=None; Secure; Partitioned` для Telegram WebView; по HTTP в dev сохраняется `SameSite=Lax`. Админская авторизация и cookie остаются независимыми.
 - `GET /learner-auth/config` сообщает frontend, включён ли обязательный вход. На production после подготовки secrets установить `TELEGRAM_AUTH_REQUIRED=true`; выключенный флаг сохраняет совместимость со старой версией до согласованной выкладки.
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут, в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.

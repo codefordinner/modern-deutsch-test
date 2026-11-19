@@ -88,8 +88,7 @@ const cookieOptions = (req: Request, maxAgeSeconds: number) => {
   return [
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
-    ...(secure ? ['Secure'] : []),
+    ...(secure ? ['SameSite=None', 'Secure', 'Partitioned'] : ['SameSite=Lax']),
     `Max-Age=${maxAgeSeconds}`,
   ].join('; ');
 };
