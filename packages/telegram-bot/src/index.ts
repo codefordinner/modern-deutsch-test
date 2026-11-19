@@ -16,6 +16,7 @@ const apiUrl = `https://api.telegram.org/bot${token}`;
 let stopping = false;
 let nextOffset = 0;
 let retryDelayMs = 1_000;
+const longPollTimeoutSeconds = 5;
 
 const telegramRequest = async <T>(method: string, body: unknown, signal?: AbortSignal): Promise<T> => {
   const response = await fetch(`${apiUrl}/${method}`, {
@@ -53,11 +54,11 @@ const confirmCode = async (code: string, telegramId: string) => {
 const poll = async () => {
   while (!stopping) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35_000);
+    const timeout = setTimeout(() => controller.abort(), (longPollTimeoutSeconds + 10) * 1_000);
     try {
       const updates = await telegramRequest<TelegramUpdate[]>(
         'getUpdates',
-        { offset: nextOffset, timeout: 25, allowed_updates: ['message'] },
+        { offset: nextOffset, timeout: longPollTimeoutSeconds, allowed_updates: ['message'] },
         controller.signal,
       );
       retryDelayMs = 1_000;
