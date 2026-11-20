@@ -38,7 +38,7 @@ describe('SRS sync data', () => {
     expect(mergeSyncData(data, emptySyncData()).settings.trainerPrefs).toEqual(data.settings.trainerPrefs);
   });
 
-  it('migrates legacy local trainer settings even when shared profile settings are newer', () => {
+  it('merges trainer preferences independently using their own timestamp', () => {
     const legacyProfile = sanitizeSyncData({ settings: { updatedAt: 500 } });
     const localSettings = sanitizeSyncData({
       settings: {

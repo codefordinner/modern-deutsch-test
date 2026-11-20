@@ -75,8 +75,7 @@ export function sanitizeSyncData(raw) {
     articlesCategories: categoryList(settings.articlesCategories),
     updatedAt: count(settings.updatedAt),
     trainerPrefs: sanitizeTrainerPrefs(settings.trainerPrefs),
-    // Older account snapshots only had the shared timestamp; legacy snapshots without
-    // trainerPrefs use zero so local trainer settings can be imported once.
+    // Snapshots that predate trainerPrefs have no reliable trainer-preference timestamp.
     trainerPrefsUpdatedAt: settings.trainerPrefsUpdatedAt === undefined
       ? (isRecord(settings.trainerPrefs) ? count(settings.updatedAt) : 0)
       : count(settings.trainerPrefsUpdatedAt),

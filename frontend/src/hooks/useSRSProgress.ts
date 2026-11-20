@@ -42,7 +42,7 @@ function writeJSON(key: string, value: unknown): void {
  *   `pickCard` changes identity when that preference changes, which makes the
  *   trainers deal a fresh card.
  * - `recordAnswer` updates and persists progress; it does nothing while SRS is off.
- * - With a sync key set (Settings), changes are pushed to the server shortly after
+ * - When signed in with Telegram, changes are pushed to the server shortly after
  *   and progress from other devices arrives through SRS_SYNCED_EVENT (utils/srsSync.ts).
  */
 export function useSRSProgress(storagePrefix: string) {

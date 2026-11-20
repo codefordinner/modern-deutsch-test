@@ -81,7 +81,7 @@ export interface SrsSyncData {
   daily: SyncDaily;
 }
 
-/** Learner settings shared by devices using the same sync key. */
+/** Learner settings shared by devices through the Telegram account. */
 export interface SyncSettings {
   dailyGoal: number;
   wordsCategories: string[];

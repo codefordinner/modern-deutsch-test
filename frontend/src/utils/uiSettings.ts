@@ -63,12 +63,7 @@ export function getUISettings(): UISettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_UI_SETTINGS;
     const parsed = JSON.parse(raw);
-    const storedSettings = { ...parsed };
-    if (Object.prototype.hasOwnProperty.call(parsed, 'syncKey')) {
-      delete storedSettings.syncKey;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(storedSettings));
-    }
-    const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...storedSettings };
+    const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
     if (typeof merged.highlightArticles !== 'boolean') merged.highlightArticles = true;
     if (typeof merged.useAdminSrsPromotionThreshold !== 'boolean') merged.useAdminSrsPromotionThreshold = false;
     if (typeof merged.audioVolume !== 'number' || !Number.isFinite(merged.audioVolume)) merged.audioVolume = 1;
@@ -82,9 +77,7 @@ export function getUISettings(): UISettings {
 export function setUISettings(partial: Partial<UISettings>): UISettings {
   const next = { ...getUISettings(), ...partial };
   try {
-    const persisted = { ...next } as UISettings & { syncKey?: unknown };
-    delete persisted.syncKey;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // Non-blocking: the setting just won't persist across reloads.
   }

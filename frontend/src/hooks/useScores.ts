@@ -44,7 +44,7 @@ function loadScores(): Scores {
  * localStorage so a page reload doesn't wipe it. "Reset" clears one trainer.
  * Every recorded answer also counts towards the daily goal (utils/studyPrefs.ts).
  *
- * With a sync key set, the score is shared between devices (utils/srsSync.ts): every change is
+ * When signed in with Telegram, the score is shared between devices (utils/srsSync.ts): every change is
  * stamped with `updatedAt`, pushed shortly after, and a newer score from another device is picked
  * up through SRS_SYNCED_EVENT. The score that changed last wins (a reset is a score of zeros).
  */

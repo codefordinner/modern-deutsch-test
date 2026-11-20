@@ -135,7 +135,7 @@ export function App() {
   // Leitner box probabilities configured by the admin (defaults until loaded).
   useSrsWeightsSync();
 
-  // Keeps SRS progress in step with the learner's other devices when a sync key is set.
+  // Keeps SRS progress in step with the learner's other devices through their Telegram account.
   useSrsSync(learner?.id ?? null);
 
   // NOTE: the light theme in index.css is scoped to `html.light` (dark is
