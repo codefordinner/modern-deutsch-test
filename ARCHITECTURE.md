@@ -72,7 +72,7 @@
 | `TELEGRAM_AUTH_PEPPER` | HMAC pepper для digest кодов и browser binding | не задан |
 | `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS` | максимальный возраст Mini App initData | `300` |
 | `TELEGRAM_SESSION_TTL_SECONDS` | срок сессии ученика в секундах | `2592000` |
-| `TELEGRAM_COOKIE_SECURE` | принудительный `Secure` для ученических cookie за HTTPS tunnel (`true` в production) | авто по запросу |
+| `TELEGRAM_COOKIE_SECURE` | настройка `Secure` для ученических cookie за HTTPS tunnel | автоматически в production и для HTTPS; `false` — только для локального HTTP |
 | `PORT` | порт отдельного backend | 3001 (`server.ts` — всегда 3000) |
 | `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
  | `PIPER_VOICE` | голос Piper по умолчанию | `de_DE-thorsten-medium` |
@@ -136,7 +136,7 @@
 | `numbers-generator.ts`, `time-generator.ts` | немецкие числительные и время |
 | `srs.ts`, `srsDue.ts`, `srsWeights.ts` | Лейтнер: ключи, выбор карточки, «к повторению», веса ящиков |
 | `srsSync.ts`, `srsSyncData.ts` | синхронизация SRS (ввод-вывод / чистое слияние) |
-| `studyPrefs.ts`, `uiSettings.ts`, `progressBackup.ts` | настройки обучения и интерфейса; экспорт/импорт прогресса |
+| `studyPrefs.ts`, `uiSettings.ts` | настройки обучения и интерфейса |
 | `verbCards.ts`, `verbConjugation.ts`, `verbQuiz.ts`, `wordCards.ts`, `wordHint.ts`, `articles.ts`, `partOfSpeech.ts` | колоды карточек и правила тренажёров |
 | `random.ts`, `audio.ts`, `toast.ts`, `scrollGuard.ts` | служебное; аудио кэшируется на сервере, URL-файлы браузера живут только во время воспроизведения |
 
@@ -152,25 +152,25 @@
 `answerMatch.ts`: регистр, пробелы, Unicode-форма, `ae/oe/ue/ss` (настройка), `е/ё`. Числа: `parseTypedInteger`, `germanNumberVariants` (+`hundert`/`tausend`). Подсветка ошибок — LCS в `answerDiff.ts`.
 
 ### Хранилище браузера (localStorage)
-| Ключ | Что | В бэкапе |
-|---|---|---|
-| `words_srs_state`, `verbs_srs_state`, `articles_srs_state` | карточки SRS | да |
-| `app_srs_reset_at` | когда тренажёры сбрасывались (для синхронизации) | да |
-| `app_scores` | счёт по тренажёрам | да |
-| `app_ui_settings` | панель умлаутов, ae/oe, фокус, клавиатура, подсказка категории, цвета артиклей, громкость озвучки | да |
-| `theme` | тема | да |
-| `app_daily_progress` | ответов за сегодня | нет |
-| `app_learner_profile_id` | Telegram-профиль, которому принадлежит локальный кэш синхронизируемого прогресса | нет |
-| `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
-| `admin_last_word_category_id` | последняя категория в форме слова | нет |
+| Ключ | Что |
+|---|---|
+| `words_srs_state`, `verbs_srs_state`, `articles_srs_state` | локальный кэш карточек SRS |
+| `app_srs_reset_at` | когда тренажёры сбрасывались (для синхронизации) |
+| `app_scores` | локальный кэш счёта по тренажёрам |
+| `app_ui_settings` | панель умлаутов, ae/oe, фокус, клавиатура, подсказка категории, цвета артиклей, громкость озвучки |
+| `theme` | тема |
+| `app_daily_progress` | ответов за сегодня |
+| `app_learner_profile_id` | Telegram-профиль, которому принадлежит локальный кэш синхронизируемого прогресса |
+| `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie |
+| `admin_last_word_category_id` | последняя категория в форме слова |
 
 Тема (`theme`) и UI-параметры, включая громкость озвучки, являются устройственными и не синхронизируются аккаунтом. Направление/формы слов, режимы чисел/глаголов/времени, диапазон чисел, выбранные категории, флаги SRS и дневная цель принадлежат аккаунту; `onboardingSeen` хранится только в `LearnerProgress`. Настройки тренажёров не читаются и не записываются в `localStorage`; старые локальные значения не импортируются в аккаунт и удаляются при загрузке серверных настроек. Вход обязателен. SRS-карточки, счёт и ответы за день по-прежнему имеют отдельный локальный кэш.
 
-`picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом и намеренно не включается в экспорт.
+`picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом.
 
 Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Настройки тренажёров хранятся только в аккаунте на сервере; локальные копии старых настроек игнорируются и удаляются.
 
-Перенос между устройствами: Telegram-аккаунт или «Скачать/Загрузить» (`utils/progressBackup.ts`, JSON `{app, version, exportedAt, data}`; загрузка **заменяет** прогресс на устройстве).
+Перенос прогресса между устройствами выполняется через Telegram-аккаунт; ручной экспорт и импорт прогресса удалены.
 
 ### PWA и офлайн
 `manifest.webmanifest` + `sw.js` (регистрируется только в production). Версия кэшей Service Worker подставляется автоматически скриптом `frontend/scripts/build.mjs`: в CI используется GitHub SHA, локально — текущий Git commit, а без Git — timestamp. Поэтому ручное изменение `VERSION` не требуется. Стратегии: HTML — network-first; `/assets/*` — cache-first; `GET /api/words` и `/api/categories` — network-first с таймаутом 4 с и запасом из кэша (при изменении данных страницы получают `DICTIONARY_UPDATED` и перезагружают словарь); остальное не перехватывается (в том числе `/api/settings/*` и `/api/sync/*`: офлайн действуют веса по умолчанию, синхронизация ждёт сети). HTML-shell (`/` и `/index.html`) отдаётся с `Cache-Control: no-cache, no-store`, потому что он содержит имя текущего hashed JS-файла.

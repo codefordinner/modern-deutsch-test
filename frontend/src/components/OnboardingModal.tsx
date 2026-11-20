@@ -16,7 +16,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => 
         <li>Отмечайте результат честно: так повторения будут действительно полезными.</li>
         <li>Включите SRS, чтобы сложные карточки возвращались именно тогда, когда пора их повторить.</li>
       </ol>
-      <p className="muted-note">Ваш прогресс сохраняется в этом браузере. В разделе «Настройки» его можно экспортировать или перенести на другое устройство с помощью ключа синхронизации.</p>
+      <p className="muted-note">Ваш прогресс автоматически сохраняется в аккаунте Telegram и доступен на всех устройствах, где вы вошли в этот аккаунт.</p>
     </div>
     <div className="modal-footer">
       <button type="button" className="btn-primary" onClick={onClose}>Начать обучение</button>

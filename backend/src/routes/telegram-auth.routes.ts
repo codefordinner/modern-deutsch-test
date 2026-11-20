@@ -100,7 +100,7 @@ router.post('/telegram/challenge', issueLimiter, asyncRoute(async (req, res) => 
   return res.json({
     code,
     expiresAt: expiresAt.toISOString(),
-    botUrl: `https://t.me/${encodeURIComponent(telegramUsername)}`,
+    botUrl: `https://t.me/${encodeURIComponent(telegramUsername)}?start=${encodeURIComponent(code)}`,
     botUsername: telegramUsername,
   });
 }));

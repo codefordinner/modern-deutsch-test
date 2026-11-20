@@ -17,6 +17,8 @@ RUN npm --prefix backend run build
 FROM node:22-alpine
 WORKDIR /app
 
+ENV NODE_ENV=production
+
 RUN apk add --no-cache openssl libc6-compat
 
 COPY package.json package-lock.json ./

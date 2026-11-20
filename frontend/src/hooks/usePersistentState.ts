@@ -14,7 +14,7 @@ const ACCOUNT_SETTING_KEYS = new Set([
  * anything missing, corrupted or from an older version falls back to defaults
  * instead of breaking the trainer. Every storage access is in try/catch.
  *
- * Add the key to BACKUP_KEYS (utils/progressBackup.ts) — it belongs to the learner.
+ * Learner progress keys are synced through the signed-in account where applicable.
  */
 export function usePersistentState<T>(
   key: string,

@@ -45,7 +45,7 @@ BlitzDeutsch: тренажёр немецкого для русскоязычн�
 15. Синхронизация между устройствами работает через Telegram: логика слияния живёт в `backend/src/services/srsSync.ts` и `frontend/src/utils/srsSyncData.ts`. Меняйте обе одновременно. Новый тренажёр с SRS нужно добавить в `SYNC_TRAINERS` (бэкенд), `SRS_TRAINERS` (фронт), тип `SrsTrainer` и `emptySyncData`.
 
 ### localStorage
-16. Ключи, принадлежащие ученику, перечислены в `utils/progressBackup.ts` (`BACKUP_KEYS`). **Добавили новый ключ — добавьте его туда** и в таблицу ключей в `ARCHITECTURE.md`, иначе экспорт/импорт прогресса его потеряет.
+16. Ключи `localStorage` документируйте в таблице в `ARCHITECTURE.md`; обращения к `localStorage` и `sessionStorage` оборачивайте в `try/catch`.
 17. Любое новое прямое обращение к `localStorage` или `sessionStorage` — в `try/catch` (в Safari private mode и при отключённом хранилище оно бросает исключение). Для переиспользуемой логики предпочтительны `usePersistentState` и существующие утилиты хранения.
 
 ### UI и стили
@@ -74,5 +74,5 @@ BlitzDeutsch: тренажёр немецкого для русскоязычн�
 
 ## Перед завершением задачи
 - `npm run lint` (в корне) и сборка фронта/бэка проходят.
-- Новые строки интерфейса на русском, новые localStorage-ключи добавлены в `BACKUP_KEYS`.
+- Новые строки интерфейса на русском, новые localStorage-ключи задокументированы в `ARCHITECTURE.md`.
 - Обновлены `ARCHITECTURE.md` (структура, API, модель данных, ключи хранилища, переменные окружения) и `.env.example`, если они менялись.

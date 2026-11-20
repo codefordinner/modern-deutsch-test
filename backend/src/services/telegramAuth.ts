@@ -81,10 +81,18 @@ export const getCookie = (req: Request, name: string): string | null => {
   }
 };
 
-const cookieOptions = (req: Request, maxAgeSeconds: number) => {
+export const shouldUseSecureTelegramCookies = (req: Request): boolean => {
   const configuredSecure = process.env.TELEGRAM_COOKIE_SECURE;
-  const secure = configuredSecure === 'true'
-    || (configuredSecure !== 'false' && (req.secure || String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https'));
+  return configuredSecure === 'true'
+    || (configuredSecure !== 'false' && (
+      process.env.NODE_ENV === 'production'
+      || req.secure
+      || String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https'
+    ));
+};
+
+const cookieOptions = (req: Request, maxAgeSeconds: number) => {
+  const secure = shouldUseSecureTelegramCookies(req);
   return [
     'Path=/',
     'HttpOnly',

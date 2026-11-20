@@ -154,8 +154,6 @@
 .daily-goal-done { margin-top: 8px; font-weight: 600; color: var(--success); }
 
 /* ---- Settings: backup ---- */
-.backup-section { display: flex; flex-direction: column; gap: 8px; }
-.backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ---- Admin: bulk bar ---- */
 .th-check { width: 36px; text-align: center; }

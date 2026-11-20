@@ -26,6 +26,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
   const [loading, setLoading] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState<LearnerSession['user'] | null>(null);
   const started = useRef(false);
   const completing = useRef(false);
@@ -35,8 +36,10 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
     setError('');
     try {
       await onAuthenticated(user);
-    } catch {
-      setError('Вход выполнен, но не удалось загрузить настройки аккаунта. Проверьте соединение и повторите попытку.');
+    } catch (authenticationError) {
+      setError(authenticationError instanceof Error
+        ? `Вход выполнен, но не удалось загрузить настройки аккаунта: ${authenticationError.message}`
+        : 'Вход выполнен, но не удалось загрузить настройки аккаунта. Проверьте соединение и повторите попытку.');
     } finally {
       setLoading(false);
     }
@@ -46,6 +49,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
     setLoading(true);
     setError(initialError ?? '');
     setConfirmed(false);
+    setCopyStatus('');
     completing.current = false;
     try {
       const result = await requestTelegramChallenge();
@@ -130,6 +134,16 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
   }, [challenge, finishAuthentication]);
 
   const formattedTime = `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
+  const copyCode = async () => {
+    if (!challenge) return;
+    try {
+      await navigator.clipboard.writeText(challenge.code);
+      setCopyStatus((previous) => previous === 'Код скопирован' ? 'Код скопирован\u00a0' : 'Код скопирован');
+    } catch {
+      const message = 'Не удалось скопировать код. Выделите его и скопируйте вручную.';
+      setCopyStatus((previous) => previous === message ? `${message}\u00a0` : message);
+    }
+  };
 
   return (
     <main className="telegram-login" id="main">
@@ -180,9 +194,17 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
           ) : challenge && remainingSeconds > 0 ? (
             <>
               <p className="telegram-login-instruction">
-                Откройте бота <strong>@{challenge.botUsername}</strong> и отправьте ему этот код:
+                Откройте бота <strong>@{challenge.botUsername}</strong> — код передастся автоматически:
               </p>
-              <output className="telegram-login-code" aria-label="Одноразовый код">{challenge.code}</output>
+              <button
+                className="telegram-login-code"
+                type="button"
+                onClick={() => void copyCode()}
+                aria-label={`Скопировать код ${challenge.code}`}
+              >
+                {challenge.code}
+              </button>
+              <p className="telegram-login-copy-status" role="status" aria-live="polite">{copyStatus}</p>
               <p className="telegram-login-expiry" aria-live="polite">Код действует ещё {formattedTime}</p>
               <a className="telegram-login-open-bot" href={challenge.botUrl} target="_blank" rel="noopener noreferrer">
                 <Send size={17} aria-hidden="true" />

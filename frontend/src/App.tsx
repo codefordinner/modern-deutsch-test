@@ -10,7 +10,7 @@ import { useServiceWorkerUpdates } from './hooks/useServiceWorkerUpdates';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
-import { hasSeenLearnerOnboarding, markLearnerOnboardingSeen, prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
+import { getSyncStatus, hasSeenLearnerOnboarding, markLearnerOnboardingSeen, prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
 import { clearAccountTrainerSettings, hasAccountTrainerSettings } from './utils/trainerSettingsStore';
 import { resetAccountStudyPrefs } from './utils/studyPrefs';
 import type { ScoredTab } from './config/tabs';
@@ -59,7 +59,10 @@ export function App() {
     setLearnerSyncUser(user.id);
     // Hydrate account-owned trainer preferences before any trainer is mounted.
     await syncNow();
-    if (!hasAccountTrainerSettings()) throw new Error('Не удалось загрузить настройки аккаунта.');
+    if (!hasAccountTrainerSettings()) {
+      const status = getSyncStatus();
+      throw new Error(status.state === 'error' ? status.message : 'Не удалось загрузить настройки аккаунта.');
+    }
     setIsOnboardingOpen(!hasSeenLearnerOnboarding());
     setLearner(user);
     setAuthError('');

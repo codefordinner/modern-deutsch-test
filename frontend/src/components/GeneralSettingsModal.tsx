@@ -1,12 +1,10 @@
-import React, { useRef, useState } from 'react';
-import { Download, Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Upload, Volume2, Layers } from 'lucide-react';
+import React from 'react';
+import { Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Volume2, Layers } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
-import { applyBackup, downloadBackup, parseBackup } from '../utils/progressBackup';
 import { useSyncStatus } from '../hooks/useSrsSync';
-import { markSyncSettingsChanged, syncNow } from '../utils/srsSync';
-import { useConfirm } from '../hooks/useConfirm';
+import { markSyncSettingsChanged } from '../utils/srsSync';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
@@ -16,26 +14,7 @@ interface GeneralSettingsModalProps {
 export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onClose, isLearnerSignedIn }) => {
   const [settings, updateSettings] = useUISettings();
   const [prefs, setPrefs] = useStudyPrefs();
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [importError, setImportError] = useState<string | null>(null);
   const syncStatus = useSyncStatus();
-  const confirm = useConfirm();
-
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
-    setImportError(null);
-    try {
-      const backup = parseBackup(await file.text());
-      const when = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ru-RU') : 'неизвестно';
-      if (!await confirm(`Заменить весь текущий прогресс и настройки данными из файла (сохранён: ${when})?`, { title: 'Заменить прогресс', confirmLabel: 'Заменить', danger: true })) return;
-      applyBackup(backup);
-      window.location.reload();
-    } catch (e) {
-      setImportError(e instanceof Error ? e.message : 'Не удалось прочитать файл');
-    } finally {
-      if (fileInput.current) fileInput.current.value = '';
-    }
-  };
 
   return (
     <Modal title="Общие настройки" size="sm" onClose={onClose}>
@@ -192,41 +171,9 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
               {syncStatus.state === 'ok' && `Синхронизировано в ${new Date(syncStatus.lastSyncedAt).toLocaleTimeString('ru-RU')}`}
               {syncStatus.state === 'error' && syncStatus.message}
               {syncStatus.state === 'off' && 'Синхронизация ожидает запуска…'}
-              {syncStatus.state !== 'syncing' && (
-                <>
-                  {' '}
-                  <button type="button" className="btn-secondary" onClick={() => void syncNow()}>
-                    Синхронизировать сейчас
-                  </button>
-                </>
-              )}
             </div>
           </div>
         )}
-
-        <div className="settings-divider backup-section">
-          <span className="settings-group-title">Перенос прогресса между устройствами</span>
-          <span className="setting-toggle-desc">
-            Файл содержит ящики SRS, счёт и настройки. Загрузка заменяет текущий прогресс на этом устройстве.
-          </span>
-          <div className="backup-actions">
-            <button type="button" className="btn-secondary" onClick={downloadBackup}>
-              <Download size={14} /> Скачать
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => fileInput.current?.click()}>
-              <Upload size={14} /> Загрузить
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              aria-label="Файл прогресса"
-              onChange={(e) => void handleFile(e.target.files?.[0])}
-            />
-          </div>
-          {importError && <div className="status-msg status-msg--error" role="alert">{importError}</div>}
-        </div>
       </div>
 
       <div className="modal-footer">

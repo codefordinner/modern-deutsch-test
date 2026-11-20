@@ -4,8 +4,10 @@ import { createHmac } from 'node:crypto';
 import {
   createLoginCode,
   digestChallengeCode,
+  shouldUseSecureTelegramCookies,
   telegramUserIdFromInitData,
 } from './telegramAuth';
+import type { Request } from 'express';
 
 const makeInitData = (botToken: string, authDate: number, user: unknown) => {
   const params = new URLSearchParams({
@@ -44,4 +46,22 @@ test('generates six-digit codes including leading zeroes and stores keyed digest
   assert.match(code, /^\d{6}$/);
   assert.match(digestChallengeCode(code), /^[a-f0-9]{64}$/);
   assert.notEqual(digestChallengeCode(code), code);
+});
+
+test('uses secure Telegram cookies by default in production behind an HTTP-terminating proxy', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalSecureSetting = process.env.TELEGRAM_COOKIE_SECURE;
+  process.env.NODE_ENV = 'production';
+  delete process.env.TELEGRAM_COOKIE_SECURE;
+  try {
+    const request = { secure: false, headers: { 'x-forwarded-proto': 'http' } } as unknown as Request;
+    assert.equal(shouldUseSecureTelegramCookies(request), true);
+    process.env.TELEGRAM_COOKIE_SECURE = 'false';
+    assert.equal(shouldUseSecureTelegramCookies(request), false);
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalSecureSetting === undefined) delete process.env.TELEGRAM_COOKIE_SECURE;
+    else process.env.TELEGRAM_COOKIE_SECURE = originalSecureSetting;
+  }
 });

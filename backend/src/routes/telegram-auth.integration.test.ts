@@ -61,7 +61,7 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.match(issueResponse.headers.get('set-cookie') ?? '', /;\s*Partitioned/i);
   const issue = await issueResponse.json() as { code: string; botUrl: string };
   assert.match(issue.code, /^\d{6}$/);
-  assert.equal(issue.botUrl, 'https://t.me/test_sprachfunke_bot');
+  assert.equal(issue.botUrl, `https://t.me/test_sprachfunke_bot?start=${issue.code}`);
   const browserCookie = `telegram_challenge=${cookieValue(issueResponse.headers.get('set-cookie'), 'telegram_challenge')}`;
   const unrelatedCookie = 'telegram_challenge=unrelated-browser-binding';
 

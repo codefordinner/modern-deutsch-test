@@ -114,6 +114,7 @@
 
 .telegram-login-code {
   display: block;
+  width: 100%;
   margin: 14px 0 8px;
   padding: 14px;
   border: 1px dashed var(--border-color);
@@ -125,6 +126,25 @@
   letter-spacing: 0.22em;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.telegram-login-code:hover {
+  border-color: var(--accent-primary);
+}
+
+.telegram-login-code:focus-visible {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.telegram-login-copy-status {
+  min-height: 1.25em;
+  margin: 0 0 6px;
+  color: var(--success);
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .telegram-login-expiry {
