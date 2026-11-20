@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
-import { isAdminRequest, requireAdmin } from '../middleware/auth.middleware';
+import { requireAdmin } from '../middleware/auth.middleware';
+import { findCurrentUser } from '../services/telegramAuth';
 import rateLimit from 'express-rate-limit';
 import { checkPictureAnswer, formatPictureAnswer, generatePictureMetadata, MAX_PICTURE_ANSWER_LENGTH } from '../services/aiSettings';
 import { registerAiUsage } from '../services/aiUsage';
@@ -51,7 +52,8 @@ router.get('/admin', requireAdmin, async (_req: Request, res: Response) => {
 router.get('/:id/image', async (req: Request, res: Response) => {
   try {
     const picture = await prisma.picture.findUnique({ where: { id: req.params.id }, select: { dataUrl: true, isActive: true } });
-    if (!picture || (!picture.isActive && !isAdminRequest(req))) return res.status(404).json({ error: 'Картинка не найдена' });
+    const user = picture?.isActive ? null : await findCurrentUser(req);
+    if (!picture || (!picture.isActive && !user?.isAdmin)) return res.status(404).json({ error: 'Картинка не найдена' });
     const match = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/.exec(picture.dataUrl.slice(0, 80));
     if (!match) return res.status(404).json({ error: 'Картинка не найдена' });
     return res.set({ 'Content-Type': `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`, 'Cache-Control': picture.isActive ? 'public, max-age=31536000, immutable' : 'private, no-cache', 'X-Content-Type-Options': 'nosniff' }).send(Buffer.from(picture.dataUrl.slice(match[0].length), 'base64'));

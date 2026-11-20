@@ -191,9 +191,8 @@ export function App() {
     recordAnswer(scoredTab, isCorrect);
   };
 
-  // Learner accounts gate training only. The existing admin area keeps its
-  // independent cookie-based authentication and can still be opened directly.
-  if (activeTab !== 'admin' && authLoading) {
+  // A single Telegram session gates both trainers and administrator access.
+  if (authLoading) {
     return (
       <>
         <main className="telegram-login" id="main" aria-live="polite">Загружаем профиль ученика…</main>
@@ -201,10 +200,18 @@ export function App() {
       </>
     );
   }
-  if (activeTab !== 'admin' && authRequired && !learner) {
+  if (authRequired && !learner) {
     return (
       <>
         <TelegramLogin onAuthenticated={handleLearnerAuthenticated} initialError={authError} />
+        <ToastHost />
+      </>
+    );
+  }
+  if (activeTab === 'admin' && !learner?.isAdmin) {
+    return (
+      <>
+        <main className="telegram-login" id="main" role="status">Доступ к админке не предоставлен.</main>
         <ToastHost />
       </>
     );

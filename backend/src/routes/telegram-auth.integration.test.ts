@@ -151,6 +151,38 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.equal(afterLogout.status, 401);
 });
 
+test('admin endpoints require a Telegram session and the current database admin flag', async (t) => {
+  const [{ createApp }, { prisma }, { createUserSession }] = await Promise.all([
+    import('../app'),
+    import('../db'),
+    import('../services/telegramAuth'),
+  ]);
+  const server = createServer(createApp());
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await prisma.$disconnect();
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
+  const user = await prisma.telegramUser.create({ data: { telegramId: '9988776655' } });
+  const token = await createUserSession(user.id);
+  const cookie = `learner_session=${token}`;
+  const path = `${base}/api/pictures/admin`;
+
+  const denied = await fetch(path, { headers: { Cookie: cookie } });
+  assert.equal(denied.status, 403);
+
+  await prisma.telegramUser.update({ where: { id: user.id }, data: { isAdmin: true } });
+  const allowed = await fetch(path, { headers: { Cookie: cookie } });
+  assert.equal(allowed.status, 200);
+
+  await prisma.telegramUser.update({ where: { id: user.id }, data: { isAdmin: false } });
+  const revoked = await fetch(path, { headers: { Cookie: cookie } });
+  assert.equal(revoked.status, 403);
+});
+
 test('valid Mini App initData creates an HttpOnly user session', async (t) => {
   const [{ createApp }, { prisma }] = await Promise.all([
     import('../app'),

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, LogOut, AudioLines, Images, Bot, FileText } from 'lucide-react';
+import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, AudioLines, Images, Bot, FileText } from 'lucide-react';
 import { PicturesTab } from './admin/PicturesTab';
 import { AISettingsTab } from './admin/AISettingsTab';
-import { AdminLogin } from './admin/AdminLogin';
 import { WordsTab } from './admin/WordsTab';
 import { CategoriesTab } from './admin/CategoriesTab';
 import { ImportExportTab } from './admin/ImportExportTab';
@@ -15,9 +14,7 @@ import { AudioCacheTab } from './admin/AudioCacheTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { ModeSwitch } from './ModeSwitch';
-import { ToolbarButton } from './ToolbarButton';
-import { ApiError, UNAUTHORIZED_EVENT } from '../api/request';
-import { checkSession, logout } from '../api/auth';
+import { ApiError } from '../api/request';
 import { bulkDeleteWords, bulkSetCategory, bulkSetPartOfSpeech, createCategory, createWord, deleteCategory, deleteWord, updateCategory, updateWord, checkWordsViaAI, detectRequiredCasesViaAI, redistributeCategoriesViaAI, getAIBulkJob } from '../api/adminWords';
 import { invalidateQueries } from '../api/queryCache';
 import { CATEGORIES_KEY, WORDS_KEY, useCategories, useWords } from '../hooks/useDictionary';
@@ -42,9 +39,6 @@ const readAdminRoute = (): { tab: AdminTab; category: string } => {
 
 export const AdminPanel: React.FC = () => {
   const confirm = useConfirm();
-  // The session cookie is HttpOnly (invisible to JS), so the client asks the
-  // server whether it is currently signed in rather than checking local state.
-  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
   const initialRoute = readAdminRoute();
   const [tab, setTab] = useState<AdminTab>(initialRoute.tab);
   const [search, setSearch] = useState('');
@@ -53,26 +47,6 @@ export const AdminPanel: React.FC = () => {
   const [isWordOpen, setIsWordOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [isCatOpen, setIsCatOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    checkSession()
-      .then((ok) => { if (!cancelled) setIsAuthed(ok); })
-      .catch(() => { if (!cancelled) setIsAuthed(false); });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // The API client fires this when the server rejects the session (e.g. it expired).
-  useEffect(() => {
-    const onUnauthorized = () => {
-      setIsAuthed(false);
-      showToast('Сессия истекла. Войдите снова.');
-    };
-    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, []);
 
   // Shared with the trainers (see hooks/useDictionary.ts): editing here refreshes what they show too.
   const { categories, error: categoriesError } = useCategories();
@@ -88,11 +62,11 @@ export const AdminPanel: React.FC = () => {
   }, [tab, category]);
 
   useEffect(() => {
-    if (isAuthed && categoriesError) reportError(categoriesError, 'Не удалось загрузить категории');
-  }, [isAuthed, categoriesError]);
+    if (categoriesError) reportError(categoriesError, 'Не удалось загрузить категории');
+  }, [categoriesError]);
   useEffect(() => {
-    if (isAuthed && wordsError) reportError(wordsError, 'Не удалось загрузить слова');
-  }, [isAuthed, wordsError]);
+    if (wordsError) reportError(wordsError, 'Не удалось загрузить слова');
+  }, [wordsError]);
 
   const words = allWords.filter((w) => {
     // A word with several categories shows up under each of them.
@@ -107,13 +81,6 @@ export const AdminPanel: React.FC = () => {
   const refreshAll = () => {
     refreshCategories();
     refreshDictionary();
-  };
-
-  const handleLogin = () => setIsAuthed(true);
-
-  const handleLogout = () => {
-    logout().catch(() => {});
-    setIsAuthed(false);
   };
 
   const handleDeleteWord = async (id: string) => {
@@ -277,9 +244,6 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  if (isAuthed === null) return <div className="centered-message">Проверка сессии...</div>;
-  if (!isAuthed) return <AdminLogin onLogin={handleLogin} />;
-
   return (
     <div>
       <div className="admin-toolbar">
@@ -300,7 +264,6 @@ export const AdminPanel: React.FC = () => {
             { value: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
           ]}
         />
-        <ToolbarButton icon={<LogOut size={14} />} label="Выйти" onClick={handleLogout} />
       </div>
 
       {tab === 'words' && (

@@ -59,8 +59,6 @@
 
 | Переменная | Назначение | По умолчанию |
 |---|---|---|
-| `ADMIN_PASSWORD` | пароль админки | `admin` (с предупреждением в логе) |
-| `JWT_SECRET` | секрет подписи JWT | ключ из `ADMIN_PASSWORD` (слабее) |
 | `DATABASE_URL` | SQLite | `file:./dev.db` |
 | `ALLOWED_ORIGINS` | доп. Origin для CSRF, через запятую | пусто |
 | `TRUST_PROXY` | число прокси перед приложением | `backend/`: 1; `server.ts`: 0 |
@@ -82,14 +80,14 @@
 
 ## Backend
 - Express 4, JSON-лимит 5 МБ (массовый импорт); nginx — `client_max_body_size 6m`.
-- **Аутентификация админа**: пароль → JWT (HS256, 24 ч) только в HttpOnly-cookie. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
+- **Аутентификация админа**: отдельного пароля нет. `requireAdmin` проверяет действующую Telegram-сессию и актуальный `TelegramUser.isAdmin` в БД для каждого защищённого запроса.
 - **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. По HTTPS cookies имеют `SameSite=None; Secure; Partitioned` для Telegram WebView; по HTTP в dev сохраняется `SameSite=Lax`. Админская авторизация и cookie остаются независимыми.
-- У `TelegramUser.isAdmin` по умолчанию `false`; `/learner-auth/me` и успешные входы возвращают этот флаг, frontend показывает вкладку «Админка» только таким Telegram-пользователям. Выдать/снять флаг можно внутри backend-контейнера: `npm run admin:set -- <telegramId> grant|revoke`. Админские API по-прежнему отдельно проверяют HttpOnly-cookie через `requireAdmin`.
+- У `TelegramUser.isAdmin` по умолчанию `false`; `/learner-auth/me` и успешные входы возвращают этот флаг, frontend показывает вкладку «Админка» только таким Telegram-пользователям. Выдать/снять флаг можно внутри backend-контейнера: `npm run admin:set -- <telegramId> grant|revoke`. Админские API используют ту же HttpOnly Telegram-cookie и проверяют флаг через `requireAdmin`.
 - `GET /learner-auth/config` сообщает frontend, что вход через Telegram обязателен. Клиент работает fail-closed и не открывает тренажёры, если endpoint отсутствует.
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут и ограничен 5 запросами в минуту на IP; в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.
 - **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
-- **Доступ**: Telegram-вход обязателен для тренажёров; вкладка админки продолжает использовать отдельный admin login. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
+- **Доступ**: Telegram-вход обязателен для тренажёров и админки; права администратора определяются флагом пользователя в БД. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
 - `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly, режимы тренажёров и `onboardingSeen` синхронизируются с сервером. Начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
@@ -161,7 +159,6 @@
 | `theme` | тема |
 | `app_daily_progress` | ответов за сегодня |
 | `app_learner_profile_id` | Telegram-профиль, которому принадлежит локальный кэш синхронизируемого прогресса |
-| `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie |
 | `admin_last_word_category_id` | последняя категория в форме слова |
 
 Тема (`theme`) и UI-параметры, включая громкость озвучки, являются устройственными и не синхронизируются аккаунтом. Направление/формы слов, режимы чисел/глаголов/времени, диапазон чисел, выбранные категории, флаги SRS и дневная цель принадлежат аккаунту; `onboardingSeen` хранится только в `LearnerProgress`. Настройки тренажёров не читаются и не записываются в `localStorage`; старые локальные значения не импортируются в аккаунт и удаляются при загрузке серверных настроек. Вход обязателен. SRS-карточки, счёт и ответы за день по-прежнему имеют отдельный локальный кэш.
@@ -185,7 +182,6 @@
 ## Известные ограничения / идеи
 - Legacy UI-ключ, `/sync/srs`, одноразовый импорт `legacyKey`, таблица `SyncProfile` и колонка `LearnerProgress.legacyKeyHash` удалены. При применении схемы `prisma db push` удаляет эти legacy-данные из БД.
 - Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются отдельными командами из `frontend/`.
-- Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
 - Метаданные вкладок централизованы в `frontend/src/config/tabs.ts`; отдельные списки в Navbar, routing и аналитике не создаются.
 - Вкладка «Время» не ведёт счёт.
