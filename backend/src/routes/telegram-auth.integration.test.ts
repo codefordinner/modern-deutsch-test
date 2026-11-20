@@ -20,7 +20,7 @@ const getInitData = (botToken: string, userId: number) => {
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
-  const secret = createHmac('sha256', botToken).update('WebAppData').digest();
+  const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
   params.set('hash', createHmac('sha256', secret).update(dataCheckString).digest('hex'));
   return params.toString();
 };

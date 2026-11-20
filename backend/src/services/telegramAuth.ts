@@ -54,7 +54,7 @@ export const telegramUserIdFromInitData = (
     .filter(([key]) => key !== 'hash')
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
   const dataCheckString = entries.map(([key, value]) => `${key}=${value}`).join('\n');
-  const secretKey = createHmac('sha256', botToken).update('WebAppData').digest();
+  const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
   const expectedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   if (!safeEqual(receivedHash.toLowerCase(), expectedHash)) return null;
 
