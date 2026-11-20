@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
-import { resolveVisitorId } from '../services/visitor';
+import { findCurrentUser } from '../services/telegramAuth';
 import { describeUserAgent } from '../services/userAgent';
 import rateLimit from 'express-rate-limit';
 
@@ -90,28 +90,32 @@ function weekStart(key: string): string {
 }
 
 /**
- * Identity of a visitor for "unique visitors". Events recorded after the cookie was introduced
- * carry `visitorId`. Older rows have none; the best that can be done for them is IP + User-Agent
- * (still better than IP alone), and those can't be merged with the new ids.
+ * New events use the authenticated Telegram learner identity. Historical events are grouped by
+ * the former visitor cookie where available, then by IP + User-Agent as a last resort.
  */
-const visitorKey = (e: { visitorId: string | null; ipAddress: string | null; userAgent: string | null }): string =>
-  e.visitorId ? `id:${e.visitorId}` : `legacy:${e.ipAddress ?? 'unknown'}|${e.userAgent ?? ''}`;
+const visitorKey = (e: { learnerId: string | null; visitorId: string | null; ipAddress: string | null; userAgent: string | null }): string =>
+  e.learnerId
+    ? `learner:${e.learnerId}`
+    : e.visitorId
+      ? `id:${e.visitorId}`
+      : `legacy:${e.ipAddress ?? 'unknown'}|${e.userAgent ?? ''}`;
 
 router.post('/event', analyticsLimiter, async (req: Request, res: Response) => {
   try {
+    const learner = await findCurrentUser(req);
+    if (!learner) return res.status(401).json({ error: 'Требуется войти через Telegram.' });
     const { eventType, trainerType, isCorrect } = req.body ?? {};
     if (typeof eventType !== 'string' || !EVENT_TYPES.has(eventType)) return res.status(400).json({ error: 'Неизвестный тип события' });
     if (trainerType !== undefined && trainerType !== null && (typeof trainerType !== 'string' || !TRAINER_TYPES.has(trainerType))) {
       return res.status(400).json({ error: 'Неизвестный тренажёр' });
     }
     if (isCorrect !== undefined && typeof isCorrect !== 'boolean') return res.status(400).json({ error: 'Некорректный результат ответа' });
-    const visitorId = resolveVisitorId(req, res);
     await prisma.analyticsEvent.create({
       data: {
         eventType,
         trainerType: trainerType || null,
         isCorrect: isCorrect !== undefined ? Boolean(isCorrect) : null,
-        visitorId,
+        learnerId: learner.id,
         ipAddress: req.ip || null,
         userAgent: req.headers['user-agent'] || null,
       },
@@ -147,8 +151,9 @@ const toNamed = (map: Map<string, number>) =>
   [...map.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
 /**
- * Query: `?days=7|30|90|365` (default 30). `eventType: 'visit'` is fired once per app load
- * (see App.tsx), `tab_switch` on every tab change, `quiz_answer` on every checked answer.
+ * Query: `?days=7|30|90|365` (default 30). Events require a Telegram learner session.
+ * `visit` is fired after authentication, `tab_switch` on every tab change, and
+ * `quiz_answer` on every checked answer.
  *  - daily / hourly / weekdays / heatmap / trainers / tabs / devices / browsers cover the chosen range;
  *  - weekly covers whole weeks (Monday start) and can reach a little further back than the range.
  */
@@ -164,7 +169,7 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
     const [events, allTimeVisits] = await Promise.all([
       prisma.analyticsEvent.findMany({
         where: { eventType: { in: ['visit', 'quiz_answer', 'tab_switch'] }, timestamp: { gte: since } },
-        select: { eventType: true, trainerType: true, isCorrect: true, visitorId: true, ipAddress: true, userAgent: true, timestamp: true },
+        select: { eventType: true, trainerType: true, isCorrect: true, learnerId: true, visitorId: true, ipAddress: true, userAgent: true, timestamp: true },
         orderBy: { timestamp: 'desc' },
         take: MAX_EVENTS,
       }),

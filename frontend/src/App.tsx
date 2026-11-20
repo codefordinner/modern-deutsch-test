@@ -163,11 +163,12 @@ export function App() {
     }
   }, [isDark]);
 
-  // Fired once per app load so the admin panel can show visitor stats
-  // (total visits, unique visitors, visits over time) instead of word stats.
+  // Count visits only after Telegram authentication, so analytics can identify learners
+  // consistently across devices without treating the login screen as a visit.
+  const learnerId = learner?.id;
   useEffect(() => {
-    trackEvent('visit');
-  }, []);
+    if (learnerId) trackEvent('visit');
+  }, [learnerId]);
 
   // One event per tab change — however it happened (a tab link, Back/Forward, a pasted link).
   const previousTab = useRef(activeTab);

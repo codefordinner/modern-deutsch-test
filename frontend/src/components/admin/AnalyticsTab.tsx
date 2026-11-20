@@ -135,7 +135,7 @@ export const AnalyticsTab: React.FC = () => {
   return (
     <div className="analytics-tab">
       <div className="stats-header">
-        <h3 className="stats-title"><Users size={20} /> Статистика посетителей</h3>
+        <h3 className="stats-title"><Users size={20} /> Аналитика учеников</h3>
         <button className="btn-secondary" onClick={() => void load()} disabled={busy}>
           <RefreshCw size={14} /> {busy ? 'Обновление…' : 'Обновить'}
         </button>
@@ -164,7 +164,7 @@ export const AnalyticsTab: React.FC = () => {
             onChange={setMetric}
             options={[
               { value: 'visits', label: 'Визиты' },
-              { value: 'visitors', label: 'Уникальные' },
+              { value: 'visitors', label: 'Ученики' },
               { value: 'answers', label: 'Ответы' },
             ]}
           />
@@ -183,11 +183,11 @@ export const AnalyticsTab: React.FC = () => {
           <div className="stat-card-value">{totals.visits}</div>
         </div>
         <div className="card stat-card">
-          <div className="stat-card-label">Уникальных посетителей</div>
+          <div className="stat-card-label">Уникальных учеников</div>
           <div className="stat-card-value stat-card-value--accent">{totals.uniqueVisitors}</div>
         </div>
         <div className="card stat-card">
-          <div className="stat-card-label">Сегодня (визитов / уник.)</div>
+          <div className="stat-card-label">Сегодня (визитов / учеников)</div>
           <div className="stat-card-value stat-card-value--success">{totals.visitsToday} / {totals.uniqueToday}</div>
         </div>
         <div className="card stat-card">
@@ -199,7 +199,7 @@ export const AnalyticsTab: React.FC = () => {
           <div className="stat-card-value stat-card-value--success">{totals.accuracy === null ? '—' : `${totals.accuracy}%`}</div>
         </div>
         <div className="card stat-card">
-          <div className="stat-card-label">Вернулись (2+ дня)</div>
+          <div className="stat-card-label">Возвращались (2+ дня)</div>
           <div className="stat-card-value stat-card-value--accent">{totals.returningVisitors} · {totals.returningRate}%</div>
         </div>
         <div className="card stat-card">
