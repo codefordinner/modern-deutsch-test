@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Логотип: розовая молния на тёмно-фиолетовом фоне">
+  <rect width="512" height="512" rx="112" fill="#291632"/>
+  <path d="M292 92H332L292 211H374L218 420L252 293H172L292 92Z" fill="#F64FAE"/>
+  <path d="M401 126L409 160L435 168L409 176L401 203L393 176L367 168L393 160Z" fill="#F8C4E2"/>
+  <circle cx="127" cy="383" r="14" fill="#F64FAE"/>
+</svg>

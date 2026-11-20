@@ -6,9 +6,9 @@ interface OnboardingModalProps {
 }
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => (
-  <Modal title="Добро пожаловать в Sprachfunke" size="sm" onClose={onClose}>
+  <Modal title="Добро пожаловать в BlitzDeutsch" size="sm" onClose={onClose}>
     <div className="modal-body modal-body--stack onboarding-content">
-      <p><strong>Sprachfunke</strong> помогает уверенно закреплять немецкий через регулярную практику — без длинных уроков и лишней теории.</p>
+      <p><strong>BlitzDeutsch</strong> помогает уверенно закреплять немецкий через регулярную практику — без длинных уроков и лишней теории.</p>
       <p>Выберите нужный раздел: слова, артикли, глаголы, числа, время или описание картинок.</p>
       <h4>Как заниматься</h4>
       <ol>

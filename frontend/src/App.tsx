@@ -175,7 +175,7 @@ export function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    document.title = `${getTabDefinition(activeTab).pageTitle} — Sprachfunke`;
+    document.title = `${getTabDefinition(activeTab).pageTitle} — BlitzDeutsch`;
   }, [activeTab]);
 
   const handleAnswer = (isCorrect: boolean) => {
