@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, LockKeyhole, Send, ShieldCheck } from 'lucide-react';
 import { ApiError, getErrorMessage } from '../api/request';
 import {
   completeTelegramChallenge,
@@ -116,31 +117,67 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
 
   return (
     <main className="telegram-login" id="main">
-      <section className="telegram-login-card" aria-labelledby="telegram-login-heading">
-        <h1 id="telegram-login-heading">Вход через Telegram</h1>
-        <p>Войдите через бота, чтобы продолжить занятия и синхронизировать прогресс.</p>
+      <section className="telegram-login-card" aria-labelledby="telegram-login-brand">
+        <header className="telegram-login-brand">
+          <img
+            className="telegram-login-logo"
+            src="/icons/blitzdeutsch-logo.svg"
+            alt=""
+            aria-hidden="true"
+            width="64"
+            height="64"
+          />
+          <div>
+            <h1 id="telegram-login-brand">BlitzDeutsch</h1>
+            <p className="telegram-login-tagline">Немецкий — шаг за шагом</p>
+          </div>
+        </header>
 
-        {challenge && remainingSeconds > 0 ? (
-          <>
-            <p className="telegram-login-instruction">
-              Нажмите, чтобы перейти к боту <strong>@{challenge.botUsername}</strong>, затем отправьте ему код:
-            </p>
-            <output className="telegram-login-code" aria-label="Одноразовый код">{challenge.code}</output>
-            <p className="telegram-login-expiry" aria-live="polite">Код действует ещё {formattedTime}</p>
-            <a className="telegram-login-open-bot" href={challenge.botUrl} target="_blank" rel="noopener noreferrer">
-              Перейти к боту @{challenge.botUsername}
-            </a>
-            <p className="telegram-login-status" role="status" aria-live="polite">
-              {confirmed ? 'Код подтверждён. Завершаем вход…' : 'Ожидаем подтверждение в Telegram…'}
-            </p>
-          </>
-        ) : (
-          <button className="telegram-login-button" type="button" onClick={() => void issueChallenge()} disabled={loading}>
-            {loading ? 'Получаем код…' : challenge ? 'Получить новый код' : 'Получить код'}
-          </button>
-        )}
+        <div className="telegram-login-welcome">
+          <h2>Продолжить обучение</h2>
+          <p>Войдите, чтобы заниматься и сохранять прогресс на всех устройствах.</p>
+        </div>
 
-        {error && <p className="telegram-login-error" role="alert">{error}</p>}
+        <section className="telegram-login-method" aria-labelledby="telegram-login-heading">
+          <div className="telegram-login-method-heading">
+            <span className="telegram-login-method-icon" aria-hidden="true"><Send size={19} /></span>
+            <div>
+              <h3 id="telegram-login-heading">Вход через Telegram</h3>
+              <p>Без пароля и лишних шагов</p>
+            </div>
+          </div>
+
+          {challenge && remainingSeconds > 0 ? (
+            <>
+              <p className="telegram-login-instruction">
+                Откройте бота <strong>@{challenge.botUsername}</strong> и отправьте ему этот код:
+              </p>
+              <output className="telegram-login-code" aria-label="Одноразовый код">{challenge.code}</output>
+              <p className="telegram-login-expiry" aria-live="polite">Код действует ещё {formattedTime}</p>
+              <a className="telegram-login-open-bot" href={challenge.botUrl} target="_blank" rel="noopener noreferrer">
+                <Send size={17} aria-hidden="true" />
+                <span>Открыть Telegram</span>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </a>
+              <p className={`telegram-login-status${confirmed ? ' is-confirmed' : ''}`} role="status" aria-live="polite">
+                <span className="telegram-login-status-dot" aria-hidden="true" />
+                {confirmed ? 'Код подтверждён. Завершаем вход…' : 'Ожидаем подтверждение в Telegram…'}
+              </p>
+            </>
+          ) : (
+            <button className="telegram-login-button" type="button" onClick={() => void issueChallenge()} disabled={loading}>
+              {loading ? 'Получаем код…' : challenge ? 'Получить новый код' : 'Получить код'}
+            </button>
+          )}
+
+          {error && <p className="telegram-login-error" role="alert">{error}</p>}
+        </section>
+
+        <p className="telegram-login-security">
+          <ShieldCheck size={16} aria-hidden="true" />
+          <span>Ваш аккаунт защищён подтверждением в Telegram</span>
+        </p>
+        <p className="telegram-login-privacy"><LockKeyhole size={13} aria-hidden="true" /> Мы никогда не попросим ваш пароль</p>
       </section>
     </main>
   );
