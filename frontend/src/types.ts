@@ -170,8 +170,8 @@ export interface WordsPage {
 /** What happened in one time slot (a day, a week, an hour of the day, a weekday). */
 export interface StatsBucket {
   visits: number;
-  /** Distinct visitors that opened the app in this slot. */
-  visitors: number;
+  /** Distinct authenticated learners with any activity in this slot. */
+  activeLearners: number;
   /** Quiz answers given in this slot. */
   answers: number;
 }
@@ -210,20 +210,21 @@ export interface NamedCount {
 }
 
 export interface AnalyticsTotals {
-  /** All visits ever recorded (not limited to the chosen range). */
-  allTimeVisits: number;
+  /** Total Telegram accounts currently registered. */
+  registeredLearners: number;
   visits: number;
-  uniqueVisitors: number;
+  activeLearners: number;
   visitsToday: number;
-  uniqueToday: number;
+  activeToday: number;
+  newLearners: number;
   answers: number;
   correct: number;
   accuracy: number | null;
   /** Days of the range with at least one visit. */
   activeDays: number;
   avgVisitsPerDay: number;
-  /** Visitors who came on two or more different days of the range. */
-  returningVisitors: number;
+  /** Learners active on two or more different days of the range. */
+  returningLearners: number;
   returningRate: number;
 }
 

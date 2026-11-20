@@ -19,9 +19,9 @@ const deviceLabels: Record<string, string> = {
 };
 
 type RangeKey = '7' | '30' | '90' | '365';
-type Metric = 'visits' | 'visitors' | 'answers';
+type Metric = 'visits' | 'activeLearners' | 'answers';
 
-const METRIC_UNITS: Record<Metric, string> = { visits: 'визитов', visitors: 'посетителей', answers: 'ответов' };
+const METRIC_UNITS: Record<Metric, string> = { visits: 'визитов', activeLearners: 'активных учеников', answers: 'ответов' };
 const WEEKDAY_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const WEEKDAY_LONG = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 
@@ -90,7 +90,7 @@ export const AnalyticsTab: React.FC = () => {
     if (busy) return <div className="centered-message">Загрузка аналитики...</div>;
     return (
       <div className="state-card">
-        <div className="state-text--flush">Не удалось загрузить статистику посетителей.</div>
+        <div className="state-text--flush">Не удалось загрузить статистику учеников.</div>
         {error && <div className="error-note">{error}</div>}
         <div className="muted-note state-text">
           Убедитесь, что backend пересобран и задеплоен с обновлённым /api/analytics/stats.
@@ -164,7 +164,7 @@ export const AnalyticsTab: React.FC = () => {
             onChange={setMetric}
             options={[
               { value: 'visits', label: 'Визиты' },
-              { value: 'visitors', label: 'Ученики' },
+              { value: 'activeLearners', label: 'Активные ученики' },
               { value: 'answers', label: 'Ответы' },
             ]}
           />
@@ -183,12 +183,20 @@ export const AnalyticsTab: React.FC = () => {
           <div className="stat-card-value">{totals.visits}</div>
         </div>
         <div className="card stat-card">
-          <div className="stat-card-label">Уникальных учеников</div>
-          <div className="stat-card-value stat-card-value--accent">{totals.uniqueVisitors}</div>
+          <div className="stat-card-label">Активных учеников за период</div>
+          <div className="stat-card-value stat-card-value--accent">{totals.activeLearners}</div>
         </div>
         <div className="card stat-card">
-          <div className="stat-card-label">Сегодня (визитов / учеников)</div>
-          <div className="stat-card-value stat-card-value--success">{totals.visitsToday} / {totals.uniqueToday}</div>
+          <div className="stat-card-label">Сегодня: визиты / активные ученики</div>
+          <div className="stat-card-value stat-card-value--success">{totals.visitsToday} / {totals.activeToday}</div>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-card-label">Всего Telegram-аккаунтов</div>
+          <div className="stat-card-value">{totals.registeredLearners}</div>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-card-label">Новых учеников за период</div>
+          <div className="stat-card-value stat-card-value--accent">{totals.newLearners}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card-label">Ответов в тренажёрах</div>
@@ -200,7 +208,7 @@ export const AnalyticsTab: React.FC = () => {
         </div>
         <div className="card stat-card">
           <div className="stat-card-label">Возвращались (2+ дня)</div>
-          <div className="stat-card-value stat-card-value--accent">{totals.returningVisitors} · {totals.returningRate}%</div>
+          <div className="stat-card-value stat-card-value--accent">{totals.returningLearners} · {totals.returningRate}%</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card-label">Визитов в день (в среднем)</div>
@@ -209,10 +217,6 @@ export const AnalyticsTab: React.FC = () => {
         <div className="card stat-card">
           <div className="stat-card-label">Активных дней</div>
           <div className="stat-card-value">{totals.activeDays} / {stats.days}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-card-label">Визитов за всё время</div>
-          <div className="stat-card-value">{totals.allTimeVisits}</div>
         </div>
       </div>
 

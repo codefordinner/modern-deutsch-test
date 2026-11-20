@@ -25,7 +25,7 @@ test('analytics events require Telegram auth and are attributed to the learner a
   });
   assert.equal(anonymousEvent.status, 401);
 
-  const user = await prisma.telegramUser.create({ data: { telegramId: `analytics-${Date.now()}` } });
+  const user = await prisma.telegramUser.create({ data: { telegramId: `analytics-${Date.now()}`, isAdmin: true } });
   const sessionToken = await createUserSession(user.id);
   const eventResponse = await fetch(`${base}/api/analytics/event`, {
     method: 'POST',
@@ -43,4 +43,19 @@ test('analytics events require Telegram auth and are attributed to the learner a
   assert.equal(event?.trainerType, 'words');
   assert.equal(event?.isCorrect, true);
   assert.equal(event?.visitorId, null);
+
+  await prisma.analyticsEvent.create({
+    data: { eventType: 'visit', visitorId: 'legacy-visitor', ipAddress: '127.0.0.1' },
+  });
+  const statsResponse = await fetch(`${base}/api/analytics/stats?days=7`, {
+    headers: { cookie: `${USER_SESSION_COOKIE}=${sessionToken}` },
+  });
+  assert.equal(statsResponse.status, 200);
+  const stats = await statsResponse.json() as {
+    totals: { registeredLearners: number; activeLearners: number; visits: number; answers: number };
+  };
+  assert.ok(stats.totals.registeredLearners >= 1);
+  assert.equal(stats.totals.activeLearners, 1);
+  assert.equal(stats.totals.visits, 0);
+  assert.equal(stats.totals.answers, 1);
 });

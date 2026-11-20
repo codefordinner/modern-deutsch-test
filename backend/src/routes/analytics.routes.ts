@@ -89,17 +89,6 @@ function weekStart(key: string): string {
   return shiftDay(key, -weekday);
 }
 
-/**
- * New events use the authenticated Telegram learner identity. Historical events are grouped by
- * the former visitor cookie where available, then by IP + User-Agent as a last resort.
- */
-const visitorKey = (e: { learnerId: string | null; visitorId: string | null; ipAddress: string | null; userAgent: string | null }): string =>
-  e.learnerId
-    ? `learner:${e.learnerId}`
-    : e.visitorId
-      ? `id:${e.visitorId}`
-      : `legacy:${e.ipAddress ?? 'unknown'}|${e.userAgent ?? ''}`;
-
 router.post('/event', analyticsLimiter, async (req: Request, res: Response) => {
   try {
     const learner = await findCurrentUser(req);
@@ -141,17 +130,17 @@ const parseDays = (value: unknown): number => {
 interface Bucket {
   visits: number;
   answers: number;
-  visitors: Set<string>;
+  learners: Set<string>;
 }
-const newBucket = (): Bucket => ({ visits: 0, answers: 0, visitors: new Set() });
-const toStat = (b: Bucket) => ({ visits: b.visits, visitors: b.visitors.size, answers: b.answers });
+const newBucket = (): Bucket => ({ visits: 0, answers: 0, learners: new Set() });
+const toStat = (b: Bucket) => ({ visits: b.visits, activeLearners: b.learners.size, answers: b.answers });
 
 const bump = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
 const toNamed = (map: Map<string, number>) =>
   [...map.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
 /**
- * Query: `?days=7|30|90|365` (default 30). Events require a Telegram learner session.
+ * Query: `?days=7|30|90|365` (default 30). Only events linked to a Telegram learner are counted.
  * `visit` is fired after authentication, `tab_switch` on every tab change, and
  * `quiz_answer` on every checked answer.
  *  - daily / hourly / weekdays / heatmap / trainers / tabs / devices / browsers cover the chosen range;
@@ -166,14 +155,22 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
     const todayKey = zoner.at(new Date()).day;
     const since = new Date(Date.now() - (windowDays + 1) * DAY_MS);
 
-    const [events, allTimeVisits] = await Promise.all([
+    const [events, learnerCount, registrations] = await Promise.all([
       prisma.analyticsEvent.findMany({
-        where: { eventType: { in: ['visit', 'quiz_answer', 'tab_switch'] }, timestamp: { gte: since } },
-        select: { eventType: true, trainerType: true, isCorrect: true, learnerId: true, visitorId: true, ipAddress: true, userAgent: true, timestamp: true },
+        where: {
+          eventType: { in: ['visit', 'quiz_answer', 'tab_switch'] },
+          learnerId: { not: null },
+          timestamp: { gte: since },
+        },
+        select: { eventType: true, trainerType: true, isCorrect: true, learnerId: true, userAgent: true, timestamp: true },
         orderBy: { timestamp: 'desc' },
         take: MAX_EVENTS,
       }),
-      prisma.analyticsEvent.count({ where: { eventType: 'visit' } }),
+      prisma.telegramUser.count(),
+      prisma.telegramUser.findMany({
+        where: { createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
     ]);
 
     const daily = new Map(lastDays(todayKey, days).map((key) => [key, newBucket()]));
@@ -185,40 +182,49 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
     const weekdays = Array.from({ length: 7 }, newBucket);
     const heatmap = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
 
-    const rangeVisitors = new Set<string>();
-    const visitorDays = new Map<string, Set<string>>();
+    const rangeLearners = new Set<string>();
+    const learnerDays = new Map<string, Set<string>>();
     const trainers = new Map<string, { answers: number; correct: number }>();
     const tabs = new Map<string, number>();
     const devices = new Map<string, number>();
     const browsers = new Map<string, number>();
     let answers = 0;
     let correct = 0;
+    let newLearners = 0;
+
+    for (const registration of registrations) {
+      if (daily.has(zoner.at(registration.createdAt).day)) newLearners += 1;
+    }
 
     for (const e of events) {
       const z = zoner.at(e.timestamp);
       const dayBucket = daily.get(z.day); // defined only for days inside the chosen range
       const weekBucket = weekly.get(weekStart(z.day));
+      const learner = e.learnerId ? `learner:${e.learnerId}` : null;
+
+      if (learner) {
+        rangeLearners.add(learner);
+        if (weekBucket) weekBucket.learners.add(learner);
+        if (dayBucket) dayBucket.learners.add(learner);
+        const seenDays = learnerDays.get(learner) ?? new Set<string>();
+        seenDays.add(z.day);
+        learnerDays.set(learner, seenDays);
+      }
 
       if (e.eventType === 'visit') {
-        const who = visitorKey(e);
         if (weekBucket) {
           weekBucket.visits += 1;
-          weekBucket.visitors.add(who);
         }
         if (!dayBucket) continue;
 
         dayBucket.visits += 1;
-        dayBucket.visitors.add(who);
+        if (learner) {
+          hourly[z.hour].learners.add(learner);
+          weekdays[z.weekday].learners.add(learner);
+        }
         hourly[z.hour].visits += 1;
-        hourly[z.hour].visitors.add(who);
         weekdays[z.weekday].visits += 1;
-        weekdays[z.weekday].visitors.add(who);
         heatmap[z.weekday][z.hour] += 1;
-        rangeVisitors.add(who);
-
-        const seenDays = visitorDays.get(who) ?? new Set<string>();
-        seenDays.add(z.day);
-        visitorDays.set(who, seenDays);
 
         const info = describeUserAgent(e.userAgent);
         bump(devices, info.device);
@@ -228,6 +234,10 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
         if (!dayBucket) continue;
 
         dayBucket.answers += 1;
+        if (learner) {
+          hourly[z.hour].learners.add(learner);
+          weekdays[z.weekday].learners.add(learner);
+        }
         hourly[z.hour].answers += 1;
         weekdays[z.weekday].answers += 1;
         answers += 1;
@@ -240,14 +250,18 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
         if (isRight) entry.correct += 1;
         trainers.set(name, entry);
       } else if (e.eventType === 'tab_switch' && dayBucket) {
+        if (learner) {
+          hourly[z.hour].learners.add(learner);
+          weekdays[z.weekday].learners.add(learner);
+        }
         bump(tabs, e.trainerType || 'other');
       }
     }
 
     const dailyStats = [...daily.entries()].map(([date, b]) => ({ date, ...toStat(b) }));
     const visits = dailyStats.reduce((sum, d) => sum + d.visits, 0);
-    const uniqueVisitors = rangeVisitors.size;
-    const returningVisitors = [...visitorDays.values()].filter((set) => set.size >= 2).length;
+    const activeLearners = rangeLearners.size;
+    const returningLearners = [...learnerDays.values()].filter((set) => set.size >= 2).length;
     const today = daily.get(todayKey);
 
     res.json({
@@ -256,18 +270,19 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
       generatedAt: new Date().toISOString(),
       truncated: events.length >= MAX_EVENTS,
       totals: {
-        allTimeVisits,
+        registeredLearners: learnerCount,
         visits,
-        uniqueVisitors,
+        activeLearners,
         visitsToday: today?.visits ?? 0,
-        uniqueToday: today?.visitors.size ?? 0,
+        activeToday: today?.learners.size ?? 0,
+        newLearners,
         answers,
         correct,
         accuracy: answers > 0 ? Math.round((correct / answers) * 100) : null,
         activeDays: dailyStats.filter((d) => d.visits > 0).length,
         avgVisitsPerDay: Math.round((visits / days) * 10) / 10,
-        returningVisitors,
-        returningRate: uniqueVisitors > 0 ? Math.round((returningVisitors / uniqueVisitors) * 100) : 0,
+        returningLearners,
+        returningRate: activeLearners > 0 ? Math.round((returningLearners / activeLearners) * 100) : 0,
       },
       daily: dailyStats,
       weekly: [...weekly.entries()].map(([weekStartKey, b]) => ({ weekStart: weekStartKey, ...toStat(b) })),
