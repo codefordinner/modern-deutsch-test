@@ -1,29 +1,14 @@
-// Export / import of everything the app keeps in localStorage (SRS boxes, scores,
-// settings), so progress can move between devices. When you add a new
+// Export / import of browser-cached learner progress, so it can move between devices. When you add a new
 // localStorage key that belongs to the learner, add it to BACKUP_KEYS.
 
 export const BACKUP_KEYS = [
   'app_scores',
   'app_ui_settings',
-  'app_study_prefs',
   'theme',
-  'words_use_srs',
   'words_srs_state',
-  'verbs_use_srs',
   'verbs_srs_state',
-  'articles_use_srs',
   'articles_srs_state',
   'app_srs_reset_at', // SRS sync: when each trainer was last reset
-  'verbs_praesens_submode',
-  // Legacy trainer preferences remain exportable for unauthenticated profiles.
-  'words_settings',
-  'numbers_direction',
-  'numbers_range',
-  'time_display_mode',
-  'time_step_mode',
-  'verbs_mode',
-  'articles_category',
-  'onboarding_seen',
 ] as const;
 
 // The daily counter (app_daily_progress) is deliberately not exported: it's meaningless on another day/device.

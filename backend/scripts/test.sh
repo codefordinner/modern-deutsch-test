@@ -9,7 +9,6 @@ export TELEGRAM_AUTH_PEPPER="test-pepper-with-sufficient-length-0123456789"
 export TELEGRAM_BOT_API_SECRET="test-internal-secret-with-sufficient-length"
 export TELEGRAM_BOT_TOKEN="test-telegram-bot-token"
 export TELEGRAM_BOT_USERNAME="test_sprachfunke_bot"
-export TELEGRAM_AUTH_REQUIRED="true"
 
 npx prisma db push --schema prisma/schema.prisma --skip-generate
 npx tsx --test src/services/*.test.ts src/routes/*.test.ts

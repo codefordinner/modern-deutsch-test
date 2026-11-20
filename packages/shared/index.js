@@ -27,6 +27,7 @@ export function emptySyncData() {
     },
     scores: { numbers: emptyScore(), words: emptyScore(), articles: emptyScore(), verbs: emptyScore() },
     daily: { day: '', count: 0 },
+    onboardingSeen: false,
   };
 }
 
@@ -82,6 +83,7 @@ export function sanitizeSyncData(raw) {
   };
   for (const trainer of SCORE_TRAINERS) result.scores[trainer] = sanitizeScore(scores[trainer]);
   result.daily = sanitizeDaily(raw.daily);
+  result.onboardingSeen = raw.onboardingSeen === true;
   for (const trainer of SRS_TRAINERS) {
     const reset = resetAt[trainer];
     result.resetAt[trainer] = typeof reset === 'number' && Number.isFinite(reset) && reset > 0 ? Math.floor(reset) : 0;
@@ -163,5 +165,6 @@ export function mergeSyncData(a, b) {
   };
   for (const trainer of SCORE_TRAINERS) merged.scores[trainer] = pickScore(a.scores[trainer], b.scores[trainer]);
   merged.daily = mergeDaily(a.daily, b.daily);
+  merged.onboardingSeen = a.onboardingSeen || b.onboardingSeen;
   return merged;
 }

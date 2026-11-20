@@ -10,7 +10,7 @@ import { useServiceWorkerUpdates } from './hooks/useServiceWorkerUpdates';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
-import { prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
+import { hasSeenLearnerOnboarding, markLearnerOnboardingSeen, prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
 import { clearAccountTrainerSettings, hasAccountTrainerSettings } from './utils/trainerSettingsStore';
 import { resetAccountStudyPrefs } from './utils/studyPrefs';
 import type { ScoredTab } from './config/tabs';
@@ -31,7 +31,7 @@ export function App() {
   useServiceWorkerUpdates();
   const activeTab = useHashRoute();
   const [learner, setLearner] = useState<LearnerSession['user'] | null>(null);
-  const [authRequired, setAuthRequired] = useState(false);
+  const [authRequired, setAuthRequired] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const [logoutError, setLogoutError] = useState('');
@@ -47,12 +47,11 @@ export function App() {
   });
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
-    try { return localStorage.getItem('onboarding_seen') !== '1'; } catch { return true; }
-  });
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const closeOnboarding = () => {
-    try { localStorage.setItem('onboarding_seen', '1'); } catch { /* storage unavailable */ }
+    markLearnerOnboardingSeen();
     setIsOnboardingOpen(false);
+    void syncNow();
   };
 
   const handleLearnerAuthenticated = useCallback(async (user: LearnerSession['user']) => {
@@ -61,6 +60,7 @@ export function App() {
     // Hydrate account-owned trainer preferences before any trainer is mounted.
     await syncNow();
     if (!hasAccountTrainerSettings()) throw new Error('Не удалось загрузить настройки аккаунта.');
+    setIsOnboardingOpen(!hasSeenLearnerOnboarding());
     setLearner(user);
     setAuthError('');
     setAuthLoading(false);
@@ -75,18 +75,20 @@ export function App() {
     }
     const authenticate = async () => {
       try {
-        let config: { required: boolean };
         try {
-          config = await getLearnerAuthConfig();
+          await getLearnerAuthConfig();
         } catch (error) {
           if (error instanceof ApiError && error.status === 404) {
-            // Compatibility with an older backend during a rolling deployment.
-            if (active) setAuthRequired(false);
+            // Fail closed: never allow trainers to run without an authenticated learner.
+            if (active) {
+              setAuthRequired(true);
+              setAuthError('Сервер не поддерживает обязательный вход. Обновите приложение и сервер.');
+            }
             return;
           }
           throw error;
         }
-        if (active) setAuthRequired(config.required);
+        if (active) setAuthRequired(true);
         try {
           const session = await getLearnerSession();
           if (active) await handleLearnerAuthenticated(session.user);
@@ -99,9 +101,9 @@ export function App() {
               const session = await loginWithMiniApp(initData);
               if (active) await handleLearnerAuthenticated(session.user);
             } catch (error) {
-              if (active && config.required) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
+              if (active) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
             }
-          } else if (config.required) {
+          } else {
             setAuthError('');
           }
         }

@@ -49,10 +49,10 @@
 - **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, prompt, response, durationMs, createdAt}` — журнал вызовов AI-операций для админки; промпт и ответ Gemini сохраняются для диагностики, API-ключи и inline-данные изображений перед сохранением удаляются.
 - **AiBulkJob** `{id, status, total, completed, count, result, error, createdAt, finishedAt}` — устойчивый статус массовой проверки слов, распределения категорий и определения управления глаголов. Входные записи не сохраняются; незавершённые при рестарте становятся ошибкой `AI_JOB_INTERRUPTED` и остаются видимы в логах ИИ.
 - **TelegramUser** `{id, telegramId, isAdmin, createdAt, updatedAt}` — Telegram-аккаунт ученика; `isAdmin` управляет показом вкладки админки в навигации и по умолчанию выключен.
-- **LearnerProgress** `{userId, data (JSON), revision, createdAt, updatedAt}` — SRS-прогресс, счёт и синхронизируемые настройки Telegram-пользователя. `revision` используется для optimistic locking.
+- **LearnerProgress** `{userId, data (JSON), revision, createdAt, updatedAt}` — SRS-прогресс, счёт, настройки и отметка прохождения обучения Telegram-пользователя. `revision` используется для optimistic locking.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
-- Прогресс ученика кэшируется в `localStorage`; настройки режимов тренажёров при Telegram-входе загружаются в память из `LearnerProgress` и не записываются в браузер. Локальные настройки устройства не импортируются в аккаунт. Без входа сохраняется локальный режим.
+- Прогресс ученика кэшируется в `localStorage`; настройки режимов тренажёров при Telegram-входе загружаются в память из `LearnerProgress` и не записываются в браузер. Локальные настройки устройства не импортируются в аккаунт.
 
 ## Переменные окружения
 См. `.env.example`. Приложение `.env` само не читает — передавайте переменные окружением (docker, `node --env-file`).
@@ -68,7 +68,6 @@
 | `HERMES_WORD_IMPORT_TOKEN` | Bearer-токен локального endpoint `/api/internal/word-import` | не задан (endpoint выключен) |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token для проверки Mini App initData и работы общего Sprachfunke-бота | не задан |
 | `TELEGRAM_BOT_USERNAME` | публичный username общего Sprachfunke-бота без `@` | не задан |
-| `TELEGRAM_AUTH_REQUIRED` | обязательный вход перед тренажёрами; включается после настройки secrets | `false` |
 | `TELEGRAM_BOT_API_SECRET` | отдельная runtime-аутентификация bot → backend; не bot token | не задан |
 | `TELEGRAM_AUTH_PEPPER` | HMAC pepper для digest кодов и browser binding | не задан |
 | `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS` | максимальный возраст Mini App initData | `300` |
@@ -86,12 +85,12 @@
 - **Аутентификация админа**: пароль → JWT (HS256, 24 ч) только в HttpOnly-cookie. `requireAdmin` защищает мутации и админские чтения. Логин ограничен 8 неудачными попытками в минуту на IP.
 - **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. По HTTPS cookies имеют `SameSite=None; Secure; Partitioned` для Telegram WebView; по HTTP в dev сохраняется `SameSite=Lax`. Админская авторизация и cookie остаются независимыми.
 - У `TelegramUser.isAdmin` по умолчанию `false`; `/learner-auth/me` и успешные входы возвращают этот флаг, frontend показывает вкладку «Админка» только таким Telegram-пользователям. Выдать/снять флаг можно внутри backend-контейнера: `npm run admin:set -- <telegramId> grant|revoke`. Админские API по-прежнему отдельно проверяют HttpOnly-cookie через `requireAdmin`.
-- `GET /learner-auth/config` сообщает frontend, включён ли обязательный вход. На production после подготовки secrets установить `TELEGRAM_AUTH_REQUIRED=true`; выключенный флаг сохраняет совместимость со старой версией до согласованной выкладки.
+- `GET /learner-auth/config` сообщает frontend, что вход через Telegram обязателен. Клиент работает fail-closed и не открывает тренажёры, если endpoint отсутствует.
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут, в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.
 - **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
 - **Доступ**: Telegram-вход обязателен для тренажёров; вкладка админки продолжает использовать отдельный admin login. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
-- `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly и режимы тренажёров берутся из памяти/сервера. Первый снимок мигрирует старые настройки из `localStorage`; начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
+- `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly, режимы тренажёров и `onboardingSeen` синхронизируются с сервером. Начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `POST /words/ai/check` (фоновая проверка выбранных слов; безопасные исправления сохраняются сервером даже после закрытия вкладки; конфликты немецких форм отображаются как замечания к словам и не отменяют остальные исправления), `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
@@ -156,28 +155,20 @@
 | Ключ | Что | В бэкапе |
 |---|---|---|
 | `words_srs_state`, `verbs_srs_state`, `articles_srs_state` | карточки SRS | да |
-| `words_use_srs`, `verbs_use_srs`, `articles_use_srs` | SRS вкл/выкл | да |
 | `app_srs_reset_at` | когда тренажёры сбрасывались (для синхронизации) | да |
 | `app_scores` | счёт по тренажёрам | да |
 | `app_ui_settings` | панель умлаутов, ae/oe, фокус, клавиатура, подсказка категории, цвета артиклей, громкость озвучки | да |
-| `app_study_prefs` | dueOnly, dailyGoal; локальный режим без аккаунта и разовая миграция | да |
-| `theme`, `verbs_praesens_submode` | тема, подрежим глаголов | да |
-| `words_settings` | настройки тренажёра слов (направление, категории, формы) | да |
-| `numbers_direction`, `numbers_range` | режим и диапазон чисел | да |
-| `time_display_mode`, `time_step_mode` | вид часов и шаг минут | да |
-| `verbs_mode` | режим тренажёра глаголов | да |
-| `articles_category` | выбранная категория артиклей | да |
+| `theme` | тема | да |
 | `app_daily_progress` | ответов за сегодня | нет |
 | `app_learner_profile_id` | Telegram-профиль, которому принадлежит локальный кэш синхронизируемого прогресса | нет |
-| `onboarding_seen` | приветственный экран уже показан | да |
 | `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
 | `admin_last_word_category_id` | последняя категория в форме слова | нет |
 
-Тема (`theme`) и UI-параметры, включая громкость озвучки, являются устройственными и не синхронизируются аккаунтом. Направление/формы слов, режимы чисел/глаголов/времени, диапазон чисел, выбранные категории, флаги SRS, dueOnly и дневная цель — аккаунтные. Старые ключи настроек тренажёров и `app_study_prefs` читаются для миграции; после успешной загрузки Telegram-профиля удаляются. В аккаунтном режиме эти настройки находятся в памяти клиента до отправки на сервер, а не в `localStorage`; без аккаунта остаётся локальный режим. SRS-карточки, счёт и ответы за день по-прежнему имеют отдельный локальный кэш.
+Тема (`theme`) и UI-параметры, включая громкость озвучки, являются устройственными и не синхронизируются аккаунтом. Направление/формы слов, режимы чисел/глаголов/времени, диапазон чисел, выбранные категории, флаги SRS и дневная цель принадлежат аккаунту; `onboardingSeen` хранится только в `LearnerProgress`. Настройки тренажёров не читаются и не записываются в `localStorage`; старые локальные значения не импортируются в аккаунт и удаляются при загрузке серверных настроек. Вход обязателен. SRS-карточки, счёт и ответы за день по-прежнему имеют отдельный локальный кэш.
 
 `picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом и намеренно не включается в экспорт.
 
-Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Аккаунтные настройки тренажёров хранятся на сервере, а локальные ключи настроек используются только без входа.
+Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Настройки тренажёров хранятся только в аккаунте на сервере; локальные копии старых настроек игнорируются и удаляются.
 
 Перенос между устройствами: Telegram-аккаунт или «Скачать/Загрузить» (`utils/progressBackup.ts`, JSON `{app, version, exportedAt, data}`; загрузка **заменяет** прогресс на устройстве).
 

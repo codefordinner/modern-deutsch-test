@@ -20,7 +20,7 @@
 
 Обычные несекретные env: `TELEGRAM_BOT_USERNAME`, `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=300`, `TELEGRAM_SESSION_TTL_SECONDS=2592000`, `TELEGRAM_COOKIE_SECURE=true`. Нельзя печатать секреты через `systemctl show`, shell tracing, workflow или логи. Если значения передаются env-файлом, файл должен быть недоступен другим пользователям.
 
-`TELEGRAM_AUTH_REQUIRED=true` включает обязательный gate на тренажёры. Пока флаг выключен (default), старый backend и frontend работают без входа; это нужно для безопасного порядка обновления, но не является целевой production-конфигурацией.
+Вход через Telegram обязателен для доступа к тренажёрам; конфигурационного флага для отключения входа нет.
 
 Не добавлять второй backend unit и не менять `telegram-userbot-dm`. Бот не получает `DATABASE_URL`, SQLite volume или наружный порт.
 

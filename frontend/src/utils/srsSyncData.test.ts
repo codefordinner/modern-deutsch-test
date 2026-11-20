@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { emptySyncData, mergeSyncData, sanitizeSyncData } from './srsSyncData';
 
 describe('SRS sync data', () => {
+  it('persists onboarding completion across merged account snapshots', () => {
+    const completed = sanitizeSyncData({ onboardingSeen: true });
+    expect(completed.onboardingSeen).toBe(true);
+    expect(mergeSyncData(completed, emptySyncData()).onboardingSeen).toBe(true);
+    expect(mergeSyncData(emptySyncData(), completed).onboardingSeen).toBe(true);
+  });
+
   it('keeps the newer card and applies a reset timestamp', () => {
     const old = new Date('2025-01-01T00:00:00Z').toISOString();
     const fresh = new Date('2025-01-02T00:00:00Z').toISOString();

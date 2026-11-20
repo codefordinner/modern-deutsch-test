@@ -43,7 +43,7 @@ const asyncRoute = (handler: (req: Request, res: Response) => Promise<unknown>) 
 
 router.get('/config', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ required: process.env.TELEGRAM_AUTH_REQUIRED === 'true' });
+  return res.json({ required: true });
 });
 
 router.post('/telegram/mini-app', miniAppLimiter, asyncRoute(async (req, res) => {

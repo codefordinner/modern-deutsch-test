@@ -6,9 +6,8 @@ import {
   updateAccountDueOnly,
 } from './trainerSettingsStore';
 
-// Study preferences shared by every trainer, plus the "answers today" counter
-// behind the daily goal. Persisted in localStorage; every mounted component
-// follows changes through useSyncExternalStore (no context provider needed).
+// Account-owned study preferences plus the local "answers today" counter.
+// Components follow changes through useSyncExternalStore.
 //
 //  - dueOnly:   in SRS mode ask only cards whose review date has come (see srsDue.ts);
 //  - dailyGoal: how many answers per day the learner aims for (0 = no goal).
@@ -21,7 +20,6 @@ export interface StudyPrefs {
 export const DEFAULT_STUDY_PREFS: StudyPrefs = { dueOnly: false, dailyGoal: 20 };
 export const MAX_DAILY_GOAL = 1000;
 
-const PREFS_KEY = 'app_study_prefs';
 const DAILY_KEY = 'app_daily_progress';
 
 const listeners = new Set<() => void>();
@@ -39,21 +37,7 @@ function sanitizeGoal(value: unknown): number {
   return Number.isFinite(n) ? Math.min(MAX_DAILY_GOAL, Math.max(0, n)) : DEFAULT_STUDY_PREFS.dailyGoal;
 }
 
-function loadPrefs(): StudyPrefs {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return DEFAULT_STUDY_PREFS;
-    const parsed = JSON.parse(raw) as Partial<StudyPrefs>;
-    return {
-      dueOnly: parsed.dueOnly === true,
-      dailyGoal: parsed.dailyGoal === undefined ? DEFAULT_STUDY_PREFS.dailyGoal : sanitizeGoal(parsed.dailyGoal),
-    };
-  } catch {
-    return DEFAULT_STUDY_PREFS;
-  }
-}
-
-let prefs: StudyPrefs = loadPrefs();
+let prefs: StudyPrefs = DEFAULT_STUDY_PREFS;
 
 export const getStudyPrefs = (): StudyPrefs => prefs;
 
@@ -66,38 +50,13 @@ export function setStudyPrefs(partial: Partial<StudyPrefs>): void {
     updateAccountDueOnly(prefs.dueOnly);
     updateAccountDailyGoal(prefs.dailyGoal);
     window.dispatchEvent(new Event('learner-account-setting-changed'));
-  } else {
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    } catch {
-      // Non-blocking: the setting just won't persist across reloads.
-    }
   }
   notify();
 }
 
 /** Applies settings received from another device without touching the daily counter. */
-export function applySyncedDailyGoal(dailyGoal: number): void {
-  prefs = { ...prefs, dailyGoal: sanitizeGoal(dailyGoal) };
-  if (!hasAccountTrainerSettings()) {
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    } catch {
-      // Non-blocking
-    }
-  }
-  notify();
-}
-
 export function applySyncedStudyPrefs(dailyGoal: number, dueOnly: boolean): void {
   prefs = { dailyGoal: sanitizeGoal(dailyGoal), dueOnly };
-  if (!hasAccountTrainerSettings()) {
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    } catch {
-      // Non-blocking
-    }
-  }
   notify();
 }
 

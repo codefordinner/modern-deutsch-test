@@ -79,6 +79,7 @@ export interface SrsSyncData {
   settings: SyncSettings;
   scores: Record<ScoreTrainer, SyncScore>;
   daily: SyncDaily;
+  onboardingSeen: boolean;
 }
 
 /** Learner settings shared by devices through the Telegram account. */

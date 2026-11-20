@@ -25,7 +25,7 @@ function germanTarget(word: Word, formType: WordFormType): string {
   return word.de;
 }
 
-/** Quiz settings kept in localStorage (`words_settings`). */
+/** Quiz settings are backed by the authenticated learner profile. */
 interface WordsSettings {
   directionMode: DirectionMode;
   selectedCats: string[];

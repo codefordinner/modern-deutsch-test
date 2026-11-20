@@ -22,8 +22,8 @@ export function usePersistentState<T>(
   sanitize: (raw: unknown) => T
 ): [T, Dispatch<SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
-    if (ACCOUNT_SETTING_KEYS.has(key) && hasAccountTrainerSettings()) {
-      return sanitize(getAccountSettingValue(key));
+    if (ACCOUNT_SETTING_KEYS.has(key)) {
+      return hasAccountTrainerSettings() ? sanitize(getAccountSettingValue(key)) : defaultValue;
     }
     try {
       const raw = localStorage.getItem(key);
@@ -34,7 +34,7 @@ export function usePersistentState<T>(
   });
 
   useEffect(() => {
-    if (ACCOUNT_SETTING_KEYS.has(key) && hasAccountTrainerSettings()) return;
+    if (ACCOUNT_SETTING_KEYS.has(key)) return;
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
@@ -47,8 +47,8 @@ export function usePersistentState<T>(
       const keys = (event as CustomEvent<{ keys?: unknown }>).detail?.keys;
       if (Array.isArray(keys) && !keys.includes(key)) return;
       try {
-        if (ACCOUNT_SETTING_KEYS.has(key) && hasAccountTrainerSettings()) {
-          const next = sanitize(getAccountSettingValue(key));
+        if (ACCOUNT_SETTING_KEYS.has(key)) {
+          const next = hasAccountTrainerSettings() ? sanitize(getAccountSettingValue(key)) : defaultValue;
           setValue((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
           return;
         }
@@ -56,8 +56,6 @@ export function usePersistentState<T>(
         if (raw !== null) {
           const next = sanitize(JSON.parse(raw));
           setValue((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
-        } else if (ACCOUNT_SETTING_KEYS.has(key)) {
-          setValue((previous) => JSON.stringify(previous) === JSON.stringify(defaultValue) ? previous : defaultValue);
         }
       } catch {
         // ignore unavailable or malformed storage

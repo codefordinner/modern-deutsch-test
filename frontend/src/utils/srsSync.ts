@@ -53,20 +53,21 @@ function readLocal(): SrsSyncData {
   for (const trainer of SRS_TRAINERS) srs[trainer] = readJSON(stateKeyOf(trainer));
   const accountSettings = getAccountTrainerSettings();
   const defaultSettings = emptySyncData().settings;
-  // Trainer settings come only from the authenticated account snapshot, never from
-  // legacy per-device localStorage values.
+  // Trainer settings come only from the authenticated account snapshot.
   return mergeSyncData(sanitizeSyncData({
     srs,
     resetAt: readJSON(RESET_AT_KEY),
     scores: readJSON(SCORES_KEY),
     daily: getDailyProgress(),
     settings: accountSettings ?? defaultSettings,
+    onboardingSeen: learnerOnboardingSeen,
   }), emptySyncData());
 }
 
 /** Writes the merged data into localStorage; returns whether any progress or score actually changed. */
 function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): boolean {
   let changed = false;
+  learnerOnboardingSeen = data.onboardingSeen;
   for (const trainer of SRS_TRAINERS) {
     if (!force && JSON.stringify(data.srs[trainer]) === JSON.stringify(previous.srs[trainer])) continue;
     changed = true;
@@ -103,7 +104,6 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): bo
     }
     if (learnerUserId) {
       applySyncedStudyPrefs(data.settings.dailyGoal, data.settings.trainerPrefs.srs.dueOnly);
-      window.dispatchEvent(new CustomEvent('app-storage-updated', { detail: { keys: ['app_study_prefs'] } }));
     }
   } catch {
     // ignore
@@ -156,6 +156,16 @@ const syncWaiters: Array<() => void> = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let learnerUserId: string | null = null;
 let forceReplaceForUserId: string | null = null;
+let learnerOnboardingSeen = false;
+
+export function hasSeenLearnerOnboarding(): boolean {
+  return learnerOnboardingSeen;
+}
+
+export function markLearnerOnboardingSeen(): void {
+  learnerOnboardingSeen = true;
+  scheduleSync();
+}
 
 export function setLearnerSyncUser(userId: string | null): void {
   learnerUserId = userId;

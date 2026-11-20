@@ -4,7 +4,6 @@ const ACCOUNT_KEYS = [
   'words_settings', 'articles_category', 'numbers_direction', 'numbers_range',
   'verbs_mode', 'verbs_praesens_submode', 'time_display_mode', 'time_step_mode',
   'words_use_srs', 'verbs_use_srs', 'articles_use_srs',
-  'app_study_prefs',
 ] as const;
 
 let settings: SyncSettings | null = null;

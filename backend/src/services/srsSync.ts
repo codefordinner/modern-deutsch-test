@@ -21,6 +21,7 @@ export interface SyncData {
   settings: { dailyGoal: number; wordsCategories: string[]; articlesCategories: string[]; updatedAt: number; trainerPrefsUpdatedAt: number; trainerPrefs: SharedSyncData['settings']['trainerPrefs'] };
   scores: Record<SyncScoreTrainer, SyncScore>;
   daily: SyncDaily;
+  onboardingSeen: boolean;
 }
 
 export const emptySyncData = (): SyncData => emptySharedSyncData() as SyncData;
