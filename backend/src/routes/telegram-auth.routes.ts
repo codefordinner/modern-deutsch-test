@@ -54,7 +54,7 @@ router.post('/telegram/mini-app', miniAppLimiter, asyncRoute(async (req, res) =>
   const user = await getOrCreateTelegramUser(telegramId);
   const token = await createUserSession(user.id);
   setUserSessionCookie(req, res, token);
-  return res.json({ authenticated: true, user: { id: user.id } });
+  return res.json({ authenticated: true, user: { id: user.id, isAdmin: user.isAdmin } });
 }));
 
 router.post('/telegram/challenge', issueLimiter, asyncRoute(async (req, res) => {
@@ -101,6 +101,7 @@ router.post('/telegram/challenge', issueLimiter, asyncRoute(async (req, res) => 
     code,
     expiresAt: expiresAt.toISOString(),
     botUrl: `https://t.me/${encodeURIComponent(telegramUsername)}`,
+    botUsername: telegramUsername,
   });
 }));
 
@@ -156,7 +157,8 @@ router.post('/telegram/challenge/complete', completeLimiter, asyncRoute(async (r
   setUserSessionCookie(req, res, token);
   clearChallengeCookie(req, res);
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ authenticated: true, user: { id: userId } });
+  const user = await prisma.telegramUser.findUniqueOrThrow({ where: { id: userId }, select: { isAdmin: true } });
+  return res.json({ authenticated: true, user: { id: userId, isAdmin: user.isAdmin } });
 }));
 
 router.get('/me', asyncRoute(async (req, res) => {
@@ -166,7 +168,7 @@ router.get('/me', asyncRoute(async (req, res) => {
     clearUserSessionCookie(req, res);
     return res.status(401).json({ error: 'Требуется войти через Telegram.' });
   }
-  return res.json({ authenticated: true, user: { id: user.id } });
+  return res.json({ authenticated: true, user: { id: user.id, isAdmin: user.isAdmin } });
 }));
 
 router.post('/logout', asyncRoute(async (req, res) => {

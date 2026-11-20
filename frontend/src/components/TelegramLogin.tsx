@@ -118,15 +118,17 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
     <main className="telegram-login" id="main">
       <section className="telegram-login-card" aria-labelledby="telegram-login-heading">
         <h1 id="telegram-login-heading">Вход через Telegram</h1>
-        <p>Чтобы продолжить занятия, подтвердите вход в Telegram.</p>
+        <p>Войдите через бота, чтобы продолжить занятия и синхронизировать прогресс.</p>
 
         {challenge && remainingSeconds > 0 ? (
           <>
-            <p className="telegram-login-instruction">Отправьте этот код боту в личном чате:</p>
+            <p className="telegram-login-instruction">
+              Нажмите, чтобы перейти к боту <strong>@{challenge.botUsername}</strong>, затем отправьте ему код:
+            </p>
             <output className="telegram-login-code" aria-label="Одноразовый код">{challenge.code}</output>
             <p className="telegram-login-expiry" aria-live="polite">Код действует ещё {formattedTime}</p>
             <a className="telegram-login-open-bot" href={challenge.botUrl} target="_blank" rel="noopener noreferrer">
-              Открыть чат с ботом
+              Перейти к боту @{challenge.botUsername}
             </a>
             <p className="telegram-login-status" role="status" aria-live="polite">
               {confirmed ? 'Код подтверждён. Завершаем вход…' : 'Ожидаем подтверждение в Telegram…'}
@@ -139,9 +141,6 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
         )}
 
         {error && <p className="telegram-login-error" role="alert">{error}</p>}
-        <p className="telegram-login-admin-link">
-          Администратор? <a href="#/admin">Перейти к админке</a>
-        </p>
       </section>
     </main>
   );

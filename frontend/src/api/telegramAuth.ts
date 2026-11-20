@@ -4,6 +4,7 @@ export interface TelegramChallenge {
   code: string;
   expiresAt: string;
   botUrl: string;
+  botUsername: string;
 }
 
 export interface TelegramChallengeStatus {
@@ -13,7 +14,7 @@ export interface TelegramChallengeStatus {
 
 export interface LearnerSession {
   authenticated: true;
-  user: { id: string };
+  user: { id: string; isAdmin: boolean };
 }
 
 const basePath = '/learner-auth';

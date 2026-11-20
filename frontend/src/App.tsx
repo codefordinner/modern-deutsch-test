@@ -204,6 +204,7 @@ export function App() {
         showStats={scoredTab !== null}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isLearnerSignedIn={Boolean(learner)}
+        isAdmin={Boolean(learner?.isAdmin)}
         onLearnerLogout={handleLearnerLogout}
       />
 

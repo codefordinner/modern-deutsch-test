@@ -128,9 +128,10 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.deepEqual(completionResponses.map((response) => response.status).sort(), [200, 409]);
   const successfulResponse = completionResponses.find((response) => response.status === 200);
   assert.ok(successfulResponse);
-  const completionBody = await successfulResponse.json() as { authenticated: boolean; user: { id: string } };
+  const completionBody = await successfulResponse.json() as { authenticated: boolean; user: { id: string; isAdmin: boolean } };
   assert.equal(completionBody.authenticated, true);
   assert.equal(typeof completionBody.user.id, 'string');
+  assert.equal(completionBody.user.isAdmin, false);
   const sessionCookie = `learner_session=${cookieValue(successfulResponse.headers.get('set-cookie'), 'learner_session')}`;
 
   const meResponse = await fetch(`${base}/api/learner-auth/me`, { headers: { Cookie: sessionCookie } });
@@ -169,9 +170,10 @@ test('valid Mini App initData creates an HttpOnly user session', async (t) => {
   });
   assert.equal(response.status, 200);
   assert.match(response.headers.get('set-cookie') || '', /learner_session=.*HttpOnly/i);
-  const body = await response.json() as { authenticated: boolean; user: { id: string } };
+  const body = await response.json() as { authenticated: boolean; user: { id: string; isAdmin: boolean } };
   assert.equal(body.authenticated, true);
   assert.equal(typeof body.user.id, 'string');
+  assert.equal(body.user.isAdmin, false);
   assert.deepEqual(Object.keys(body).sort(), ['authenticated', 'user']);
   assert.equal(JSON.stringify(body).includes(process.env.TELEGRAM_BOT_TOKEN!), false);
 });

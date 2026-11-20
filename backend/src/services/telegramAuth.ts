@@ -129,10 +129,10 @@ export const findCurrentUser = async (req: Request) => {
   if (!token) return null;
   const session = await prisma.userSession.findUnique({
     where: { tokenDigest: digestSessionToken(token) },
-    include: { user: { select: { id: true, telegramId: true } } },
+    include: { user: { select: { id: true, telegramId: true, isAdmin: true } } },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date()) return null;
-  return { id: session.user.id, telegramId: session.user.telegramId };
+  return { id: session.user.id, telegramId: session.user.telegramId, isAdmin: session.user.isAdmin };
 };
 
 export const createUserSession = async (userId: string) => {

@@ -13,6 +13,7 @@ interface NavbarProps {
   showStats: boolean;
   onOpenSettings: () => void;
   isLearnerSignedIn?: boolean;
+  isAdmin?: boolean;
   onLearnerLogout?: () => void;
 }
 
@@ -24,11 +25,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   showStats,
   onOpenSettings,
   isLearnerSignedIn = false,
+  isAdmin = false,
   onLearnerLogout,
 }) => {
   const themeLabel = isDark ? 'Включить светлую тему' : 'Включить тёмную тему';
   const [{ dailyGoal }] = useStudyPrefs();
   const answeredToday = useDailyCount();
+  const visibleTabs = APP_TABS.filter((tab) => tab.id !== 'admin' || isAdmin);
 
   return (
     <>
@@ -45,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Wide screens: tabs in the header. Phones: the same tabs live in the bottom bar below. */}
           <nav className="nav-tabs" aria-label="Разделы">
-            {APP_TABS.map((t) => {
+            {visibleTabs.map((t) => {
               const Icon = t.icon;
               const isActive = activeTab === t.id;
               return (
@@ -121,8 +124,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      <nav className="bottom-nav" aria-label="Разделы" style={{ '--bottom-nav-count': APP_TABS.length } as React.CSSProperties}>
-        {APP_TABS.map((t) => {
+      <nav className="bottom-nav" aria-label="Разделы" style={{ '--bottom-nav-count': visibleTabs.length } as React.CSSProperties}>
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
           return (

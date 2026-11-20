@@ -28,6 +28,12 @@
 
 .telegram-login-instruction {
   margin-top: 28px;
+  text-align: center;
+}
+
+.telegram-login-instruction strong {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .telegram-login-code {
