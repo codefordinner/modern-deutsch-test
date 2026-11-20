@@ -16,7 +16,7 @@ export function getErrorMessage(error: unknown, fallback = 'Что-то пошл
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   auth?: boolean;
   responseType?: 'json' | 'blob';

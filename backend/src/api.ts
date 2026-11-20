@@ -10,6 +10,7 @@ import audioRoutes from './routes/audio.routes';
 import picturesRoutes from './routes/pictures.routes';
 import internalRoutes from './routes/internal.routes';
 import telegramAuthRoutes from './routes/telegram-auth.routes';
+import usersAdminRoutes from './routes/users-admin.routes';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.use(requireSameOrigin);
 
 // Telegram session is also the sole authentication mechanism for admin access.
 router.use('/learner-auth', telegramAuthRoutes);
+router.use('/users', usersAdminRoutes);
 router.use('/words', normalizeWordBody);
 // Admin-only bulk tools; mounted before the CRUD router (their paths never clash with it).
 router.use('/words', wordsAdminRoutes);

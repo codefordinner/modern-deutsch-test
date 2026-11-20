@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, AudioLines, Images, Bot, FileText } from 'lucide-react';
+import { BookOpen, Tag, ArrowLeftRight, BarChart3, Copy, Layers, AudioLines, Images, Bot, FileText, Users } from 'lucide-react';
 import { PicturesTab } from './admin/PicturesTab';
 import { AISettingsTab } from './admin/AISettingsTab';
 import { WordsTab } from './admin/WordsTab';
@@ -11,6 +11,7 @@ import { DuplicatesTab } from './admin/DuplicatesTab';
 import { AnalyticsTab } from './admin/AnalyticsTab';
 import { SrsSettingsTab } from './admin/SrsSettingsTab';
 import { AudioCacheTab } from './admin/AudioCacheTab';
+import { UsersTab } from './admin/UsersTab';
 import { WordModal } from './admin/WordModal';
 import { CategoryModal } from './admin/CategoryModal';
 import { ModeSwitch } from './ModeSwitch';
@@ -23,9 +24,9 @@ import { wordInCategory } from '../utils/wordCategories';
 import type { Word, Category, PartOfSpeech } from '../types';
 import { useConfirm } from '../hooks/useConfirm';
 
-type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'ai-settings' | 'ai-logs' | 'analytics';
+type AdminTab = 'words' | 'categories' | 'import' | 'duplicates' | 'srs' | 'audio' | 'pictures' | 'ai-settings' | 'ai-logs' | 'analytics' | 'users';
 
-const ADMIN_TABS: readonly AdminTab[] = ['words', 'categories', 'import', 'duplicates', 'srs', 'audio', 'pictures', 'ai-settings', 'ai-logs', 'analytics'];
+const ADMIN_TABS: readonly AdminTab[] = ['words', 'categories', 'import', 'duplicates', 'srs', 'audio', 'pictures', 'ai-settings', 'ai-logs', 'analytics', 'users'];
 const readAdminRoute = (): { tab: AdminTab; category: string } => {
   if (typeof window === 'undefined') return { tab: 'words', category: 'all' };
   const match = /^#\/?admin(?:\?([^#]*))?$/.exec(window.location.hash);
@@ -262,6 +263,7 @@ export const AdminPanel: React.FC = () => {
             { value: 'ai-settings', label: 'Настройки ИИ', icon: <Bot size={14} /> },
             { value: 'ai-logs', label: 'Логи ИИ', icon: <FileText size={14} /> },
             { value: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
+            { value: 'users', label: 'Пользователи', icon: <Users size={14} /> },
           ]}
         />
       </div>
@@ -307,6 +309,7 @@ export const AdminPanel: React.FC = () => {
       {tab === 'ai-settings' && <AISettingsTab view="settings" />}
       {tab === 'ai-logs' && <AISettingsTab view="logs" />}
       {tab === 'analytics' && <AnalyticsTab />}
+      {tab === 'users' && <UsersTab />}
 
       {isWordOpen && <WordModal word={editingWord} categories={categories} onClose={() => setIsWordOpen(false)} onSave={handleSaveWord} />}
       {isCatOpen && <CategoryModal category={editingCat} onClose={() => setIsCatOpen(false)} onSave={handleSaveCategory} />}

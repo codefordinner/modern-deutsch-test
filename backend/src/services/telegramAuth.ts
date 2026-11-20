@@ -146,9 +146,9 @@ export const findCurrentUser = async (req: Request) => {
   for (const token of getCookies(req, USER_SESSION_COOKIE)) {
     const session = await prisma.userSession.findUnique({
       where: { tokenDigest: digestSessionToken(token) },
-      include: { user: { select: { id: true, telegramId: true, isAdmin: true } } },
+      include: { user: { select: { id: true, telegramId: true, isAdmin: true, isBanned: true } } },
     });
-    if (session && !session.revokedAt && session.expiresAt > new Date()) {
+    if (session && !session.revokedAt && session.expiresAt > new Date() && !session.user.isBanned) {
       return { id: session.user.id, telegramId: session.user.telegramId, isAdmin: session.user.isAdmin };
     }
   }

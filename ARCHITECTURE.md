@@ -17,7 +17,7 @@
 │     ├─ api.ts              сборка роутера /api (порядок монтирования важен)
 │     ├─ db.ts               PrismaClient
 │     ├─ middleware/         auth (JWT, cookie), csrf (Origin/Referer), normalizeWordBody
-│     ├─ routes/             auth, telegram-auth, words, words-admin, categories, pictures, audio, analytics, settings, sync
+│     ├─ routes/             auth, telegram-auth, users-admin, words, words-admin, categories, pictures, audio, analytics, settings, sync
 │     └─ services/           audio, audioSettings, aiSettings, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
 ├─ packages/shared/            @sprachfunke/shared: общая чистая логика SRS-синхронизации и веса по умолчанию
 ├─ packages/telegram-bot/       общий long-polling бот; auth handler сейчас, без доступа к SQLite
@@ -48,7 +48,7 @@
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `srsPromotionThreshold`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ, общий лимит запросов в минуту и registry профилей `{profileId: {model, prompt}}`). AI-ключ никогда не возвращается клиенту.
 - **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, prompt, response, durationMs, createdAt}` — журнал вызовов AI-операций для админки; промпт и ответ Gemini сохраняются для диагностики, API-ключи и inline-данные изображений перед сохранением удаляются.
 - **AiBulkJob** `{id, status, total, completed, count, result, error, createdAt, finishedAt}` — устойчивый статус массовой проверки слов, распределения категорий и определения управления глаголов. Входные записи не сохраняются; незавершённые при рестарте становятся ошибкой `AI_JOB_INTERRUPTED` и остаются видимы в логах ИИ.
-- **TelegramUser** `{id, telegramId, isAdmin, createdAt, updatedAt}` — Telegram-аккаунт ученика; `isAdmin` управляет показом вкладки админки в навигации и по умолчанию выключен.
+- **TelegramUser** `{id, telegramId, isAdmin, isBanned, createdAt, updatedAt}` — Telegram-аккаунт ученика; `isAdmin` управляет показом вкладки админки, `isBanned` блокирует вход и действующие сессии.
 - **LearnerProgress** `{userId, data (JSON), revision, createdAt, updatedAt}` — SRS-прогресс, счёт, настройки и отметка прохождения обучения Telegram-пользователя. `revision` используется для optimistic locking.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
@@ -88,6 +88,7 @@
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут и ограничен 5 запросами в минуту на IP; в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.
 - **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
 - **Доступ**: Telegram-вход обязателен для тренажёров и админки; права администратора определяются флагом пользователя в БД. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
+- **Пользователи админки**: `/users` и `/users/:id/{progress,admin,ban}` доступны только через `requireAdmin`; раздел показывает Telegram ID (профиль Telegram по ID получить нельзя), позволяет смотреть SRS/счёт/настройки прогресса, сбрасывать прогресс, блокировать/разблокировать, выдавать/снимать админку и удалять аккаунт. Самого себя и последнего администратора нельзя лишить доступа или удалить; блокировка отзывает сессии. Удаление аккаунта каскадно удаляет прогресс, сессии и challenge.
 - `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly, режимы тренажёров и `onboardingSeen` синхронизируются с сервером. Начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
@@ -125,7 +126,7 @@
 | Время | `TimeTrainer` | `time-generator.ts`; только флэш-карточки («показать ответ»), ответы не проверяются и не считаются (в статистике счёт 0) |
 | Админка | `AdminPanel` (lazy) | слова (массовые действия), категории, импорт/экспорт + проверка, дубликаты, ящики SRS, озвучка, картинки, настройки ИИ, отдельные логи ИИ, аналитика |
 
-В админке настройки ИИ и технические журналы ИИ разделены на отдельные пункты навигации. Профили промптов в «Настройках ИИ» отображаются компактным списком: подробности профиля открываются по нажатию на его название. Очередь задач и журнал ошибок загружаются только в разделе «Логи ИИ».
+В админке настройки ИИ и технические журналы ИИ разделены на отдельные пункты навигации. Профили промптов в «Настройках ИИ» отображаются компактным списком: подробности профиля открываются по нажатию на его название. Очередь задач и журнал ошибок загружаются только в разделе «Логи ИИ». Раздел «Пользователи» управляет Telegram-аккаунтами и показывает снимок сохранённого прогресса.
 
 ### Утилиты (`frontend/src/utils`)
 | Файл | Назначение |

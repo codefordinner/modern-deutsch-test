@@ -52,6 +52,7 @@ router.post('/telegram/mini-app', miniAppLimiter, asyncRoute(async (req, res) =>
   if (!telegramId) return res.status(401).json({ error: 'Не удалось проверить данные Telegram. Откройте приложение заново.' });
 
   const user = await getOrCreateTelegramUser(telegramId);
+  if (user.isBanned) return res.status(403).json({ error: 'Доступ к приложению ограничен.' });
   const token = await createUserSession(user.id);
   setUserSessionCookie(req, res, token);
   return res.json({ authenticated: true, user: { id: user.id, isAdmin: user.isAdmin } });
@@ -160,6 +161,8 @@ router.post('/telegram/challenge/complete', completeLimiter, asyncRoute(async (r
   }
 
   if (!userId) return res.status(409).json({ error: 'Подтверждение не найдено или уже использовано.' });
+  const account = await prisma.telegramUser.findUnique({ where: { id: userId }, select: { isBanned: true } });
+  if (!account || account.isBanned) return res.status(403).json({ error: 'Доступ к приложению ограничен.' });
   setUserSessionCookie(req, res, token);
   clearChallengeCookie(req, res);
   res.setHeader('Cache-Control', 'no-store');

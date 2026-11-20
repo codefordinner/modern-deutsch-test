@@ -177,6 +177,7 @@ model TelegramUser {
   id         String         @id @default(cuid())
   telegramId String         @unique
   isAdmin    Boolean        @default(false)
+  isBanned   Boolean        @default(false)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   challenges TelegramChallenge[]
