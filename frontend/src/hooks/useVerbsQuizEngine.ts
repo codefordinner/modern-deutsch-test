@@ -10,6 +10,7 @@ import type { PraesensSubMode, VerbCard, VerbQuizMode } from '../utils/verbCards
 import { buildPartizip2Options } from '../utils/verbQuiz';
 import type { Feedback, SRSRecord } from '../types';
 import { markSyncSettingsChanged } from '../utils/srsSync';
+import { getAccountSettingValue, hasAccountTrainerSettings, updateAccountSetting } from '../utils/trainerSettingsStore';
 
 export type { PraesensSubMode, VerbQuizMode } from '../utils/verbCards';
 
@@ -39,6 +40,10 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
 
   const [currentCard, setCurrentCard] = useState<VerbCard | null>(null);
   const [praesensSubMode, setPraesensSubMode] = useState<PraesensSubMode>(() => {
+    if (hasAccountTrainerSettings()) {
+      const saved = getAccountSettingValue(SUBMODE_STORAGE_KEY);
+      return saved === 'praesens' || saved === 'form_to_infinitive' || saved === 'both' ? saved : 'both';
+    }
     try {
       const saved = localStorage.getItem(SUBMODE_STORAGE_KEY);
       return saved === 'praesens' || saved === 'form_to_infinitive' || saved === 'both' ? saved : 'both';
@@ -46,6 +51,23 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
       return 'both';
     }
   });
+  useEffect(() => {
+    const onSettingsUpdated = () => {
+      if (hasAccountTrainerSettings()) {
+        const saved = getAccountSettingValue(SUBMODE_STORAGE_KEY);
+        if (saved === 'praesens' || saved === 'form_to_infinitive' || saved === 'both') setPraesensSubMode(saved);
+        return;
+      }
+      try {
+        const saved = localStorage.getItem(SUBMODE_STORAGE_KEY);
+        setPraesensSubMode(saved === 'praesens' || saved === 'form_to_infinitive' || saved === 'both' ? saved : 'both');
+      } catch {
+        setPraesensSubMode('both');
+      }
+    };
+    window.addEventListener('app-storage-updated', onSettingsUpdated);
+    return () => window.removeEventListener('app-storage-updated', onSettingsUpdated);
+  }, []);
 
   const [userInput, setUserInput] = useState('');
   const [praeteritumInput, setPraeteritumInput] = useState('');
@@ -62,11 +84,14 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
 
   const handleSetPraesensSubMode = (val: PraesensSubMode) => {
     setPraesensSubMode(val);
+    if (hasAccountTrainerSettings()) updateAccountSetting(SUBMODE_STORAGE_KEY, val);
     markSyncSettingsChanged();
-    try {
-      localStorage.setItem(SUBMODE_STORAGE_KEY, val);
-    } catch {
-      // Non-blocking: the choice just won't persist across reloads.
+    if (!hasAccountTrainerSettings()) {
+      try {
+        localStorage.setItem(SUBMODE_STORAGE_KEY, val);
+      } catch {
+        // Non-blocking: the choice just won't persist across reloads.
+      }
     }
   };
 

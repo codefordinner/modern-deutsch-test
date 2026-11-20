@@ -33,9 +33,24 @@ describe('SRS sync data', () => {
       numbers: { directionMode: 'mixed', range: { min: 10, max: 1000 } },
       verbs: { mode: 'praesens', praesensSubMode: 'form_to_infinitive' },
       time: { displayMode: 'both', stepMode: '5min' },
-      srs: { words: false, verbs: true, articles: true },
+      srs: { words: false, verbs: true, articles: true, dueOnly: false },
     });
     expect(mergeSyncData(data, emptySyncData()).settings.trainerPrefs).toEqual(data.settings.trainerPrefs);
+  });
+
+  it('migrates legacy local trainer settings even when shared profile settings are newer', () => {
+    const legacyProfile = sanitizeSyncData({ settings: { updatedAt: 500 } });
+    const localSettings = sanitizeSyncData({
+      settings: {
+        updatedAt: 100,
+        trainerPrefsUpdatedAt: 100,
+        trainerPrefs: { numbers: { directionMode: 'mixed', range: { min: 5, max: 200 } } },
+      },
+    });
+    expect(mergeSyncData(legacyProfile, localSettings).settings.trainerPrefs.numbers).toEqual({
+      directionMode: 'mixed',
+      range: { min: 5, max: 200 },
+    });
   });
 });
 

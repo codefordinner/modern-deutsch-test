@@ -1,5 +1,10 @@
 import { useSyncExternalStore } from 'react';
 import { localDayKey } from './srs';
+import {
+  hasAccountTrainerSettings,
+  updateAccountDailyGoal,
+  updateAccountDueOnly,
+} from './trainerSettingsStore';
 
 // Study preferences shared by every trainer, plus the "answers today" counter
 // behind the daily goal. Persisted in localStorage; every mounted component
@@ -57,10 +62,16 @@ export function setStudyPrefs(partial: Partial<StudyPrefs>): void {
     dueOnly: partial.dueOnly ?? prefs.dueOnly,
     dailyGoal: partial.dailyGoal === undefined ? prefs.dailyGoal : sanitizeGoal(partial.dailyGoal),
   };
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  } catch {
-    // Non-blocking: the setting just won't persist across reloads.
+  if (hasAccountTrainerSettings()) {
+    updateAccountDueOnly(prefs.dueOnly);
+    updateAccountDailyGoal(prefs.dailyGoal);
+    window.dispatchEvent(new Event('learner-account-setting-changed'));
+  } else {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // Non-blocking: the setting just won't persist across reloads.
+    }
   }
   notify();
 }
@@ -68,11 +79,30 @@ export function setStudyPrefs(partial: Partial<StudyPrefs>): void {
 /** Applies settings received from another device without touching the daily counter. */
 export function applySyncedDailyGoal(dailyGoal: number): void {
   prefs = { ...prefs, dailyGoal: sanitizeGoal(dailyGoal) };
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  } catch {
-    // Non-blocking
+  if (!hasAccountTrainerSettings()) {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // Non-blocking
+    }
   }
+  notify();
+}
+
+export function applySyncedStudyPrefs(dailyGoal: number, dueOnly: boolean): void {
+  prefs = { dailyGoal: sanitizeGoal(dailyGoal), dueOnly };
+  if (!hasAccountTrainerSettings()) {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // Non-blocking
+    }
+  }
+  notify();
+}
+
+export function resetAccountStudyPrefs(): void {
+  prefs = { ...DEFAULT_STUDY_PREFS };
   notify();
 }
 

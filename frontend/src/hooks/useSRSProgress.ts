@@ -7,6 +7,7 @@ import { pickRandom } from '../utils/random';
 import { getSrsPromotionThreshold } from '../utils/srsWeights';
 import { useUISettings } from './useUISettings';
 import { markSrsReset, markSyncSettingsChanged, scheduleSync, SRS_SYNCED_EVENT, toSrsTrainer } from '../utils/srsSync';
+import { getAccountSettingValue, hasAccountTrainerSettings, updateAccountSetting } from '../utils/trainerSettingsStore';
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -49,7 +50,7 @@ export function useSRSProgress(storagePrefix: string) {
   const stateKey = `${storagePrefix}_srs_state`;
 
   const [useSRS, setUseSRSState] = useState<boolean>(() => {
-    const saved = readJSON<unknown>(useSrsKey, true);
+    const saved = hasAccountTrainerSettings() ? getAccountSettingValue(useSrsKey) : readJSON<unknown>(useSrsKey, true);
     return typeof saved === 'boolean' ? saved : true;
   });
   const [srsMap, setSrsMap] = useState<SRSMap>(() => sanitizeSRSMap(readJSON<unknown>(stateKey, {})));
@@ -76,7 +77,7 @@ export function useSRSProgress(storagePrefix: string) {
 
   useEffect(() => {
     const onSettingsUpdated = () => {
-      const saved = readJSON<unknown>(useSrsKey, true);
+      const saved = hasAccountTrainerSettings() ? getAccountSettingValue(useSrsKey) : readJSON<unknown>(useSrsKey, true);
       setUseSRSState(typeof saved === 'boolean' ? saved : true);
     };
     window.addEventListener('app-storage-updated', onSettingsUpdated);
@@ -86,7 +87,8 @@ export function useSRSProgress(storagePrefix: string) {
   const setUseSRS = useCallback(
     (value: boolean) => {
       setUseSRSState(value);
-      writeJSON(useSrsKey, value);
+      if (hasAccountTrainerSettings()) updateAccountSetting(useSrsKey, value);
+      else writeJSON(useSrsKey, value);
       markSyncSettingsChanged();
     },
     [useSrsKey]

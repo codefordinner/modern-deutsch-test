@@ -18,13 +18,13 @@ export function emptySyncData() {
     srs: { words: {}, verbs: {}, articles: {} },
     resetAt: { words: 0, verbs: 0, articles: 0 },
     settings: {
-      dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0,
+      dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0, trainerPrefsUpdatedAt: 0,
       trainerPrefs: {
         words: { directionMode: 'ru_to_de', requireArticle: true, enableBase: true, enablePlural: true, enableFeminine: true },
         numbers: { directionMode: 'num_to_de', range: { min: 0, max: 100 } },
         verbs: { mode: 'stammformen', praesensSubMode: 'both' },
         time: { displayMode: 'analog', stepMode: 'any' },
-        srs: { words: true, verbs: true, articles: true },
+        srs: { words: true, verbs: true, articles: true, dueOnly: false },
       },
     },
     scores: { numbers: emptyScore(), words: emptyScore(), articles: emptyScore(), verbs: emptyScore() },
@@ -77,6 +77,11 @@ export function sanitizeSyncData(raw) {
     articlesCategories: categoryList(settings.articlesCategories),
     updatedAt: count(settings.updatedAt),
     trainerPrefs: sanitizeTrainerPrefs(settings.trainerPrefs),
+    // Older account snapshots only had the shared timestamp; legacy snapshots without
+    // trainerPrefs use zero so local trainer settings can be imported once.
+    trainerPrefsUpdatedAt: settings.trainerPrefsUpdatedAt === undefined
+      ? (isRecord(settings.trainerPrefs) ? count(settings.updatedAt) : 0)
+      : count(settings.trainerPrefsUpdatedAt),
   };
   for (const trainer of SCORE_TRAINERS) result.scores[trainer] = sanitizeScore(scores[trainer]);
   result.daily = sanitizeDaily(raw.daily);
@@ -132,6 +137,7 @@ function sanitizeTrainerPrefs(raw) {
       words: bool(srs.words, true),
       verbs: bool(srs.verbs, true),
       articles: bool(srs.articles, true),
+      dueOnly: bool(srs.dueOnly, false),
     },
   };
 }
@@ -151,7 +157,13 @@ export function mergeSyncData(a, b) {
       if (!current || time > Date.parse(current.lastReviewed)) merged.srs[trainer][key] = record;
     }
   }
-  merged.settings = a.settings.updatedAt >= b.settings.updatedAt ? a.settings : b.settings;
+  const latestSettings = a.settings.updatedAt >= b.settings.updatedAt ? a.settings : b.settings;
+  const latestTrainerPrefs = a.settings.trainerPrefsUpdatedAt >= b.settings.trainerPrefsUpdatedAt ? a.settings : b.settings;
+  merged.settings = {
+    ...latestSettings,
+    trainerPrefs: latestTrainerPrefs.trainerPrefs,
+    trainerPrefsUpdatedAt: Math.max(a.settings.trainerPrefsUpdatedAt, b.settings.trainerPrefsUpdatedAt),
+  };
   for (const trainer of SCORE_TRAINERS) merged.scores[trainer] = pickScore(a.scores[trainer], b.scores[trainer]);
   merged.daily = mergeDaily(a.daily, b.daily);
   return merged;

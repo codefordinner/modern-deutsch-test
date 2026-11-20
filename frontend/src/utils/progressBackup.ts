@@ -16,7 +16,7 @@ export const BACKUP_KEYS = [
   'app_srs_reset_at', // SRS sync: when each trainer was last reset
   'app_sync_settings_updated_at',
   'verbs_praesens_submode',
-  // Trainer settings (usePersistentState)
+  // Legacy trainer preferences remain exportable for unauthenticated profiles.
   'words_settings',
   'numbers_direction',
   'numbers_range',

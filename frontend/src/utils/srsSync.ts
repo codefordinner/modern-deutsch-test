@@ -3,7 +3,14 @@ import { getErrorMessage } from '../api/request';
 import type { SrsSyncData, SrsTrainer } from '../types';
 import { emptySyncData, mergeSyncData, readSyncKey, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
 import { getUISettings, setUISettings } from './uiSettings';
-import { applySyncedDailyGoal, applySyncedDailyProgress, getDailyProgress, getStudyPrefs } from './studyPrefs';
+import { applySyncedStudyPrefs, applySyncedDailyProgress, getDailyProgress, getStudyPrefs } from './studyPrefs';
+import {
+  clearAccountTrainerSettings,
+  clearLocalAccountSettings,
+  getAccountTrainerSettings,
+  hasAccountTrainerSettings,
+  setAccountTrainerSettings,
+} from './trainerSettingsStore';
 
 // Syncs progress through Telegram accounts, with the legacy sync key as a migration path and
 // fallback for unauthenticated use. Pure merge logic lives in srsSyncData.ts; this file handles
@@ -58,6 +65,7 @@ function readLocal(): SrsSyncData {
   const wordsSettings = readJSON('words_settings');
   const articlesCategories = readJSON('articles_category');
   // Normalise through the merge so records older than a reset are dropped here too.
+  const accountSettings = getAccountTrainerSettings();
   return mergeSyncData(sanitizeSyncData({
     srs,
     resetAt: readJSON(RESET_AT_KEY),
@@ -65,16 +73,22 @@ function readLocal(): SrsSyncData {
     daily: getDailyProgress(),
     settings: {
       // The in-memory prefs are already sanitised and default to 20; the raw storage value may be missing.
-      dailyGoal: getStudyPrefs().dailyGoal,
-      wordsCategories: (wordsSettings as { selectedCats?: unknown } | null)?.selectedCats,
-      articlesCategories,
-      updatedAt: readJSON('app_sync_settings_updated_at'),
-      trainerPrefs: {
+      dailyGoal: accountSettings?.dailyGoal ?? getStudyPrefs().dailyGoal,
+      wordsCategories: accountSettings?.wordsCategories ?? (wordsSettings as { selectedCats?: unknown } | null)?.selectedCats,
+      articlesCategories: accountSettings?.articlesCategories ?? articlesCategories,
+      updatedAt: accountSettings?.updatedAt ?? readJSON('app_sync_settings_updated_at'),
+      trainerPrefsUpdatedAt: accountSettings?.trainerPrefsUpdatedAt ?? readJSON('app_sync_settings_updated_at'),
+      trainerPrefs: accountSettings?.trainerPrefs ?? {
         words: wordsSettings,
         numbers: { directionMode: readJSON('numbers_direction'), range: readJSON('numbers_range') },
         verbs: { mode: readJSON('verbs_mode'), praesensSubMode: readPlain('verbs_praesens_submode') },
         time: { displayMode: readJSON('time_display_mode'), stepMode: readJSON('time_step_mode') },
-        srs: { words: readJSON('words_use_srs'), verbs: readJSON('verbs_use_srs'), articles: readJSON('articles_use_srs') },
+        srs: {
+          words: readJSON('words_use_srs'),
+          verbs: readJSON('verbs_use_srs'),
+          articles: readJSON('articles_use_srs'),
+          dueOnly: getStudyPrefs().dueOnly,
+        },
       },
     },
   }), emptySyncData());
@@ -111,7 +125,12 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): bo
 
   try {
     localStorage.setItem(RESET_AT_KEY, JSON.stringify(data.resetAt));
-    if (force || data.settings.updatedAt !== previous.settings.updatedAt) {
+    if (learnerUserId) {
+      setAccountTrainerSettings(data.settings, learnerUserId);
+      clearLocalAccountSettings();
+      // Categories and trainer mode values are owned by the Telegram profile now.
+      changed = true;
+    } else if (force || data.settings.updatedAt !== previous.settings.updatedAt) {
       localStorage.setItem('articles_category', JSON.stringify(data.settings.articlesCategories));
       localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(data.settings.updatedAt));
       const prefs = data.settings.trainerPrefs;
@@ -132,12 +151,14 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): bo
       localStorage.setItem('time_display_mode', JSON.stringify(prefs.time.displayMode));
       localStorage.setItem('time_step_mode', JSON.stringify(prefs.time.stepMode));
       for (const trainer of SRS_TRAINERS) localStorage.setItem(`${trainer}_use_srs`, JSON.stringify(prefs.srs[trainer]));
-      // Writes app_study_prefs itself (keeping this device's dueOnly) and notifies subscribers.
-      applySyncedDailyGoal(data.settings.dailyGoal);
       window.dispatchEvent(new CustomEvent('app-storage-updated', {
         detail: { keys: ['words_settings', 'articles_category', 'app_study_prefs', 'numbers_direction', 'numbers_range', 'verbs_mode', 'verbs_praesens_submode', 'time_display_mode', 'time_step_mode', 'words_use_srs', 'verbs_use_srs', 'articles_use_srs'] },
       }));
       changed = true;
+    }
+    if (learnerUserId) {
+      applySyncedStudyPrefs(data.settings.dailyGoal, data.settings.trainerPrefs.srs.dueOnly);
+      window.dispatchEvent(new CustomEvent('app-storage-updated', { detail: { keys: ['app_study_prefs'] } }));
     }
   } catch {
     // ignore
@@ -199,6 +220,7 @@ export function setLearnerSyncUser(userId: string | null): void {
 export function prepareLearnerSyncUser(userId: string): void {
   const storedUserId = getStoredLearnerId();
   if (storedUserId && storedUserId !== userId) {
+    clearAccountTrainerSettings(storedUserId);
     clearLocalSyncedData();
     applySyncedDailyProgress('', 0, true);
     window.dispatchEvent(new Event(SRS_SYNCED_EVENT));
@@ -323,10 +345,12 @@ export function flushPendingSync(): void {
 
 /** Marks learner settings as changed, then schedules the normal debounced exchange. */
 export function markSyncSettingsChanged(): void {
-  try {
-    localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(Date.now()));
-  } catch {
-    // ignore unavailable storage
+  if (!hasAccountTrainerSettings()) {
+    try {
+      localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(Date.now()));
+    } catch {
+      // ignore unavailable storage
+    }
   }
   scheduleSync();
 }

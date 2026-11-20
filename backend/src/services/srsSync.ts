@@ -23,7 +23,7 @@ export interface SyncDaily { day: string; count: number }
 export interface SyncData {
   srs: Record<SyncTrainer, SyncMap>;
   resetAt: Record<SyncTrainer, number>;
-  settings: { dailyGoal: number; wordsCategories: string[]; articlesCategories: string[]; updatedAt: number; trainerPrefs: SharedSyncData['settings']['trainerPrefs'] };
+  settings: { dailyGoal: number; wordsCategories: string[]; articlesCategories: string[]; updatedAt: number; trainerPrefsUpdatedAt: number; trainerPrefs: SharedSyncData['settings']['trainerPrefs'] };
   scores: Record<SyncScoreTrainer, SyncScore>;
   daily: SyncDaily;
 }

@@ -11,6 +11,8 @@ import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
 import { prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
+import { clearAccountTrainerSettings, hasAccountTrainerSettings } from './utils/trainerSettingsStore';
+import { resetAccountStudyPrefs } from './utils/studyPrefs';
 import type { ScoredTab } from './config/tabs';
 import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -57,6 +59,7 @@ export function App() {
     setLearnerSyncUser(user.id);
     // Hydrate account-owned trainer preferences before any trainer is mounted.
     await syncNow();
+    if (!hasAccountTrainerSettings()) throw new Error('Не удалось загрузить настройки аккаунта.');
     setLearner(user);
     setAuthError('');
     setAuthLoading(false);
@@ -118,11 +121,13 @@ export function App() {
     setLogoutError('');
     try {
       await logoutLearner();
+      clearAccountTrainerSettings(learner?.id);
+      resetAccountStudyPrefs();
       setLearner(null);
     } catch (error) {
       setLogoutError(getErrorMessage(error, 'Не удалось завершить сеанс. Попробуйте ещё раз.'));
     }
-  }, []);
+  }, [learner]);
 
   const { scores, recordAnswer, resetScore } = useScores();
   const scoredTab: ScoredTab | null = getTabDefinition(activeTab).scored ? activeTab as ScoredTab : null;

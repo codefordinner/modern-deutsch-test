@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { flushPendingSync, getSyncStatus, setLearnerSyncUser, subscribeSyncStatus, syncNow } from '../utils/srsSync';
+import { flushPendingSync, getSyncStatus, scheduleSync, setLearnerSyncUser, subscribeSyncStatus, syncNow } from '../utils/srsSync';
 import type { SyncStatus } from '../utils/srsSync';
 import { readSyncKey } from '../utils/srsSyncData';
 import { useUISettings } from './useUISettings';
@@ -30,13 +30,16 @@ export function useSrsSync(userId: string | null): void {
     };
     const onOnline = () => void syncNow();
     const onPageHide = () => flushPendingSync();
+    const onAccountSettingChanged = () => scheduleSync();
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
     window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('learner-account-setting-changed', onAccountSettingChanged);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('learner-account-setting-changed', onAccountSettingChanged);
     };
   }, [key, userId]);
 }
