@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { markSyncSettingsChanged } from '../utils/srsSync';
+
+const ACCOUNT_SETTING_KEYS = new Set([
+  'words_settings', 'numbers_direction', 'numbers_range', 'verbs_mode',
+  'verbs_praesens_submode', 'time_display_mode', 'time_step_mode',
+]);
 
 /**
  * `useState` whose value lives in localStorage, so a setting survives a reload
@@ -49,7 +55,11 @@ export function usePersistentState<T>(
     return () => window.removeEventListener('app-storage-updated', onSynced);
   }, [key, sanitize]);
 
-  return [value, setValue];
+  const setPersistentValue: Dispatch<SetStateAction<T>> = useCallback((action) => {
+    setValue(action);
+    if (ACCOUNT_SETTING_KEYS.has(key)) markSyncSettingsChanged();
+  }, [key]);
+  return [value, setPersistentValue];
 }
 
 /** Sanitizer for a value that must be one of a fixed list of strings. */

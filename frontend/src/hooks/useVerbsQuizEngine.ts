@@ -9,6 +9,7 @@ import { buildVerbCards, isCardInSelection, selectVerbCards } from '../utils/ver
 import type { PraesensSubMode, VerbCard, VerbQuizMode } from '../utils/verbCards';
 import { buildPartizip2Options } from '../utils/verbQuiz';
 import type { Feedback, SRSRecord } from '../types';
+import { markSyncSettingsChanged } from '../utils/srsSync';
 
 export type { PraesensSubMode, VerbQuizMode } from '../utils/verbCards';
 
@@ -61,6 +62,7 @@ export function useVerbsQuizEngine(onAnswer: (ok: boolean) => void) {
 
   const handleSetPraesensSubMode = (val: PraesensSubMode) => {
     setPraesensSubMode(val);
+    markSyncSettingsChanged();
     try {
       localStorage.setItem(SUBMODE_STORAGE_KEY, val);
     } catch {

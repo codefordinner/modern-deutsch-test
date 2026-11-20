@@ -14,6 +14,29 @@ describe('SRS sync data', () => {
   it('drops malformed records', () => {
     expect(sanitizeSyncData({ srs: { words: { bad: { box: 99 } } } }).srs.words).toEqual({});
   });
+
+  it('sanitizes and syncs account-owned trainer preferences', () => {
+    const data = sanitizeSyncData({
+      settings: {
+        updatedAt: 12,
+        trainerPrefs: {
+          words: { directionMode: 'de_to_ru', enablePlural: false },
+          numbers: { directionMode: 'mixed', range: { min: 10, max: 1000 } },
+          verbs: { mode: 'praesens', praesensSubMode: 'form_to_infinitive' },
+          time: { displayMode: 'both', stepMode: '5min' },
+          srs: { words: false },
+        },
+      },
+    });
+    expect(data.settings.trainerPrefs).toMatchObject({
+      words: { directionMode: 'de_to_ru', enablePlural: false, enableBase: true },
+      numbers: { directionMode: 'mixed', range: { min: 10, max: 1000 } },
+      verbs: { mode: 'praesens', praesensSubMode: 'form_to_infinitive' },
+      time: { displayMode: 'both', stepMode: '5min' },
+      srs: { words: false, verbs: true, articles: true },
+    });
+    expect(mergeSyncData(data, emptySyncData()).settings.trainerPrefs).toEqual(data.settings.trainerPrefs);
+  });
 });
 
 describe('score and daily counter sync', () => {

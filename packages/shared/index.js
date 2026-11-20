@@ -17,7 +17,16 @@ export function emptySyncData() {
   return {
     srs: { words: {}, verbs: {}, articles: {} },
     resetAt: { words: 0, verbs: 0, articles: 0 },
-    settings: { dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0 },
+    settings: {
+      dailyGoal: 20, wordsCategories: ['all'], articlesCategories: ['all'], updatedAt: 0,
+      trainerPrefs: {
+        words: { directionMode: 'ru_to_de', requireArticle: true, enableBase: true, enablePlural: true, enableFeminine: true },
+        numbers: { directionMode: 'num_to_de', range: { min: 0, max: 100 } },
+        verbs: { mode: 'stammformen', praesensSubMode: 'both' },
+        time: { displayMode: 'analog', stepMode: 'any' },
+        srs: { words: true, verbs: true, articles: true },
+      },
+    },
     scores: { numbers: emptyScore(), words: emptyScore(), articles: emptyScore(), verbs: emptyScore() },
     daily: { day: '', count: 0 },
   };
@@ -67,6 +76,7 @@ export function sanitizeSyncData(raw) {
     wordsCategories: categoryList(settings.wordsCategories),
     articlesCategories: categoryList(settings.articlesCategories),
     updatedAt: count(settings.updatedAt),
+    trainerPrefs: sanitizeTrainerPrefs(settings.trainerPrefs),
   };
   for (const trainer of SCORE_TRAINERS) result.scores[trainer] = sanitizeScore(scores[trainer]);
   result.daily = sanitizeDaily(raw.daily);
@@ -83,6 +93,47 @@ export function sanitizeSyncData(raw) {
     }
   }
   return result;
+}
+
+function sanitizeTrainerPrefs(raw) {
+  const value = isRecord(raw) ? raw : {};
+  const words = isRecord(value.words) ? value.words : {};
+  const numbers = isRecord(value.numbers) ? value.numbers : {};
+  const range = isRecord(numbers.range) ? numbers.range : {};
+  const verbs = isRecord(value.verbs) ? value.verbs : {};
+  const time = isRecord(value.time) ? value.time : {};
+  const srs = isRecord(value.srs) ? value.srs : {};
+  const min = Number(range.min);
+  const max = Number(range.max);
+  const validRange = Number.isInteger(min) && Number.isInteger(max) && min >= 0 && max > min && max <= 999_999_999;
+  const select = (rawValue, allowed, fallback) => allowed.includes(rawValue) ? rawValue : fallback;
+  const bool = (rawValue, fallback) => typeof rawValue === 'boolean' ? rawValue : fallback;
+  return {
+    words: {
+      directionMode: select(words.directionMode, ['ru_to_de', 'de_to_ru', 'mixed'], 'ru_to_de'),
+      requireArticle: bool(words.requireArticle, true),
+      enableBase: bool(words.enableBase, true),
+      enablePlural: bool(words.enablePlural, true),
+      enableFeminine: bool(words.enableFeminine, true),
+    },
+    numbers: {
+      directionMode: select(numbers.directionMode, ['de_to_num', 'num_to_de', 'mixed'], 'num_to_de'),
+      range: validRange ? { min, max } : { min: 0, max: 100 },
+    },
+    verbs: {
+      mode: select(verbs.mode, ['praesens', 'stammformen', 'multiple_choice', 'required_case'], 'stammformen'),
+      praesensSubMode: select(verbs.praesensSubMode, ['praesens', 'form_to_infinitive', 'both'], 'both'),
+    },
+    time: {
+      displayMode: select(time.displayMode, ['analog', 'digital', 'both'], 'analog'),
+      stepMode: select(time.stepMode, ['any', '5min'], 'any'),
+    },
+    srs: {
+      words: bool(srs.words, true),
+      verbs: bool(srs.verbs, true),
+      articles: bool(srs.articles, true),
+    },
+  };
 }
 
 const pickScore = (a, b) => a.updatedAt !== b.updatedAt ? { ...(a.updatedAt > b.updatedAt ? a : b) } : { ...(b.total > a.total ? b : a) };

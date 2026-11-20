@@ -10,7 +10,7 @@ import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
-import { prepareLearnerSyncUser } from './utils/srsSync';
+import { prepareLearnerSyncUser, setLearnerSyncUser, syncNow } from './utils/srsSync';
 import type { ScoredTab } from './config/tabs';
 import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -52,8 +52,11 @@ export function App() {
     setIsOnboardingOpen(false);
   };
 
-  const handleLearnerAuthenticated = useCallback((user: LearnerSession['user']) => {
+  const handleLearnerAuthenticated = useCallback(async (user: LearnerSession['user']) => {
     prepareLearnerSyncUser(user.id);
+    setLearnerSyncUser(user.id);
+    // Hydrate account-owned trainer preferences before any trainer is mounted.
+    await syncNow();
     setLearner(user);
     setAuthError('');
     setAuthLoading(false);
@@ -82,7 +85,7 @@ export function App() {
         if (active) setAuthRequired(config.required);
         try {
           const session = await getLearnerSession();
-          if (active) handleLearnerAuthenticated(session.user);
+          if (active) await handleLearnerAuthenticated(session.user);
         } catch {
           if (!active) return;
           const initData = window.Telegram?.WebApp?.initData;
@@ -90,7 +93,7 @@ export function App() {
             miniAppAttempted.current = true;
             try {
               const session = await loginWithMiniApp(initData);
-              if (active) handleLearnerAuthenticated(session.user);
+              if (active) await handleLearnerAuthenticated(session.user);
             } catch (error) {
               if (active && config.required) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
             }
@@ -178,10 +181,10 @@ export function App() {
 
   // Learner accounts gate training only. The existing admin area keeps its
   // independent cookie-based authentication and can still be opened directly.
+  if (activeTab !== 'admin' && authLoading) {
+    return <main className="telegram-login" id="main" aria-live="polite">Загружаем профиль ученика…</main>;
+  }
   if (activeTab !== 'admin' && authRequired && !learner) {
-    if (authLoading) {
-      return <main className="telegram-login" id="main" aria-live="polite">Проверяем вход…</main>;
-    }
     return <TelegramLogin onAuthenticated={handleLearnerAuthenticated} initialError={authError} />;
   }
 

@@ -44,6 +44,14 @@ function readJSON(key: string): unknown {
   }
 }
 
+function readPlain(key: string): unknown {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 function readLocal(): SrsSyncData {
   const srs: Record<string, unknown> = {};
   for (const trainer of SRS_TRAINERS) srs[trainer] = readJSON(stateKeyOf(trainer));
@@ -61,6 +69,13 @@ function readLocal(): SrsSyncData {
       wordsCategories: (wordsSettings as { selectedCats?: unknown } | null)?.selectedCats,
       articlesCategories,
       updatedAt: readJSON('app_sync_settings_updated_at'),
+      trainerPrefs: {
+        words: wordsSettings,
+        numbers: { directionMode: readJSON('numbers_direction'), range: readJSON('numbers_range') },
+        verbs: { mode: readJSON('verbs_mode'), praesensSubMode: readPlain('verbs_praesens_submode') },
+        time: { displayMode: readJSON('time_display_mode'), stepMode: readJSON('time_step_mode') },
+        srs: { words: readJSON('words_use_srs'), verbs: readJSON('verbs_use_srs'), articles: readJSON('articles_use_srs') },
+      },
     },
   }), emptySyncData());
 }
@@ -97,13 +112,30 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): bo
   try {
     localStorage.setItem(RESET_AT_KEY, JSON.stringify(data.resetAt));
     if (force || data.settings.updatedAt !== previous.settings.updatedAt) {
-      localStorage.setItem('words_settings', JSON.stringify({ ...(readJSON('words_settings') as object ?? {}), selectedCats: data.settings.wordsCategories }));
       localStorage.setItem('articles_category', JSON.stringify(data.settings.articlesCategories));
       localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(data.settings.updatedAt));
+      const prefs = data.settings.trainerPrefs;
+      const words = readJSON('words_settings');
+      localStorage.setItem('words_settings', JSON.stringify({
+        ...(typeof words === 'object' && words !== null ? words : {}),
+        directionMode: prefs.words.directionMode,
+        requireArticle: prefs.words.requireArticle,
+        enableBase: prefs.words.enableBase,
+        enablePlural: prefs.words.enablePlural,
+        enableFeminine: prefs.words.enableFeminine,
+        selectedCats: data.settings.wordsCategories,
+      }));
+      localStorage.setItem('numbers_direction', JSON.stringify(prefs.numbers.directionMode));
+      localStorage.setItem('numbers_range', JSON.stringify(prefs.numbers.range));
+      localStorage.setItem('verbs_mode', JSON.stringify(prefs.verbs.mode));
+      localStorage.setItem('verbs_praesens_submode', prefs.verbs.praesensSubMode);
+      localStorage.setItem('time_display_mode', JSON.stringify(prefs.time.displayMode));
+      localStorage.setItem('time_step_mode', JSON.stringify(prefs.time.stepMode));
+      for (const trainer of SRS_TRAINERS) localStorage.setItem(`${trainer}_use_srs`, JSON.stringify(prefs.srs[trainer]));
       // Writes app_study_prefs itself (keeping this device's dueOnly) and notifies subscribers.
       applySyncedDailyGoal(data.settings.dailyGoal);
       window.dispatchEvent(new CustomEvent('app-storage-updated', {
-        detail: { keys: ['words_settings', 'articles_category', 'app_study_prefs'] },
+        detail: { keys: ['words_settings', 'articles_category', 'app_study_prefs', 'numbers_direction', 'numbers_range', 'verbs_mode', 'verbs_praesens_submode', 'time_display_mode', 'time_step_mode', 'words_use_srs', 'verbs_use_srs', 'articles_use_srs'] },
       }));
       changed = true;
     }
@@ -154,6 +186,7 @@ const lastSyncedOf = (s: SyncStatus): number | null => (s.state === 'off' ? null
 
 let running = false;
 let rerun = false;
+const syncWaiters: Array<() => void> = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let learnerUserId: string | null = null;
 let forceReplaceForUserId: string | null = null;
@@ -197,6 +230,8 @@ export async function syncNow(): Promise<void> {
   }
   if (running) {
     rerun = true;
+    await new Promise<void>((resolve) => syncWaiters.push(resolve));
+    await syncNow();
     return;
   }
   running = true;
@@ -256,6 +291,7 @@ export async function syncNow(): Promise<void> {
     } while (rerun);
   } finally {
     running = false;
+    syncWaiters.splice(0).forEach((resolve) => resolve());
   }
 }
 

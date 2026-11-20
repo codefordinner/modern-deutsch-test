@@ -8,6 +8,7 @@ import {
   SRS_TRAINERS,
   SCORE_TRAINERS,
 } from '@sprachfunke/shared';
+import type { SharedSyncData } from '@sprachfunke/shared';
 export { MIN_SYNC_KEY_LENGTH, MAX_SYNC_KEY_LENGTH } from '@sprachfunke/shared';
 
 export const SYNC_TRAINERS = SRS_TRAINERS;
@@ -22,7 +23,7 @@ export interface SyncDaily { day: string; count: number }
 export interface SyncData {
   srs: Record<SyncTrainer, SyncMap>;
   resetAt: Record<SyncTrainer, number>;
-  settings: { dailyGoal: number; wordsCategories: string[]; articlesCategories: string[]; updatedAt: number };
+  settings: { dailyGoal: number; wordsCategories: string[]; articlesCategories: string[]; updatedAt: number; trainerPrefs: SharedSyncData['settings']['trainerPrefs'] };
   scores: Record<SyncScoreTrainer, SyncScore>;
   daily: SyncDaily;
 }

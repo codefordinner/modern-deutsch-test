@@ -87,6 +87,13 @@ export interface SyncSettings {
   wordsCategories: string[];
   articlesCategories: string[];
   updatedAt: number;
+  trainerPrefs: {
+    words: { directionMode: 'ru_to_de' | 'de_to_ru' | 'mixed'; requireArticle: boolean; enableBase: boolean; enablePlural: boolean; enableFeminine: boolean };
+    numbers: { directionMode: 'de_to_num' | 'num_to_de' | 'mixed'; range: NumberRangeSettings };
+    verbs: { mode: 'praesens' | 'stammformen' | 'multiple_choice' | 'required_case'; praesensSubMode: 'praesens' | 'form_to_infinitive' | 'both' };
+    time: { displayMode: 'analog' | 'digital' | 'both'; stepMode: 'any' | '5min' };
+    srs: Record<SrsTrainer, boolean>;
+  };
 }
 
 export interface NumberRangeSettings {

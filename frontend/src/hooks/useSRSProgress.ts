@@ -6,7 +6,7 @@ import { useStudyPrefs } from '../utils/studyPrefs';
 import { pickRandom } from '../utils/random';
 import { getSrsPromotionThreshold } from '../utils/srsWeights';
 import { useUISettings } from './useUISettings';
-import { markSrsReset, scheduleSync, SRS_SYNCED_EVENT, toSrsTrainer } from '../utils/srsSync';
+import { markSrsReset, markSyncSettingsChanged, scheduleSync, SRS_SYNCED_EVENT, toSrsTrainer } from '../utils/srsSync';
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -74,10 +74,20 @@ export function useSRSProgress(storagePrefix: string) {
     return () => window.removeEventListener(SRS_SYNCED_EVENT, onSynced);
   }, [stateKey]);
 
+  useEffect(() => {
+    const onSettingsUpdated = () => {
+      const saved = readJSON<unknown>(useSrsKey, true);
+      setUseSRSState(typeof saved === 'boolean' ? saved : true);
+    };
+    window.addEventListener('app-storage-updated', onSettingsUpdated);
+    return () => window.removeEventListener('app-storage-updated', onSettingsUpdated);
+  }, [useSrsKey]);
+
   const setUseSRS = useCallback(
     (value: boolean) => {
       setUseSRSState(value);
       writeJSON(useSrsKey, value);
+      markSyncSettingsChanged();
     },
     [useSrsKey]
   );
