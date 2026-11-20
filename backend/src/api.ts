@@ -5,7 +5,6 @@ import wordsAdminRoutes from './routes/words-admin.routes';
 import categoriesRoutes from './routes/categories.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import settingsRoutes from './routes/settings.routes';
-import syncRoutes from './routes/sync.routes';
 import { requireSameOrigin } from './middleware/csrf.middleware';
 import { normalizeWordBody } from './middleware/normalizeWordBody.middleware';
 import audioRoutes from './routes/audio.routes';
@@ -31,7 +30,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/audio', audioRoutes);
 router.use('/pictures', picturesRoutes);
-router.use('/sync', syncRoutes);
 // Token-authenticated local automation endpoints; mounted separately from browser admin auth.
 router.use('/internal', internalRoutes);
 

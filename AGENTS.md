@@ -29,7 +29,7 @@ Sprachfunke: тренажёр немецкого для русскоязычны
 3. Каждый админский эндпоинт защищён `requireAdmin`; изменяющие запросы проходят `requireSameOrigin` (CSRF, подключён глобально в `backend/src/api.ts`). Клиентские мутации — только через API-слой с `auth: true` для админских запросов.
 4. Новый админский роутер подключайте в `backend/src/api.ts` **до** `words.routes` (иначе `/:id` перехватит путь).
 5. Пользователю показываем `getErrorMessage(...)` / `reportError(...)`, не сырые ошибки.
-6. Публичные «ключевые» эндпоинты (`/auth/login`, `/sync/srs`) защищены `express-rate-limit`; новый публичный эндпоинт, который можно перебирать, тоже ограничивайте.
+6. Публичные «ключевые» эндпоинты (например, `/auth/login`) защищены `express-rate-limit`; новый публичный эндпоинт, который можно перебирать, тоже ограничивайте.
 
 ### Немецкие данные
 7. **Никогда не угадывайте немецкие формы** (Präsens, Partizip II…). Нет данных → карточки нет (см. `verbConjugation.ts`).
@@ -42,7 +42,7 @@ Sprachfunke: тренажёр немецкого для русскоязычны
 12. Список карточек для тренажёра и для SRS-окна должен быть один и тот же (см. `wordCards.ts`, `verbCards.ts`).
 13. «К повторению» определяется `utils/srsDue.ts` (`isDue`); режим «только к повторению» — глобальная настройка в `utils/studyPrefs.ts`, применяется внутри `useSRSProgress.pickCard`. Не дублируйте эту логику в тренажёрах; пустой пул → `SRSIdleCard`.
 14. Веса ящиков — серверная настройка (`Setting`, ключ `srsBoxWeights`). Значения по умолчанию (`DEFAULT_SRS_WEIGHTS` в `backend/src/services/srsSettings.ts` и `DEFAULT_SRS_BOX_WEIGHTS` в `frontend/src/utils/srsWeights.ts`) и правила валидации должны совпадать.
-15. Синхронизация между устройствами: логика слияния живёт в двух копиях — `backend/src/services/srsSync.ts` и `frontend/src/utils/srsSyncData.ts`. Меняйте обе одновременно. Новый тренажёр с SRS нужно добавить в `SYNC_TRAINERS` (бэкенд), `SRS_TRAINERS` (фронт), тип `SrsTrainer` и `emptySyncData`. Сам ключ синхронизации на сервере не хранится — только его хэш.
+15. Синхронизация между устройствами работает через Telegram: логика слияния живёт в `backend/src/services/srsSync.ts` и `frontend/src/utils/srsSyncData.ts`. Меняйте обе одновременно. Новый тренажёр с SRS нужно добавить в `SYNC_TRAINERS` (бэкенд), `SRS_TRAINERS` (фронт), тип `SrsTrainer` и `emptySyncData`.
 
 ### localStorage
 16. Ключи, принадлежащие ученику, перечислены в `utils/progressBackup.ts` (`BACKUP_KEYS`). **Добавили новый ключ — добавьте его туда** и в таблицу ключей в `ARCHITECTURE.md`, иначе экспорт/импорт прогресса его потеряет.

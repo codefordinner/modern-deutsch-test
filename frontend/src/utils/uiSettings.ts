@@ -37,11 +37,6 @@ export interface UISettings {
    * words trainer and the dictionary. On by default.
    */
   highlightArticles: boolean;
-  /**
-   * Key for syncing SRS progress between devices: devices with the same key share
-   * progress (see utils/srsSync.ts). Empty (default) = no sync, nothing leaves the device.
-   */
-  syncKey: string;
   /** Playback volume for generated speech, from 0 to 1. */
   audioVolume: number;
   /** Use the administrator's correct-answer threshold before promoting SRS cards. */
@@ -58,7 +53,6 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   autoFocus: true,
   showCategoryHint: true,
   highlightArticles: true,
-  syncKey: '',
   audioVolume: 1,
   useAdminSrsPromotionThreshold: false,
 };
@@ -69,8 +63,12 @@ export function getUISettings(): UISettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_UI_SETTINGS;
     const parsed = JSON.parse(raw);
-    const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...parsed };
-    if (typeof merged.syncKey !== 'string') merged.syncKey = '';
+    const storedSettings = { ...parsed };
+    if (Object.prototype.hasOwnProperty.call(parsed, 'syncKey')) {
+      delete storedSettings.syncKey;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(storedSettings));
+    }
+    const merged: UISettings = { ...DEFAULT_UI_SETTINGS, ...storedSettings };
     if (typeof merged.highlightArticles !== 'boolean') merged.highlightArticles = true;
     if (typeof merged.useAdminSrsPromotionThreshold !== 'boolean') merged.useAdminSrsPromotionThreshold = false;
     if (typeof merged.audioVolume !== 'number' || !Number.isFinite(merged.audioVolume)) merged.audioVolume = 1;
@@ -84,7 +82,9 @@ export function getUISettings(): UISettings {
 export function setUISettings(partial: Partial<UISettings>): UISettings {
   const next = { ...getUISettings(), ...partial };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    const persisted = { ...next } as UISettings & { syncKey?: unknown };
+    delete persisted.syncKey;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch {
     // Non-blocking: the setting just won't persist across reloads.
   }

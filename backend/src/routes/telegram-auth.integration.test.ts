@@ -222,8 +222,8 @@ test('expired browser challenges cannot be confirmed or completed', async (t) =>
   assert.equal(completeResponse.status, 409);
 });
 
-test('learner progress is stored on the Telegram account and imports a legacy sync profile once', async (t) => {
-  const [{ createApp }, { prisma }, { emptySyncData, hashSyncKey }] = await Promise.all([
+test('learner progress is stored on the Telegram account without legacy sync import', async (t) => {
+  const [{ createApp }, { prisma }, { emptySyncData }] = await Promise.all([
     import('../app'),
     import('../db'),
     import('../services/srsSync'),
@@ -237,18 +237,6 @@ test('learner progress is stored on the Telegram account and imports a legacy sy
   const address = server.address();
   assert.ok(address && typeof address === 'object');
   const base = `http://127.0.0.1:${address.port}`;
-  const legacyKey = 'legacy-progress-key';
-  const legacyData = emptySyncData();
-  legacyData.srs.words.legacyCard = {
-    box: 3,
-    streak: 2,
-    mistakes: 1,
-    lastReviewed: '2026-06-01T12:00:00.000Z',
-    nextReview: '2026-06-04T12:00:00.000Z',
-  };
-  await prisma.syncProfile.create({
-    data: { keyHash: hashSyncKey(legacyKey), data: JSON.stringify(legacyData) },
-  });
 
   const login = async (telegramId: number) => {
     const response = await fetch(`${base}/api/learner-auth/telegram/mini-app`, {
@@ -261,33 +249,31 @@ test('learner progress is stored on the Telegram account and imports a legacy sy
   };
 
   const firstCookie = await login(700000004);
+  const incoming = emptySyncData();
+  incoming.srs.words.currentCard = {
+    box: 2,
+    streak: 1,
+    mistakes: 0,
+    lastReviewed: '2026-06-01T12:00:00.000Z',
+    nextReview: '2026-06-04T12:00:00.000Z',
+  };
   const firstResponse = await fetch(`${base}/api/learner-auth/progress/srs`, {
     method: 'POST',
     headers: { ...headerOrigin(base), Cookie: firstCookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ data: emptySyncData(), legacyKey }),
+    body: JSON.stringify({ data: incoming, legacyKey: 'legacy-progress-key' }),
   });
   assert.equal(firstResponse.status, 200);
   const firstBody = await firstResponse.json() as {
     data: { srs: { words: Record<string, unknown> } };
-    legacyKeyMigrated: boolean;
   };
-  assert.equal(firstBody.legacyKeyMigrated, true);
-  assert.ok(firstBody.data.srs.words.legacyCard);
+  assert.ok(firstBody.data.srs.words.currentCard);
+  assert.equal(firstBody.data.srs.words.legacyCard, undefined);
 
   const learner = await prisma.telegramUser.findUniqueOrThrow({
     where: { telegramId: '700000004' },
     include: { progress: true },
   });
-  assert.equal(learner.progress?.legacyKeyHash, hashSyncKey(legacyKey));
-  assert.equal(learner.progress?.data.includes(legacyKey), false);
-
-  const secondCookie = await login(700000005);
-  const secondResponse = await fetch(`${base}/api/learner-auth/progress/srs`, {
-    method: 'POST',
-    headers: { ...headerOrigin(base), Cookie: secondCookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ data: emptySyncData(), legacyKey }),
-  });
-  assert.equal(secondResponse.status, 409);
+  assert.equal(learner.progress?.data.includes('currentCard'), true);
 
   const unauthenticated = await fetch(`${base}/api/learner-auth/progress/srs`, {
     method: 'POST',
@@ -295,4 +281,11 @@ test('learner progress is stored on the Telegram account and imports a legacy sy
     body: JSON.stringify({ data: emptySyncData() }),
   });
   assert.equal(unauthenticated.status, 401);
+
+  const legacyEndpoint = await fetch(`${base}/api/sync/srs`, {
+    method: 'POST',
+    headers: { ...headerOrigin(base), 'content-type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(legacyEndpoint.status, 404);
 });

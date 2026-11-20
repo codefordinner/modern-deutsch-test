@@ -1,7 +1,4 @@
-import crypto from 'crypto';
 import {
-  MAX_SYNC_KEY_LENGTH,
-  MIN_SYNC_KEY_LENGTH,
   emptySyncData as emptySharedSyncData,
   mergeSyncData as mergeSharedSyncData,
   sanitizeSyncData as sanitizeSharedSyncData,
@@ -9,8 +6,6 @@ import {
   SCORE_TRAINERS,
 } from '@sprachfunke/shared';
 import type { SharedSyncData } from '@sprachfunke/shared';
-export { MIN_SYNC_KEY_LENGTH, MAX_SYNC_KEY_LENGTH } from '@sprachfunke/shared';
-
 export const SYNC_TRAINERS = SRS_TRAINERS;
 export type SyncTrainer = (typeof SYNC_TRAINERS)[number];
 export const SYNC_SCORE_TRAINERS = SCORE_TRAINERS;
@@ -31,12 +26,3 @@ export interface SyncData {
 export const emptySyncData = (): SyncData => emptySharedSyncData() as SyncData;
 export const sanitizeSyncData = (raw: unknown): SyncData => sanitizeSharedSyncData(raw) as SyncData;
 export const mergeSyncData = (a: SyncData, b: SyncData): SyncData => mergeSharedSyncData(a, b) as SyncData;
-
-/** The key itself is never stored, only its hash identifies the profile. */
-export const hashSyncKey = (key: string): string => crypto.createHash('sha256').update(`deutsch-sync:${key}`).digest('hex');
-
-export function readSyncKey(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const key = value.trim();
-  return key.length >= MIN_SYNC_KEY_LENGTH && key.length <= MAX_SYNC_KEY_LENGTH ? key : null;
-}

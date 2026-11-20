@@ -1,8 +1,7 @@
-import { syncLearnerSrs, syncSrs } from '../api/srs';
+import { syncLearnerSrs } from '../api/srs';
 import { getErrorMessage } from '../api/request';
 import type { SrsSyncData, SrsTrainer } from '../types';
-import { emptySyncData, mergeSyncData, readSyncKey, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
-import { getUISettings, setUISettings } from './uiSettings';
+import { emptySyncData, mergeSyncData, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
 import { applySyncedStudyPrefs, applySyncedDailyProgress, getDailyProgress, getStudyPrefs } from './studyPrefs';
 import {
   clearAccountTrainerSettings,
@@ -12,15 +11,14 @@ import {
   setAccountTrainerSettings,
 } from './trainerSettingsStore';
 
-// Syncs progress through Telegram accounts, with the legacy sync key as a migration path and
-// fallback for unauthenticated use. Pure merge logic lives in srsSyncData.ts; this file handles
-// local cache I/O, server requests and the status store for the UI.
+// Syncs progress through Telegram accounts. Pure merge logic lives in srsSyncData.ts;
+// this file handles local cache I/O, server requests and the status store for the UI.
 //
 // What is synced: SRS boxes, the score of every trainer (app_scores), "answers today", the daily
 // goal and the selected categories.
 //
-// Flow: every answer / reset schedules a debounced push; the app also pulls on start, when the
-// key changes and when the tab becomes visible again (and flushes a pending push when it is hidden).
+// Flow: every answer / reset schedules a debounced push; the app also pulls on start and when the
+// tab becomes visible again (and flushes a pending push when it is hidden).
 // One round trip = send local, get merged.
 
 /** Fired on `window` after progress from the server was written into localStorage. */
@@ -261,9 +259,8 @@ export async function syncNow(): Promise<void> {
   try {
     do {
       rerun = false;
-      const key = readSyncKey(getUISettings().syncKey);
       const accountUserId = learnerUserId;
-      if (!accountUserId && !key) {
+      if (!accountUserId) {
         setStatus({ state: 'off' });
         break;
       }
@@ -277,17 +274,9 @@ export async function syncNow(): Promise<void> {
       // Never upload a previous account's browser cache into a different account.
       const sent = replaceLocal ? emptySyncData() : readLocal();
       try {
-        let fromServer: SrsSyncData;
-        if (accountUserId) {
-          const response = await syncLearnerSrs(sent, replaceLocal ? undefined : key ?? undefined);
-          fromServer = sanitizeSyncData(response.data);
-          if (response.legacyKeyMigrated && key && readSyncKey(getUISettings().syncKey) === key) {
-            setUISettings({ syncKey: '' });
-          }
-          setStoredLearnerId(accountUserId);
-        } else {
-          fromServer = sanitizeSyncData(await syncSrs(key!, sent));
-        }
+        const response = await syncLearnerSrs(sent);
+        const fromServer = sanitizeSyncData(response.data);
+        setStoredLearnerId(accountUserId);
 
         // Answers given while the request was in flight must survive: merge with the CURRENT local data.
         const current = replaceLocal ? emptySyncData() : readLocal();
@@ -299,8 +288,7 @@ export async function syncNow(): Promise<void> {
         // The server does not know something we have (new answers meanwhile) → one more round,
         // but never more than MAX_SELF_ROUNDS on our own, so a disagreement can't become an endless loop.
         if (!sameData(merged, fromServer) && ++selfRounds <= MAX_SELF_ROUNDS) rerun = true;
-        // The key was changed meanwhile: the result belongs to the old key, run again for the new one.
-        if (learnerUserId !== accountUserId || (!accountUserId && readSyncKey(getUISettings().syncKey) !== key)) rerun = true;
+        if (learnerUserId !== accountUserId) rerun = true;
         setStatus({ state: 'ok', lastSyncedAt: Date.now() });
       } catch (error) {
         setStatus({
@@ -328,9 +316,9 @@ function clearLocalSyncedData(): void {
   }
 }
 
-/** Pushes local changes soon (debounced). A no-op without an account or legacy sync key. */
+/** Pushes local changes soon (debounced). A no-op without a Telegram account. */
 export function scheduleSync(): void {
-  if (!learnerUserId && !readSyncKey(getUISettings().syncKey)) return;
+  if (!learnerUserId) return;
   if (timer !== undefined) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = undefined;

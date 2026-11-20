@@ -1,24 +1,19 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { flushPendingSync, getSyncStatus, scheduleSync, setLearnerSyncUser, subscribeSyncStatus, syncNow } from '../utils/srsSync';
 import type { SyncStatus } from '../utils/srsSync';
-import { readSyncKey } from '../utils/srsSyncData';
-import { useUISettings } from './useUISettings';
 
 /**
  * Keeps progress (SRS, scores, answers today) in step with the learner's other devices,
- * preferring the authenticated Telegram account over the legacy sync key.
- * Mount once, near the app root. Pulls on start, when the key changes, when the tab
+ * Mount once, near the app root. Pulls on start, when the tab
  * becomes visible again and when the connection returns; pushes after answers
  * (see useSRSProgress / useScores) and right away when the tab is hidden, so answers given in the
- * last couple of seconds are not left behind. Without an account or legacy key it does nothing.
+ * last couple of seconds are not left behind. Without an account it does nothing.
  */
 export function useSrsSync(userId: string | null): void {
-  const [{ syncKey }] = useUISettings();
-  const key = readSyncKey(syncKey);
   setLearnerSyncUser(userId);
 
   useEffect(() => {
-    if (!userId && !key) {
+    if (!userId) {
       void syncNow(); // resets the status to "off"
       return;
     }
@@ -41,7 +36,7 @@ export function useSrsSync(userId: string | null): void {
       window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('learner-account-setting-changed', onAccountSettingChanged);
     };
-  }, [key, userId]);
+  }, [userId]);
 }
 
 /** The current state of the sync (for the settings modal). */

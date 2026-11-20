@@ -3,8 +3,6 @@ export const SCORE_TRAINERS = Object.freeze(['numbers', 'words', 'articles', 've
 export const DEFAULT_SRS_WEIGHTS = Object.freeze([60, 15, 10, 5, 10]);
 export const SRS_BOX_COUNT = 5;
 export const MAX_BOX_WEIGHT = 1000;
-export const MIN_SYNC_KEY_LENGTH = 6;
-export const MAX_SYNC_KEY_LENGTH = 200;
 
 export function sanitizeWeights(raw) {
   if (!Array.isArray(raw) || raw.length !== SRS_BOX_COUNT) return null;
@@ -167,10 +165,4 @@ export function mergeSyncData(a, b) {
   for (const trainer of SCORE_TRAINERS) merged.scores[trainer] = pickScore(a.scores[trainer], b.scores[trainer]);
   merged.daily = mergeDaily(a.daily, b.daily);
   return merged;
-}
-
-export function readSyncKey(value) {
-  if (typeof value !== 'string') return null;
-  const key = value.trim();
-  return key.length >= MIN_SYNC_KEY_LENGTH && key.length <= MAX_SYNC_KEY_LENGTH ? key : null;
 }

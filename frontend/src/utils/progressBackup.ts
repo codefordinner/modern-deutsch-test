@@ -33,6 +33,18 @@ const BACKUP_APP = 'deutsch-trainer';
 const BACKUP_VERSION = 1;
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
 
+function withoutLegacySyncKey(value: string): string {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return value;
+    const settings = { ...parsed as Record<string, unknown> };
+    delete settings.syncKey;
+    return JSON.stringify(settings);
+  } catch {
+    return value;
+  }
+}
+
 export interface ProgressBackup {
   app: typeof BACKUP_APP;
   version: number;
@@ -45,7 +57,7 @@ export function buildBackup(): ProgressBackup {
   for (const key of BACKUP_KEYS) {
     try {
       const value = localStorage.getItem(key);
-      if (value !== null) data[key] = value;
+      if (value !== null) data[key] = key === 'app_ui_settings' ? withoutLegacySyncKey(value) : value;
     } catch {
       // storage unavailable: export what we could read
     }
@@ -99,7 +111,7 @@ export function parseBackup(text: string): ProgressBackup {
       if (key.endsWith('_srs_state') && !isPlainObject) throw new Error(`Повреждены данные «${key}»`);
       if (key.endsWith('_use_srs') && typeof inner !== 'boolean') throw new Error(`Повреждены данные «${key}»`);
     }
-    data[key] = value;
+    data[key] = key === 'app_ui_settings' ? withoutLegacySyncKey(value) : value;
   }
   if (Object.keys(data).length === 0) throw new Error('В файле нет данных прогресса');
 

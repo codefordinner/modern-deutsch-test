@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../db';
-import { syncLearnerProgress, LegacySyncKeyConflictError } from '../services/learnerProgress';
+import { syncLearnerProgress } from '../services/learnerProgress';
 import {
   CHALLENGE_TTL_MS,
   challengeCookieDigest,
@@ -192,25 +192,12 @@ router.post('/progress/srs', limiter(60_000, 60, 'Слишком много за
     const result = await syncLearnerProgress({
       learnerProgress: {
         findUnique: (args) => prisma.learnerProgress.findUnique(args),
-        findUniqueByLegacyKey: (keyHash) => prisma.learnerProgress.findUnique({
-          where: { legacyKeyHash: keyHash },
-          select: { userId: true },
-        }),
         create: (args) => prisma.learnerProgress.create(args),
         updateMany: (args) => prisma.learnerProgress.updateMany(args),
       },
-      syncProfile: {
-        findUnique: (args) => prisma.syncProfile.findUnique(args),
-      },
-    }, user.id, req.body?.data, req.body?.legacyKey);
+    }, user.id, req.body?.data);
     return res.json(result);
   } catch (error) {
-    if (error instanceof LegacySyncKeyConflictError) {
-      return res.status(409).json({ error: error.message });
-    }
-    if (error instanceof Error && error.message === 'Некорректный ключ синхронизации.') {
-      return res.status(400).json({ error: error.message });
-    }
     if (error instanceof Error && error.message === 'Синхронизация занята. Повторите попытку.') {
       return res.status(409).json({ error: error.message });
     }
