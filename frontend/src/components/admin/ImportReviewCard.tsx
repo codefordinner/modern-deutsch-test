@@ -188,11 +188,12 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
             </div>
           )}
 
-          <div className="table-frame">
+          <div className="table-frame" role="region" aria-label="Таблица проверки импорта" tabIndex={0}>
             <table className="data-table review-table">
+              <caption className="sr-only">Слова для проверки перед импортом</caption>
               <thead>
                 <tr>
-                  <th className="th-check">
+                  <th className="th-check" scope="col">
                     <input
                       type="checkbox"
                       aria-label="Выбрать все"
@@ -200,12 +201,12 @@ export const ImportReviewCard: React.FC<ImportReviewCardProps> = ({ categories, 
                       onChange={(e) => setRows((prev) => prev.map((r) => ({ ...r, include: e.target.checked })))}
                     />
                   </th>
-                  <th>Немецкий</th>
-                  <th>Русский</th>
-                  <th>Категории</th>
-                  <th>Часть речи</th>
-                  <th>Plural</th>
-                  <th />
+                  <th scope="col">Немецкий</th>
+                  <th scope="col">Русский</th>
+                  <th scope="col">Категории</th>
+                  <th scope="col">Часть речи</th>
+                  <th scope="col">Plural</th>
+                  <th scope="col" aria-label="Действия" />
                 </tr>
               </thead>
               <tbody>

@@ -151,18 +151,19 @@ export const WordsTab: React.FC<WordsTabProps> = ({
         </div>
       )}
 
-      <div className="table-frame">
+      <div className="table-frame" role="region" aria-label="Таблица слов" tabIndex={0}>
         <table className="data-table">
+          <caption className="sr-only">Слова словаря</caption>
           <thead>
             <tr>
-              <th className="th-check">
+              <th className="th-check" scope="col">
                 <input type="checkbox" aria-label="Выбрать все" checked={allSelected} onChange={toggleAll} disabled={words.length === 0} />
               </th>
-              <th>Немецкий</th>
-              <th>Русский</th>
-              <th>Категории</th>
-              <th>Дополнительно</th>
-              <th className="th-actions">Действия</th>
+              <th scope="col">Немецкий</th>
+              <th scope="col">Русский</th>
+              <th scope="col">Категории</th>
+              <th scope="col">Дополнительно</th>
+              <th className="th-actions" scope="col">Действия</th>
             </tr>
           </thead>
           <tbody>
