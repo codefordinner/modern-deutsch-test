@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, LearnerProgress, TelegramUser, TelegramChallenge, UserSession (SQLite; legacy sync tables retained pending safe DB cleanup)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, LearnerProgress, TelegramUser, TelegramChallenge, UserSession (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -49,7 +49,6 @@
 - **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, prompt, response, durationMs, createdAt}` — журнал вызовов AI-операций для админки; промпт и ответ Gemini сохраняются для диагностики, API-ключи и inline-данные изображений перед сохранением удаляются.
 - **AiBulkJob** `{id, status, total, completed, count, result, error, createdAt, finishedAt}` — устойчивый статус массовой проверки слов, распределения категорий и определения управления глаголов. Входные записи не сохраняются; незавершённые при рестарте становятся ошибкой `AI_JOB_INTERRUPTED` и остаются видимы в логах ИИ.
 - **LearnerProgress** `{userId, data (JSON), revision, createdAt, updatedAt}` — SRS-прогресс, счёт и синхронизируемые настройки Telegram-пользователя. `revision` используется для optimistic locking.
-- Таблица `SyncProfile` и колонка `LearnerProgress.legacyKeyHash` остались в Prisma schema, но приложение их больше не читает и не записывает. Физическое удаление отложено до отдельного бэкапа БД: `prisma db push --accept-data-loss` может удалить сохранённые legacy-данные.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
 - Прогресс ученика кэшируется в `localStorage`; настройки режимов тренажёров при Telegram-входе загружаются в память из `LearnerProgress` и не записываются в браузер. Первый запрос переносит старые локальные настройки; после успешной загрузки устаревшие ключи настроек удаляются. Без входа сохраняется локальный режим.
@@ -192,7 +191,7 @@
 - Новые таблицы (`Setting`, `Picture`) создаются автоматически через `prisma db push` при старте.
 
 ## Известные ограничения / идеи
-- Legacy UI-ключ, `/sync/srs` и одноразовый импорт `legacyKey` удалены. Таблица `SyncProfile` и колонка `LearnerProgress.legacyKeyHash` пока сохранены в схеме, чтобы не удалять данные без бэкапа; приложение их больше не использует.
+- Legacy UI-ключ, `/sync/srs`, одноразовый импорт `legacyKey`, таблица `SyncProfile` и колонка `LearnerProgress.legacyKeyHash` удалены. При применении схемы `prisma db push` удаляет эти legacy-данные из БД.
 - Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются отдельными командами из `frontend/`.
 - Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.

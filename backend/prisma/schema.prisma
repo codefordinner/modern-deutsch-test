@@ -149,28 +149,14 @@ model AiBulkJob {
   @@index([status, createdAt])
 }
 
-/// SRS progress shared between a learner's devices through a sync key.
-/// `keyHash` = sha256 of the key (the key itself is never stored); `data` = JSON snapshot,
-/// see src/services/srsSync.ts.
-model SyncProfile {
-  keyHash   String   @id
-  data      String
-  /// Optimistic-lock revision used to prevent concurrent sync requests from overwriting each other.
-  revision  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 /// SRS progress and synced study settings owned by a Telegram learner account.
-/// The optional legacy key hash is retained only to make the one-time migration safe.
 model LearnerProgress {
-  userId           String      @id
-  user             TelegramUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  data             String
-  revision         Int         @default(0)
-  legacyKeyHash    String?     @unique
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  userId    String       @id
+  user      TelegramUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      String
+  revision  Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 /// Images used by the picture-description trainer.
