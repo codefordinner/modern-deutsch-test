@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
-import { subscribeToasts } from '../utils/toast';
+import { showToast, subscribeToasts } from '../utils/toast';
 import type { Toast, ToastKind } from '../utils/toast';
 
 const AUTO_DISMISS_MS = 5000;
 const MAX_VISIBLE = 4;
+const UPDATE_NOTICE_KEY = 'app_sw_updated_notice';
 
 const kindIcon: Record<ToastKind, React.ReactNode> = {
   error: <AlertCircle size={18} />,
@@ -16,14 +17,23 @@ const kindIcon: Record<ToastKind, React.ReactNode> = {
 export const ToastHost: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  useEffect(
-    () =>
-      subscribeToasts((toast) => {
-        setToasts((prev) => [...prev, toast].slice(-MAX_VISIBLE));
-        window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toast.id)), AUTO_DISMISS_MS);
-      }),
-    []
-  );
+  useEffect(() => {
+    const unsubscribe = subscribeToasts((toast) => {
+      setToasts((prev) => [...prev, toast].slice(-MAX_VISIBLE));
+      window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toast.id)), AUTO_DISMISS_MS);
+    });
+
+    try {
+      if (sessionStorage.getItem(UPDATE_NOTICE_KEY)) {
+        sessionStorage.removeItem(UPDATE_NOTICE_KEY);
+        showToast('Страница обновлена до последней версии приложения.', 'success');
+      }
+    } catch {
+      // Storage can be unavailable in private browsing.
+    }
+
+    return unsubscribe;
+  }, []);
 
   if (toasts.length === 0) return null;
 

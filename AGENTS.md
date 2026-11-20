@@ -61,7 +61,7 @@ BlitzDeutsch: тренажёр немецкого для русскоязычн�
 
 ### PWA / Service Worker
 23. `frontend/public/sw.js` кэширует только публичные `GET /api/words` и `GET /api/categories`. Админские, аналитические, `/api/settings/*` и `/api/sync/*` кэшировать **нельзя**. При изменении правил кэширования поднимите `VERSION`.
-24. `sw.js` и `manifest.webmanifest` отдаются без долгого кэша (см. `nginx.conf`). Новый воркер сам не активируется: пользователю показывается `UpdateBanner`.
+24. `sw.js` и `manifest.webmanifest` отдаются без долгого кэша (см. `nginx.conf`). Новый Service Worker автоматически активируется; после смены контроллера страница перезагружается и показывает исчезающее уведомление.
 
 ### База данных
 25. Схема — `backend/prisma/schema.prisma`; применяется `prisma db push`. Сейчас `entrypoint.sh`, `npm start` и `server.ts` используют `--accept-data-loss`: не вносите деструктивных изменений схемы без бэкапа БД. Разовые правки данных делайте идемпотентными сервисами, как `backfillPartOfSpeech.ts` (вызываются при старте).

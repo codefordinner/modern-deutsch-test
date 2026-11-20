@@ -4,9 +4,9 @@ import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
 import { TrainerContent } from './components/routing/TrainerContent';
 import { ToastHost } from './components/ToastHost';
-import { UpdateBanner } from './components/UpdateBanner';
 import { trackEvent } from './api/analytics';
 import { useHashRoute } from './hooks/useHashRoute';
+import { useServiceWorkerUpdates } from './hooks/useServiceWorkerUpdates';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
@@ -28,6 +28,7 @@ import { ApiError, getErrorMessage } from './api/request';
 import type { LearnerSession } from './api/telegramAuth';
 
 export function App() {
+  useServiceWorkerUpdates();
   const activeTab = useHashRoute();
   const [learner, setLearner] = useState<LearnerSession['user'] | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
@@ -187,10 +188,20 @@ export function App() {
   // Learner accounts gate training only. The existing admin area keeps its
   // independent cookie-based authentication and can still be opened directly.
   if (activeTab !== 'admin' && authLoading) {
-    return <main className="telegram-login" id="main" aria-live="polite">Загружаем профиль ученика…</main>;
+    return (
+      <>
+        <main className="telegram-login" id="main" aria-live="polite">Загружаем профиль ученика…</main>
+        <ToastHost />
+      </>
+    );
   }
   if (activeTab !== 'admin' && authRequired && !learner) {
-    return <TelegramLogin onAuthenticated={handleLearnerAuthenticated} initialError={authError} />;
+    return (
+      <>
+        <TelegramLogin onAuthenticated={handleLearnerAuthenticated} initialError={authError} />
+        <ToastHost />
+      </>
+    );
   }
 
   return (
@@ -226,7 +237,6 @@ export function App() {
       {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
       {logoutError && <p className="telegram-login-error" role="alert">{logoutError}</p>}
 
-      <UpdateBanner />
       <ToastHost />
     </div>
     </ConfirmProvider>

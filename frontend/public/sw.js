@@ -10,8 +10,8 @@
  *                             The API cache is capped at MAX_API_ENTRIES (oldest dropped first);
  *  - everything else (admin, analytics, any non-GET) is never touched.
  *
- * Updates: a new worker does NOT take over by itself (no skipWaiting on install). The page shows
- * "доступна новая версия" and sends SKIP_WAITING when the learner agrees.
+ * Updates: the page sends SKIP_WAITING as soon as a new worker is installed, then reloads when it
+ * takes control so old page code is never mixed with new assets.
  *
  * Bump VERSION when you change this file's caching rules: old caches are deleted on activate.
  */
@@ -29,7 +29,6 @@ const API_NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    // No skipWaiting() here: taking over mid-session could mix old page code with new assets.
     caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_URLS))
   );
 });

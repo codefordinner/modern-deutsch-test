@@ -10,7 +10,7 @@ import {
 import type { LearnerSession } from '../api/telegramAuth';
 
 interface TelegramLoginProps {
-  onAuthenticated: (user: LearnerSession['user']) => void;
+  onAuthenticated: (user: LearnerSession['user']) => void | Promise<void>;
   initialError?: string;
 }
 
@@ -26,8 +26,21 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
   const [loading, setLoading] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
+  const [authenticatedUser, setAuthenticatedUser] = useState<LearnerSession['user'] | null>(null);
   const started = useRef(false);
   const completing = useRef(false);
+
+  const finishAuthentication = useCallback(async (user: LearnerSession['user']) => {
+    setLoading(true);
+    setError('');
+    try {
+      await onAuthenticated(user);
+    } catch {
+      setError('Вход выполнен, но не удалось загрузить настройки аккаунта. Проверьте соединение и повторите попытку.');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthenticated]);
 
   const issueChallenge = useCallback(async () => {
     setLoading(true);
@@ -79,7 +92,10 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
           setConfirmed(true);
           try {
             const session = await completeTelegramChallenge();
-            if (active && session.authenticated) onAuthenticated(session.user);
+            if (active && session.authenticated) {
+              setAuthenticatedUser(session.user);
+              await finishAuthentication(session.user);
+            }
           } catch (completionError) {
             completing.current = false;
             if (!active) return;
@@ -111,7 +127,7 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [challenge, onAuthenticated]);
+  }, [challenge, finishAuthentication]);
 
   const formattedTime = `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
 
@@ -147,7 +163,21 @@ export function TelegramLogin({ onAuthenticated, initialError }: TelegramLoginPr
             </div>
           </div>
 
-          {challenge && remainingSeconds > 0 ? (
+          {authenticatedUser ? (
+            <>
+              <p className="telegram-login-status is-confirmed" role="status">
+                Вход выполнен. Осталось загрузить настройки аккаунта.
+              </p>
+              <button
+                className="telegram-login-button"
+                type="button"
+                onClick={() => void finishAuthentication(authenticatedUser)}
+                disabled={loading}
+              >
+                {loading ? 'Загружаем настройки…' : 'Повторить загрузку аккаунта'}
+              </button>
+            </>
+          ) : challenge && remainingSeconds > 0 ? (
             <>
               <p className="telegram-login-instruction">
                 Откройте бота <strong>@{challenge.botUsername}</strong> и отправьте ему этот код:

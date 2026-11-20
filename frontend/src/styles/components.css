@@ -135,32 +135,6 @@
   cursor: pointer;
 }
 
-/* ---- "New version" banner -------------------------------------------------- */
-
-.update-banner {
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  max-width: min(420px, calc(100vw - 32px));
-  padding: 10px 14px;
-  font-size: 14px;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-left: 4px solid var(--accent-primary);
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
-}
-
-.update-banner-text {
-  flex: 1 1 160px;
-}
-
 /* ---- Trainer layout ------------------------------------------------------- */
 
 .trainer-toolbar {

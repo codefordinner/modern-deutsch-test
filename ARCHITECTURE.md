@@ -36,7 +36,7 @@
       ├─ utils/              чистая логика (см. «Утилиты»)
       ├─ components/         Navbar, *Trainer (включая PictureDescriptionTrainer), admin/, words/, verbs/, numbers/, time/, articles/, srs/,
       │                      Modal, ModeSwitch, ToolbarButton, FeedbackBox, StatsPanel, GeneralSettingsModal,
-      │                      ToastHost, UpdateBanner, ArticleText, UmlautBar, Scorebar, …
+      │                      ToastHost, ArticleText, UmlautBar, Scorebar, …
       └─ styles/             components.css, import-export.css, features.css, srs-settings.css, layout.css, mobile.css (последним)
 ```
 
@@ -183,7 +183,7 @@
 
 ### PWA и офлайн
 `manifest.webmanifest` + `sw.js` (регистрируется только в production). Версия кэшей Service Worker подставляется автоматически скриптом `frontend/scripts/build.mjs`: в CI используется GitHub SHA, локально — текущий Git commit, а без Git — timestamp. Поэтому ручное изменение `VERSION` не требуется. Стратегии: HTML — network-first; `/assets/*` — cache-first; `GET /api/words` и `/api/categories` — network-first с таймаутом 4 с и запасом из кэша (при изменении данных страницы получают `DICTIONARY_UPDATED` и перезагружают словарь); остальное не перехватывается (в том числе `/api/settings/*` и `/api/sync/*`: офлайн действуют веса по умолчанию, синхронизация ждёт сети). HTML-shell (`/` и `/index.html`) отдаётся с `Cache-Control: no-cache, no-store`, потому что он содержит имя текущего hashed JS-файла.
-Новый воркер сам не активируется: `useServiceWorkerUpdates` + `UpdateBanner` предлагают «Обновить», после согласия страница перезагружается.
+Новый воркер автоматически активируется через `useServiceWorkerUpdates`; после смены контроллера страница перезагружается, а после загрузки показывается исчезающее toast-уведомление об обновлении.
 
 ## Сборка и деплой
 - Docker: `backend/Dockerfile` (порт 3001), `frontend/Dockerfile` (nginx), `packages/telegram-bot/Dockerfile` (long polling, без опубликованных портов). Образы собирает GitHub Actions (`deploy.yml`): PR выполняет backend build/tests, frontend typecheck/lint/tests/build и bot build/tests; push в `main` публикует все образы в GHCR с тегами `latest` и SHA коммита. Сервер получает готовые образы; секреты не являются build args.

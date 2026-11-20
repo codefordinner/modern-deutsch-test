@@ -1,29 +1,37 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { CATEGORIES_KEY, WORDS_KEY } from './useDictionary';
 import { invalidateQueries } from '../api/queryCache';
 
+const UPDATE_NOTICE_KEY = 'app_sw_updated_notice';
+
 /**
  * Talks to public/sw.js (production only):
- *  - a new worker waiting to take over  -> `updateReady` (the UI offers "Обновить");
+ *  - a new worker waiting to take over  -> activate it immediately;
  *  - DICTIONARY_UPDATED from the worker -> the cached dictionary is refetched, so a slow-network
  *    session that was shown the cached copy catches up without a page reload.
  */
 export function useServiceWorkerUpdates() {
-  const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
     const container = navigator.serviceWorker;
     let cancelled = false;
+    let updateRequested = false;
+    const hadController = Boolean(container.controller);
+
+    const activateUpdate = (worker: ServiceWorker) => {
+      if (updateRequested) return;
+      updateRequested = true;
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    };
 
     const watch = (registration: ServiceWorkerRegistration) => {
-      // A worker that is already waiting while a controller exists is an update (not the first install).
-      if (registration.waiting && container.controller) setWaiting(registration.waiting);
+      // A waiting worker plus a controller means this is an update, not the first install.
+      if (registration.waiting && container.controller) activateUpdate(registration.waiting);
       registration.addEventListener('updatefound', () => {
         const installing = registration.installing;
         if (!installing) return;
         installing.addEventListener('statechange', () => {
-          if (installing.state === 'installed' && container.controller) setWaiting(installing);
+          if (installing.state === 'installed' && container.controller) activateUpdate(installing);
         });
       });
     };
@@ -38,11 +46,17 @@ export function useServiceWorkerUpdates() {
     };
     container.addEventListener('message', onMessage);
 
-    // After the learner accepts the update the new worker takes control: load its page code.
+    // Once the new worker takes control, load its matching page code.
     let reloading = false;
     const onControllerChange = () => {
-      if (reloading) return;
+      // Reload even if another tab initiated activation; do not reload on first-ever installation.
+      if ((!updateRequested && !hadController) || reloading) return;
       reloading = true;
+      try {
+        sessionStorage.setItem(UPDATE_NOTICE_KEY, '1');
+      } catch {
+        // The update can still reload if storage is unavailable.
+      }
       window.location.reload();
     };
     container.addEventListener('controllerchange', onControllerChange);
@@ -53,10 +67,4 @@ export function useServiceWorkerUpdates() {
       container.removeEventListener('controllerchange', onControllerChange);
     };
   }, []);
-
-  const applyUpdate = useCallback(() => {
-    waiting?.postMessage({ type: 'SKIP_WAITING' });
-  }, [waiting]);
-
-  return { updateReady: waiting !== null, applyUpdate };
 }
