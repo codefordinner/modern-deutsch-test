@@ -11,16 +11,20 @@ import { useConfirm } from '../hooks/useConfirm';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
+  isLearnerSignedIn: boolean;
 }
 
-export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onClose }) => {
+export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onClose, isLearnerSignedIn }) => {
   const [settings, updateSettings] = useUISettings();
   const [prefs, setPrefs] = useStudyPrefs();
   const fileInput = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const [keyDraft, setKeyDraft] = useState(settings.syncKey);
+  const [keyDraftState, setKeyDraftState] = useState({ source: settings.syncKey, value: settings.syncKey });
+  const keyDraft = keyDraftState.source === settings.syncKey ? keyDraftState.value : settings.syncKey;
   const syncStatus = useSyncStatus();
   const confirm = useConfirm();
+
+  const updateKeyDraft = (value: string) => setKeyDraftState({ source: settings.syncKey, value });
 
   const draftTrimmed = keyDraft.trim();
   const draftValid = draftTrimmed === '' || readSyncKey(draftTrimmed) !== null;
@@ -29,7 +33,7 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
   const saveSyncKey = () => {
     if (!draftValid) return;
     updateSettings({ syncKey: draftTrimmed });
-    setKeyDraft(draftTrimmed);
+    setKeyDraftState({ source: draftTrimmed, value: draftTrimmed });
   };
 
   const handleFile = async (file: File | undefined) => {
@@ -188,41 +192,72 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
         </label>
 
         <div className="settings-divider">
-          <label className="setting-toggle-title" htmlFor="sync-key-input">
-            <RefreshCw size={14} /> Ключ синхронизации
-          </label>
-          <div className="backup-actions">
-            <input
-              id="sync-key-input"
-              type="text"
-              className="text-input w-full"
-              value={keyDraft}
-              maxLength={MAX_SYNC_KEY_LENGTH}
-              placeholder="Пусто — без синхронизации"
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              onChange={(e) => setKeyDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveSyncKey();
-              }}
-            />
-            <button type="button" className="btn-secondary" onClick={saveSyncKey} disabled={!draftChanged || !draftValid}>
-              Сохранить
-            </button>
-          </div>
-          <span className="setting-toggle-desc">
-            Впишите одинаковый ключ на всех своих устройствах — прогресс SRS (слова, глаголы, артикли) будет общим.
-            Пусто — синхронизации нет, ничего не отправляется. Ключ — это ваш «пароль»: выберите длинный и не
-            показывайте его другим (от {MIN_SYNC_KEY_LENGTH} символов).
+          <span className="setting-toggle-title">
+            <RefreshCw size={14} /> {isLearnerSignedIn ? 'Синхронизация через Telegram' : 'Ключ синхронизации'}
           </span>
+          {isLearnerSignedIn ? (
+            <>
+              <span className="setting-toggle-desc">
+                Прогресс синхронизируется с вашим Telegram-аккаунтом. Ключ ниже нужен только для однократного переноса
+                старого профиля; после переноса он удалится с этого устройства.
+              </span>
+              <div className="backup-actions">
+                <input
+                  id="sync-key-input"
+                  type="text"
+                  className="text-input w-full"
+                  value={keyDraft}
+                  maxLength={MAX_SYNC_KEY_LENGTH}
+                  placeholder="Старый ключ (если использовали)"
+                  aria-label="Старый ключ синхронизации для переноса"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => updateKeyDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveSyncKey(); }}
+                />
+                <button type="button" className="btn-secondary" onClick={saveSyncKey} disabled={!draftChanged || !draftValid}>
+                  Сохранить
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="backup-actions">
+                <input
+                  id="sync-key-input"
+                  type="text"
+                  className="text-input w-full"
+                  value={keyDraft}
+                  maxLength={MAX_SYNC_KEY_LENGTH}
+                  placeholder="Пусто — без синхронизации"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => updateKeyDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveSyncKey();
+                  }}
+                />
+                <button type="button" className="btn-secondary" onClick={saveSyncKey} disabled={!draftChanged || !draftValid}>
+                  Сохранить
+                </button>
+              </div>
+              <span className="setting-toggle-desc">
+                Впишите одинаковый ключ на всех своих устройствах — прогресс SRS (слова, глаголы, артикли) будет общим.
+                Пусто — синхронизации нет, ничего не отправляется. Ключ — это ваш «пароль»: выберите длинный и не
+                показывайте его другим (от {MIN_SYNC_KEY_LENGTH} символов).
+              </span>
+            </>
+          )}
           {!draftValid && (
             <div className="status-msg status-msg--error" role="alert">
               Ключ должен быть не короче {MIN_SYNC_KEY_LENGTH} символов.
             </div>
           )}
-          {settings.syncKey !== '' && draftValid && (
+          {(settings.syncKey !== '' || isLearnerSignedIn) && draftValid && (
             <div
               className={`status-msg${syncStatus.state === 'error' ? ' status-msg--error' : syncStatus.state === 'ok' ? ' status-msg--success' : ''}`}
               role="status"
@@ -230,8 +265,8 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
               {syncStatus.state === 'syncing' && 'Синхронизация…'}
               {syncStatus.state === 'ok' && `Синхронизировано в ${new Date(syncStatus.lastSyncedAt).toLocaleTimeString('ru-RU')}`}
               {syncStatus.state === 'error' && syncStatus.message}
-              {syncStatus.state === 'off' && 'Ожидание синхронизации…'}
-              {settings.syncKey !== '' && syncStatus.state !== 'syncing' && (
+              {syncStatus.state === 'off' && (isLearnerSignedIn ? 'Синхронизация через Telegram ожидает запуска…' : 'Ожидание синхронизации…')}
+              {(settings.syncKey !== '' || isLearnerSignedIn) && syncStatus.state !== 'syncing' && (
                 <>
                   {' '}
                   <button type="button" className="btn-secondary" onClick={() => void syncNow()}>

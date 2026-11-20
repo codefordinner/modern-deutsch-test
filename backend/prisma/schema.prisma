@@ -161,6 +161,18 @@ model SyncProfile {
   updatedAt DateTime @updatedAt
 }
 
+/// SRS progress and synced study settings owned by a Telegram learner account.
+/// The optional legacy key hash is retained only to make the one-time migration safe.
+model LearnerProgress {
+  userId           String      @id
+  user             TelegramUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data             String
+  revision         Int         @default(0)
+  legacyKeyHash    String?     @unique
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
 /// Images used by the picture-description trainer.
 model Picture {
   id        String   @id @default(cuid())
@@ -180,6 +192,7 @@ model TelegramUser {
   updatedAt  DateTime       @updatedAt
   challenges TelegramChallenge[]
   sessions   UserSession[]
+  progress   LearnerProgress?
 }
 
 /// One-time browser login challenge. Digests are stored instead of secrets.

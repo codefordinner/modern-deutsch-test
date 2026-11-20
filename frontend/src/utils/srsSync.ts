@@ -1,13 +1,13 @@
-import { syncSrs } from '../api/srs';
+import { syncLearnerSrs, syncSrs } from '../api/srs';
 import { getErrorMessage } from '../api/request';
 import type { SrsSyncData, SrsTrainer } from '../types';
 import { emptySyncData, mergeSyncData, readSyncKey, sanitizeSyncData, SRS_TRAINERS } from './srsSyncData';
-import { getUISettings } from './uiSettings';
+import { getUISettings, setUISettings } from './uiSettings';
 import { applySyncedDailyGoal, applySyncedDailyProgress, getDailyProgress, getStudyPrefs } from './studyPrefs';
 
-// Syncing progress between devices that share a sync key (Settings → "Ключ синхронизации").
-// The pure merge logic lives in srsSyncData.ts; this file does the I/O: reading / writing
-// localStorage, talking to the server and keeping a small status store for the UI.
+// Syncs progress through Telegram accounts, with the legacy sync key as a migration path and
+// fallback for unauthenticated use. Pure merge logic lives in srsSyncData.ts; this file handles
+// local cache I/O, server requests and the status store for the UI.
 //
 // What is synced: SRS boxes, the score of every trainer (app_scores), "answers today", the daily
 // goal and the selected categories.
@@ -23,6 +23,7 @@ export const SRS_SYNCED_EVENT = 'srs-synced';
 export const RESET_AT_KEY = 'app_srs_reset_at';
 
 const SCORES_KEY = 'app_scores';
+const LEARNER_PROFILE_ID_KEY = 'app_learner_profile_id';
 const PUSH_DELAY_MS = 2500;
 /** How many extra round trips a single syncNow may make on its own to catch up (protects against loops). */
 const MAX_SELF_ROUNDS = 3;
@@ -65,10 +66,10 @@ function readLocal(): SrsSyncData {
 }
 
 /** Writes the merged data into localStorage; returns whether any progress or score actually changed. */
-function writeLocal(data: SrsSyncData, previous: SrsSyncData): boolean {
+function writeLocal(data: SrsSyncData, previous: SrsSyncData, force = false): boolean {
   let changed = false;
   for (const trainer of SRS_TRAINERS) {
-    if (JSON.stringify(data.srs[trainer]) === JSON.stringify(previous.srs[trainer])) continue;
+    if (!force && JSON.stringify(data.srs[trainer]) === JSON.stringify(previous.srs[trainer])) continue;
     changed = true;
     try {
       if (Object.keys(data.srs[trainer]).length === 0) localStorage.removeItem(stateKeyOf(trainer));
@@ -78,7 +79,7 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData): boolean {
     }
   }
 
-  if (JSON.stringify(data.scores) !== JSON.stringify(previous.scores)) {
+  if (force || JSON.stringify(data.scores) !== JSON.stringify(previous.scores)) {
     try {
       const stored = readJSON(SCORES_KEY);
       const base = typeof stored === 'object' && stored !== null && !Array.isArray(stored) ? stored : {};
@@ -89,13 +90,13 @@ function writeLocal(data: SrsSyncData, previous: SrsSyncData): boolean {
     }
   }
 
-  if (data.daily.day !== previous.daily.day || data.daily.count !== previous.daily.count) {
-    applySyncedDailyProgress(data.daily.day, data.daily.count);
+  if (force || data.daily.day !== previous.daily.day || data.daily.count !== previous.daily.count) {
+    applySyncedDailyProgress(data.daily.day, data.daily.count, force);
   }
 
   try {
     localStorage.setItem(RESET_AT_KEY, JSON.stringify(data.resetAt));
-    if (data.settings.updatedAt !== previous.settings.updatedAt) {
+    if (force || data.settings.updatedAt !== previous.settings.updatedAt) {
       localStorage.setItem('words_settings', JSON.stringify({ ...(readJSON('words_settings') as object ?? {}), selectedCats: data.settings.wordsCategories }));
       localStorage.setItem('articles_category', JSON.stringify(data.settings.articlesCategories));
       localStorage.setItem('app_sync_settings_updated_at', JSON.stringify(data.settings.updatedAt));
@@ -154,6 +155,39 @@ const lastSyncedOf = (s: SyncStatus): number | null => (s.state === 'off' ? null
 let running = false;
 let rerun = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
+let learnerUserId: string | null = null;
+let forceReplaceForUserId: string | null = null;
+
+export function setLearnerSyncUser(userId: string | null): void {
+  learnerUserId = userId;
+}
+
+/** Clears a previous account's local cache before newly authenticated trainers render. */
+export function prepareLearnerSyncUser(userId: string): void {
+  const storedUserId = getStoredLearnerId();
+  if (storedUserId && storedUserId !== userId) {
+    clearLocalSyncedData();
+    applySyncedDailyProgress('', 0, true);
+    window.dispatchEvent(new Event(SRS_SYNCED_EVENT));
+    forceReplaceForUserId = userId;
+  }
+}
+
+function getStoredLearnerId(): string | null {
+  try {
+    return localStorage.getItem(LEARNER_PROFILE_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredLearnerId(userId: string): void {
+  try {
+    localStorage.setItem(LEARNER_PROFILE_ID_KEY, userId);
+  } catch {
+    // Progress stays on the server; storage may be unavailable.
+  }
+}
 
 /** One or more round trips with the server; safe to call at any time (calls made meanwhile are coalesced). */
 export async function syncNow(): Promise<void> {
@@ -171,25 +205,45 @@ export async function syncNow(): Promise<void> {
     do {
       rerun = false;
       const key = readSyncKey(getUISettings().syncKey);
-      if (!key) {
+      const accountUserId = learnerUserId;
+      if (!accountUserId && !key) {
         setStatus({ state: 'off' });
         break;
       }
 
       setStatus({ state: 'syncing', lastSyncedAt: lastSyncedOf(status) });
-      const sent = readLocal();
+      const storedLearnerId = accountUserId ? getStoredLearnerId() : null;
+      const replaceLocal = Boolean(accountUserId && (
+        (storedLearnerId && storedLearnerId !== accountUserId)
+        || forceReplaceForUserId === accountUserId
+      ));
+      // Never upload a previous account's browser cache into a different account.
+      const sent = replaceLocal ? emptySyncData() : readLocal();
       try {
-        const fromServer = sanitizeSyncData(await syncSrs(key, sent));
+        let fromServer: SrsSyncData;
+        if (accountUserId) {
+          const response = await syncLearnerSrs(sent, replaceLocal ? undefined : key ?? undefined);
+          fromServer = sanitizeSyncData(response.data);
+          if (response.legacyKeyMigrated && key && readSyncKey(getUISettings().syncKey) === key) {
+            setUISettings({ syncKey: '' });
+          }
+          setStoredLearnerId(accountUserId);
+        } else {
+          fromServer = sanitizeSyncData(await syncSrs(key!, sent));
+        }
 
         // Answers given while the request was in flight must survive: merge with the CURRENT local data.
-        const current = readLocal();
+        const current = replaceLocal ? emptySyncData() : readLocal();
         const merged = mergeSyncData(fromServer, current);
-        if (writeLocal(merged, current)) window.dispatchEvent(new Event(SRS_SYNCED_EVENT));
+        if (replaceLocal) clearLocalSyncedData();
+        const localChanged = writeLocal(merged, replaceLocal ? emptySyncData() : current, replaceLocal);
+        if (localChanged || replaceLocal) window.dispatchEvent(new Event(SRS_SYNCED_EVENT));
+        if (replaceLocal && forceReplaceForUserId === accountUserId) forceReplaceForUserId = null;
         // The server does not know something we have (new answers meanwhile) → one more round,
         // but never more than MAX_SELF_ROUNDS on our own, so a disagreement can't become an endless loop.
         if (!sameData(merged, fromServer) && ++selfRounds <= MAX_SELF_ROUNDS) rerun = true;
         // The key was changed meanwhile: the result belongs to the old key, run again for the new one.
-        if (readSyncKey(getUISettings().syncKey) !== key) rerun = true;
+        if (learnerUserId !== accountUserId || (!accountUserId && readSyncKey(getUISettings().syncKey) !== key)) rerun = true;
         setStatus({ state: 'ok', lastSyncedAt: Date.now() });
       } catch (error) {
         setStatus({
@@ -205,9 +259,20 @@ export async function syncNow(): Promise<void> {
   }
 }
 
-/** Pushes local changes soon (debounced). A no-op without a sync key. */
+function clearLocalSyncedData(): void {
+  try {
+    for (const trainer of SRS_TRAINERS) localStorage.removeItem(stateKeyOf(trainer));
+    localStorage.removeItem(SCORES_KEY);
+    localStorage.removeItem(RESET_AT_KEY);
+    localStorage.removeItem('app_daily_progress');
+  } catch {
+    // The account snapshot remains available on the server.
+  }
+}
+
+/** Pushes local changes soon (debounced). A no-op without an account or legacy sync key. */
 export function scheduleSync(): void {
-  if (!readSyncKey(getUISettings().syncKey)) return;
+  if (!learnerUserId && !readSyncKey(getUISettings().syncKey)) return;
   if (timer !== undefined) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = undefined;

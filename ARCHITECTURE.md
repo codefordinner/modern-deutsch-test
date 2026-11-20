@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, SyncProfile, TelegramUser, TelegramChallenge, UserSession (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, SyncProfile, LearnerProgress, TelegramUser, TelegramChallenge, UserSession (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -48,10 +48,11 @@
 - **Setting** `{key, value (JSON), updatedAt}` — общие настройки, редактируемые в админке. Ключи: `srsBoxWeights`, `srsPromotionThreshold`, `audioSettings` и `aiSettings` (провайдер Gemini, API-ключ, общий лимит запросов в минуту и registry профилей `{profileId: {model, prompt}}`). AI-ключ никогда не возвращается клиенту.
 - **AiErrorLog** `{operation, profileId, model, errorCode, providerStatus, message, prompt, response, durationMs, createdAt}` — журнал вызовов AI-операций для админки; промпт и ответ Gemini сохраняются для диагностики, API-ключи и inline-данные изображений перед сохранением удаляются.
 - **AiBulkJob** `{id, status, total, completed, count, result, error, createdAt, finishedAt}` — устойчивый статус массовой проверки слов, распределения категорий и определения управления глаголов. Входные записи не сохраняются; незавершённые при рестарте становятся ошибкой `AI_JOB_INTERRUPTED` и остаются видимы в логах ИИ.
-- **SyncProfile** `{keyHash, data (JSON), revision, createdAt, updatedAt}` — снимок SRS-прогресса и выбранных настроек обучения для синхронизации устройств. `keyHash` = sha256 ключа; сам ключ не хранится. `revision` используется для optimistic locking при параллельных запросах.
+- **SyncProfile** `{keyHash, data (JSON), revision, createdAt, updatedAt}` — legacy-снимок SRS-прогресса по ключу синхронизации. `keyHash` = sha256 ключа; сам ключ не хранится. Оставлен для совместимости и одноразового переноса.
+- **LearnerProgress** `{userId, data (JSON), revision, legacyKeyHash?, createdAt, updatedAt}` — SRS-прогресс, счёт и синхронизируемые настройки, принадлежащие Telegram-пользователю. `legacyKeyHash` уникально связывает старый ключ с одним аккаунтом на время переноса; сам ключ не хранится. `revision` используется для optimistic locking.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
-- Прогресс ученика по умолчанию **живёт только в `localStorage`** браузера (SRS, счёт, настройки). Если ученик задал «Ключ синхронизации», снимок SRS (слова, глаголы, артикли) дополнительно хранится на сервере в `SyncProfile`.
+- Прогресс ученика кэшируется в `localStorage`; после входа Telegram серверный `LearnerProgress` становится общим профилем для SRS, счёта, ответов за день, цели и категорий. Первый запрос переносит локальный снимок и, если задан старый ключ, объединяет его `SyncProfile`; затем ключ удаляется с устройства. Без входа сохраняется legacy-синхронизация по ключу.
 
 ## Переменные окружения
 См. `.env.example`. Приложение `.env` само не читает — передавайте переменные окружением (docker, `node --env-file`).
@@ -88,7 +89,8 @@
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут, в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.
 - **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
-- **Доступ**: Telegram-вход обязателен для тренажёров; вкладка админки продолжает использовать отдельный admin login. Прогресс, SRS, настройки и статистика аккаунту не привязаны.
+- **Доступ**: Telegram-вход обязателен для тренажёров; вкладка админки продолжает использовать отдельный admin login. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
+- `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает локальный снимок с `LearnerProgress`; необязательный `legacyKey` одноразово импортирует профиль `SyncProfile`. Один старый ключ можно привязать только к одному Telegram-аккаунту. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
 - Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `POST /words/ai/check` (фоновая проверка выбранных слов; безопасные исправления сохраняются сервером даже после закрытия вкладки; конфликты немецких форм отображаются как замечания к словам и не отменяют остальные исправления), `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
@@ -99,7 +101,7 @@
 - Массовые AI jobs запускаются фоново: UI получает `202` и больше не блокирует таблицу до завершения. Статусы хранятся в `AiBulkJob`; список доступен через `GET /words/ai/jobs`, отдельная задача — через `GET /words/ai/jobs/:jobId`. После рестарта активные записи явно помечаются прерванными. Хранятся последние 100 завершённых/прерванных задач.
 - Для `categoryRedistribution` и `requiredCase` размер одного AI-промпта задаётся отдельно для каждого профиля ползунком в админке (10–1000 слов, шаг 10; по умолчанию 100). Большая выборка разбивается на несколько задач общей очереди, результаты объединяются перед записью.
 - **audio**: `GET /audio?text=…&kind=word|sentence` отдаёт WAV, создавая запись через Piper при отсутствии в кэше; endpoint ограничен 60 запросами в минуту на IP. Админские `GET /audio/admin/stats`, `DELETE /audio/admin/cache` и `POST /audio/admin/regenerate-words` позволяют управлять кэшем. WAV не кэшируется браузером: постоянный кэш находится на сервере.
-- **sync**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со своим снимком (для каждой карточки побеждает запись с более поздним `lastReviewed`; `resetAt` отбрасывает записи не новее сброса), сохраняет и возвращает результат. Ключ — 6…200 символов; логика — `services/srsSync.ts`.
+- **sync legacy**: `POST /sync/srs` (публичный, 60 запросов/мин на IP) — клиент шлёт `{key, srs, resetAt}`, сервер сливает со снимком по ключу. Оставлен для старых клиентов и режима без авторизации; профиль также используется для одноразовой миграции в `LearnerProgress`.
 - **pictures**: `GET /pictures` отдаёт активные изображения; `GET /pictures/admin` и `POST/PUT/DELETE /pictures` доступны администратору; `POST /pictures/:id/ai-description` генерирует редактируемые название и описание через центральный AI-модуль; `POST /pictures/:id/format-answer` форматирует завершённую голосовую диктовку перед ручной правкой, а `POST /pictures/:id/check-answer` выполняет финальную проверку.
 - В тренажёре описания картинки переход «Следующая картинка» меняет текущую картинку и режим ввода через React-состояние без перезагрузки страницы; черновик ответа хранится в `localStorage`.
 - Массовая загрузка картинок выполняется последовательными защищёнными запросами, а опция автозаполнения вызывает AI-операцию для каждой картинки после сохранения изображения.
@@ -144,7 +146,7 @@
 - При включённом пороге ящик повышается после заданного числа ответов подряд, но не чаще раза в день (`promotedOn`); ошибка обнуляет серию и возвращает карточку в ящик 1. Без клиентской галочки сохраняется прежнее повышение после первого верного ответа. `nextReview` = сейчас + `[0,1,3,7,14,30]` дней[ящик]. При выборе карточки `nextReview` учитывается только в режиме «только к повторению».
 - **Режим «только к повторению»** (`studyPrefs.dueOnly`): `isDue` — новая карточка, ящик 1 (после ошибки) или `nextReview` наступил. Фильтр в `useSRSProgress.pickCard`; если пусто — `SRSIdleCard`.
 - **Цель на день** (`studyPrefs.dailyGoal`): счётчик ответов за локальные сутки, инкремент в `useScores.recordAnswer`; чип в Navbar и полоса в «Статистике».
-- **Синхронизация между устройствами** (`hooks/useSrsSync.ts`, `utils/srsSync.ts`): кроме SRS синхронизируются цель на день и выбранные категории слов/артиклей. Настройки побеждают по времени последнего изменения; счётчик ответов за текущие локальные сутки не синхронизируется. Пустой ключ — ничего не отправляется.
+- **Синхронизация между устройствами** (`hooks/useSrsSync.ts`, `utils/srsSync.ts`): при Telegram-входе снимок SRS, счёт, ответы за день, цель и выбранные категории хранятся в `LearnerProgress` и синхронизируются по сессии. На устройстве кэш помечается `app_learner_profile_id`, чтобы не слить данные предыдущего аккаунта в новый; ключевое legacy-хранилище используется только при первом переносе. Без Telegram-входа старый ключевой режим остаётся доступен.
 
 ### Проверка ответов
 `answerMatch.ts`: регистр, пробелы, Unicode-форма, `ae/oe/ue/ss` (настройка), `е/ё`. Числа: `parseTypedInteger`, `germanNumberVariants` (+`hundert`/`tausend`). Подсветка ошибок — LCS в `answerDiff.ts`.
@@ -166,15 +168,16 @@
 | `articles_category` | выбранная категория артиклей | да |
 | `app_daily_progress` | ответов за сегодня | нет |
 | `app_sync_settings_updated_at` | время изменения настроек, передаваемых синхронизацией | да |
+| `app_learner_profile_id` | Telegram-профиль, которому принадлежит локальный кэш синхронизируемого прогресса | нет |
 | `onboarding_seen` | приветственный экран уже показан | да |
 | `admin_token` | удалён: токен админа живёт только в HttpOnly-cookie | нет |
 | `admin_last_word_category_id` | последняя категория в форме слова | нет |
 
 `picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом и намеренно не включается в экспорт.
 
-Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Внимание: ключ синхронизации входит в бэкап (внутри `app_ui_settings`) — файл прогресса нужно хранить как пароль.
+Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Ключ синхронизации входит в старые бэкапы (внутри `app_ui_settings`) — такие файлы нужно хранить как пароль. После переноса в Telegram-профиль ключ из текущих настроек устройства удаляется.
 
-Перенос между устройствами: «Настройки» → «Скачать/Загрузить» (`utils/progressBackup.ts`, JSON `{app, version, exportedAt, data}`; загрузка **заменяет** прогресс и перезагружает страницу) либо ключ синхронизации.
+Перенос между устройствами: для авторизованного ученика — Telegram-аккаунт; также доступны «Скачать/Загрузить» (`utils/progressBackup.ts`, JSON `{app, version, exportedAt, data}`; загрузка **заменяет** прогресс на устройстве) и legacy-ключ для режима без авторизации.
 
 ### PWA и офлайн
 `manifest.webmanifest` + `sw.js` (регистрируется только в production). Версия кэшей Service Worker подставляется автоматически скриптом `frontend/scripts/build.mjs`: в CI используется GitHub SHA, локально — текущий Git commit, а без Git — timestamp. Поэтому ручное изменение `VERSION` не требуется. Стратегии: HTML — network-first; `/assets/*` — cache-first; `GET /api/words` и `/api/categories` — network-first с таймаутом 4 с и запасом из кэша (при изменении данных страницы получают `DICTIONARY_UPDATED` и перезагружают словарь); остальное не перехватывается (в том числе `/api/settings/*` и `/api/sync/*`: офлайн действуют веса по умолчанию, синхронизация ждёт сети). HTML-shell (`/` и `/index.html`) отдаётся с `Cache-Control: no-cache, no-store`, потому что он содержит имя текущего hashed JS-файла.
@@ -187,7 +190,7 @@
 - Новые таблицы (`Setting`, `SyncProfile`, `Picture`) создаются автоматически через `prisma db push` при старте.
 
 ## Известные ограничения / идеи
-- Нет аккаунтов: прогресс переносится файлом или ключом синхронизации (кто знает ключ — владеет профилем; ограничение 60 запросов/мин на IP).
+- Legacy-ключи синхронизации остаются для совместимости и режима без авторизации; новые синхронизации авторизованных учеников привязаны к Telegram-профилю.
 - Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются отдельными командами из `frontend/`.
 - Токен админа не возвращается в теле `/auth/login`, не хранится в `localStorage` и передаётся только в HttpOnly-cookie.
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.

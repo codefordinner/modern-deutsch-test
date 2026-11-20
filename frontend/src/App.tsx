@@ -10,6 +10,7 @@ import { useHashRoute } from './hooks/useHashRoute';
 import { useScores } from './hooks/useScores';
 import { useSrsWeightsSync } from './hooks/useSrsWeightsSync';
 import { useSrsSync } from './hooks/useSrsSync';
+import { prepareLearnerSyncUser } from './utils/srsSync';
 import type { ScoredTab } from './config/tabs';
 import { getTabDefinition } from './config/tabs';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -52,6 +53,7 @@ export function App() {
   };
 
   const handleLearnerAuthenticated = useCallback((user: LearnerSession['user']) => {
+    prepareLearnerSyncUser(user.id);
     setLearner(user);
     setAuthError('');
     setAuthLoading(false);
@@ -77,14 +79,10 @@ export function App() {
           }
           throw error;
         }
-        if (!config.required) {
-          if (active) setAuthRequired(false);
-          return;
-        }
-        if (active) setAuthRequired(true);
+        if (active) setAuthRequired(config.required);
         try {
           const session = await getLearnerSession();
-          if (active) setLearner(session.user);
+          if (active) handleLearnerAuthenticated(session.user);
         } catch {
           if (!active) return;
           const initData = window.Telegram?.WebApp?.initData;
@@ -92,10 +90,12 @@ export function App() {
             miniAppAttempted.current = true;
             try {
               const session = await loginWithMiniApp(initData);
-              if (active) setLearner(session.user);
+              if (active) handleLearnerAuthenticated(session.user);
             } catch (error) {
-              if (active) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
+              if (active && config.required) setAuthError(getErrorMessage(error, 'Не удалось войти через Telegram.'));
             }
+          } else if (config.required) {
+            setAuthError('');
           }
         }
       } catch (error) {
@@ -109,7 +109,7 @@ export function App() {
     };
     void authenticate();
     return () => { active = false; };
-  }, []);
+  }, [handleLearnerAuthenticated]);
 
   const handleLearnerLogout = useCallback(async () => {
     setLogoutError('');
@@ -128,7 +128,7 @@ export function App() {
   useSrsWeightsSync();
 
   // Keeps SRS progress in step with the learner's other devices when a sync key is set.
-  useSrsSync();
+  useSrsSync(learner?.id ?? null);
 
   // NOTE: the light theme in index.css is scoped to `html.light` (dark is
   // the default `:root`), so toggling a `dark` class here (as before) never
@@ -213,7 +213,7 @@ export function App() {
         />
       )}
 
-      {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} />}
+      {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} isLearnerSignedIn={Boolean(learner)} />}
       {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
       {logoutError && <p className="telegram-login-error" role="alert">{logoutError}</p>}
 

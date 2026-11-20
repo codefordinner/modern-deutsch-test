@@ -137,7 +137,13 @@ export function incrementDailyCount(): void {
  * Applies "answers today" received from another device: only for the current local day and only
  * upwards (the counter never decreases), so answers given here are never lost.
  */
-export function applySyncedDailyProgress(day: string, count: number): void {
+export function applySyncedDailyProgress(day: string, count: number, replace = false): void {
+  if (replace) {
+    daily = { day, count };
+    persistDaily();
+    notify();
+    return;
+  }
   if (day !== localDayKey(new Date())) return;
   if (count <= getDailyCount()) return;
   daily = { day, count };
