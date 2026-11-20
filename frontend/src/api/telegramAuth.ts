@@ -25,7 +25,7 @@ export const getLearnerSession = () => request<LearnerSession>(`${basePath}/me`)
 export const loginWithMiniApp = (initData: string) =>
   request<LearnerSession>(`${basePath}/telegram/mini-app`, { method: 'POST', body: { initData } });
 export const requestTelegramChallenge = () =>
-  request<TelegramChallenge>(`${basePath}/telegram/challenge`, { method: 'POST', body: {} });
+  request<TelegramChallenge>(`${basePath}/telegram/challenge`, { method: 'POST', body: {}, timeoutMs: 15_000 });
 export const getTelegramChallengeStatus = () =>
   request<TelegramChallengeStatus>(`${basePath}/telegram/challenge/status`);
 export const completeTelegramChallenge = () =>

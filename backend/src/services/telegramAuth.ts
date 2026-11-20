@@ -69,16 +69,22 @@ export const telegramUserIdFromInitData = (
 };
 
 export const getCookie = (req: Request, name: string): string | null => {
-  const part = req.headers.cookie
-    ?.split(';')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${name}=`));
-  if (!part) return null;
-  try {
-    return decodeURIComponent(part.slice(name.length + 1)) || null;
-  } catch {
-    return null;
+  return getCookies(req, name)[0] ?? null;
+};
+
+export const getCookies = (req: Request, name: string): string[] => {
+  const values: string[] = [];
+  for (const item of (req.headers.cookie ?? '').split(';')) {
+    const part = item.trim();
+    if (!part.startsWith(`${name}=`)) continue;
+    try {
+      const value = decodeURIComponent(part.slice(name.length + 1));
+      if (value) values.push(value);
+    } catch {
+      // Skip malformed cookie values and try any remaining duplicates.
+    }
   }
+  return values;
 };
 
 export const shouldUseSecureTelegramCookies = (req: Request): boolean => {
@@ -122,6 +128,8 @@ export const setUserSessionCookie = (req: Request, res: CookieResponse, token: s
 
 export const clearUserSessionCookie = (req: Request, res: CookieResponse) => {
   appendCookie(res, `${USER_SESSION_COOKIE}=; ${cookieOptions(req, 0)}`);
+  appendCookie(res, `${USER_SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0`);
+  appendCookie(res, `${USER_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0`);
 };
 
 export const setChallengeCookie = (req: Request, res: CookieResponse, token: string) => {
@@ -130,17 +138,21 @@ export const setChallengeCookie = (req: Request, res: CookieResponse, token: str
 
 export const clearChallengeCookie = (req: Request, res: CookieResponse) => {
   appendCookie(res, `${CHALLENGE_COOKIE}=; ${cookieOptions(req, 0)}`);
+  appendCookie(res, `${CHALLENGE_COOKIE}=; Path=/; HttpOnly; Max-Age=0`);
+  appendCookie(res, `${CHALLENGE_COOKIE}=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0`);
 };
 
 export const findCurrentUser = async (req: Request) => {
-  const token = getCookie(req, USER_SESSION_COOKIE);
-  if (!token) return null;
-  const session = await prisma.userSession.findUnique({
-    where: { tokenDigest: digestSessionToken(token) },
-    include: { user: { select: { id: true, telegramId: true, isAdmin: true } } },
-  });
-  if (!session || session.revokedAt || session.expiresAt <= new Date()) return null;
-  return { id: session.user.id, telegramId: session.user.telegramId, isAdmin: session.user.isAdmin };
+  for (const token of getCookies(req, USER_SESSION_COOKIE)) {
+    const session = await prisma.userSession.findUnique({
+      where: { tokenDigest: digestSessionToken(token) },
+      include: { user: { select: { id: true, telegramId: true, isAdmin: true } } },
+    });
+    if (session && !session.revokedAt && session.expiresAt > new Date()) {
+      return { id: session.user.id, telegramId: session.user.telegramId, isAdmin: session.user.isAdmin };
+    }
+  }
+  return null;
 };
 
 export const createUserSession = async (userId: string) => {

@@ -13,7 +13,7 @@ import {
   digestChallengeCode,
   digestSessionToken,
   findCurrentUser,
-  getCookie,
+  getCookies,
   getSessionTtlSeconds,
   getOrCreateTelegramUser,
   setChallengeCookie,
@@ -33,7 +33,7 @@ const limiter = (windowMs: number, limit: number, message: string) => rateLimit(
 });
 
 const miniAppLimiter = limiter(60_000, 10, 'Слишком много попыток входа. Попробуйте позже.');
-const issueLimiter = limiter(15 * 60_000, 5, 'Слишком часто запрашивается код. Попробуйте позже.');
+const issueLimiter = limiter(60_000, 5, 'Слишком часто запрашивается код. Попробуйте позже.');
 const statusLimiter = limiter(60_000, 30, 'Слишком частые проверки. Попробуйте чуть позже.');
 const completeLimiter = limiter(60_000, 10, 'Слишком много попыток завершить вход.');
 const asyncRoute = (handler: (req: Request, res: Response) => Promise<unknown>) =>
@@ -107,51 +107,57 @@ router.post('/telegram/challenge', issueLimiter, asyncRoute(async (req, res) => 
 
 router.get('/telegram/challenge/status', statusLimiter, asyncRoute(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const browserToken = getCookie(req, CHALLENGE_COOKIE);
-  if (!browserToken) return res.status(401).json({ error: 'Срок входа истёк. Запросите новый код.' });
-  const challenge = await prisma.telegramChallenge.findFirst({
-    where: { browserBindingDigest: challengeCookieDigest(browserToken), status: { in: ['pending', 'confirmed'] } },
-    select: { status: true, expiresAt: true },
-  });
-  if (!challenge || challenge.expiresAt <= new Date()) {
-    return res.status(410).json({ error: 'Срок действия кода истёк. Запросите новый.' });
+  const browserTokens = getCookies(req, CHALLENGE_COOKIE);
+  if (!browserTokens.length) return res.status(401).json({ error: 'Срок входа истёк. Запросите новый код.' });
+  for (const browserToken of browserTokens) {
+    const challenge = await prisma.telegramChallenge.findFirst({
+      where: { browserBindingDigest: challengeCookieDigest(browserToken), status: { in: ['pending', 'confirmed'] } },
+      select: { status: true, expiresAt: true },
+    });
+    if (challenge && challenge.expiresAt > new Date()) {
+      return res.json({ status: challenge.status, expiresAt: challenge.expiresAt.toISOString() });
+    }
   }
-  return res.json({ status: challenge.status, expiresAt: challenge.expiresAt.toISOString() });
+  return res.status(410).json({ error: 'Срок действия кода истёк. Запросите новый.' });
 }));
 
 router.post('/telegram/challenge/complete', completeLimiter, asyncRoute(async (req, res) => {
-  const browserToken = getCookie(req, CHALLENGE_COOKIE);
-  if (!browserToken) return res.status(401).json({ error: 'Срок входа истёк. Запросите новый код.' });
-  const bindingDigest = challengeCookieDigest(browserToken);
+  const browserTokens = getCookies(req, CHALLENGE_COOKIE);
+  if (!browserTokens.length) return res.status(401).json({ error: 'Срок входа истёк. Запросите новый код.' });
   const token = createOpaqueToken();
 
-  const userId = await prisma.$transaction(async (tx) => {
-    const lookupTime = new Date();
-    const challenge = await tx.telegramChallenge.findFirst({
-      where: {
-        browserBindingDigest: bindingDigest,
-        status: 'confirmed',
-        expiresAt: { gt: lookupTime },
-        consumedAt: null,
-      },
-      select: { id: true, telegramUserId: true },
+  let userId: string | null = null;
+  for (const browserToken of browserTokens) {
+    const bindingDigest = challengeCookieDigest(browserToken);
+    userId = await prisma.$transaction(async (tx) => {
+      const lookupTime = new Date();
+      const challenge = await tx.telegramChallenge.findFirst({
+        where: {
+          browserBindingDigest: bindingDigest,
+          status: 'confirmed',
+          expiresAt: { gt: lookupTime },
+          consumedAt: null,
+        },
+        select: { id: true, telegramUserId: true },
+      });
+      if (!challenge?.telegramUserId) return null;
+      const consumedAt = new Date();
+      const consumed = await tx.telegramChallenge.updateMany({
+        where: { id: challenge.id, status: 'confirmed', consumedAt: null, expiresAt: { gt: consumedAt } },
+        data: { status: 'consumed', consumedAt },
+      });
+      if (consumed.count !== 1) return null;
+      await tx.userSession.create({
+        data: {
+          userId: challenge.telegramUserId,
+          tokenDigest: digestSessionToken(token),
+          expiresAt: new Date(Date.now() + getSessionTtlSeconds() * 1000),
+        },
+      });
+      return challenge.telegramUserId;
     });
-    if (!challenge?.telegramUserId) return null;
-    const consumedAt = new Date();
-    const consumed = await tx.telegramChallenge.updateMany({
-      where: { id: challenge.id, status: 'confirmed', consumedAt: null, expiresAt: { gt: consumedAt } },
-      data: { status: 'consumed', consumedAt },
-    });
-    if (consumed.count !== 1) return null;
-    await tx.userSession.create({
-      data: {
-        userId: challenge.telegramUserId,
-        tokenDigest: digestSessionToken(token),
-        expiresAt: new Date(Date.now() + getSessionTtlSeconds() * 1000),
-      },
-    });
-    return challenge.telegramUserId;
-  });
+    if (userId) break;
+  }
 
   if (!userId) return res.status(409).json({ error: 'Подтверждение не найдено или уже использовано.' });
   setUserSessionCookie(req, res, token);
@@ -173,8 +179,7 @@ router.get('/me', asyncRoute(async (req, res) => {
 
 router.post('/logout', asyncRoute(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const token = getCookie(req, USER_SESSION_COOKIE);
-  if (token) {
+  for (const token of getCookies(req, USER_SESSION_COOKIE)) {
     await prisma.userSession.updateMany({
       where: { tokenDigest: digestSessionToken(token), revokedAt: null },
       data: { revokedAt: new Date() },

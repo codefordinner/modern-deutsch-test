@@ -20,22 +20,39 @@ interface RequestOptions {
   body?: unknown;
   auth?: boolean;
   responseType?: 'json' | 'blob';
+  timeoutMs?: number;
 }
 
-export async function request<T>(path: string, { method = 'GET', body, auth = false, responseType = 'json' }: RequestOptions = {}): Promise<T> {
+export async function request<T>(path: string, {
+  method = 'GET',
+  body,
+  auth = false,
+  responseType = 'json',
+  timeoutMs,
+}: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   let res: Response;
+  const controller = timeoutMs ? new AbortController() : undefined;
+  const timeoutId = controller && timeoutMs
+    ? globalThis.setTimeout(() => controller.abort(), timeoutMs)
+    : undefined;
   try {
     res = await fetch(`/api${path}`, {
       method,
       headers,
       credentials: 'same-origin',
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller?.signal,
     });
   } catch {
+    if (controller?.signal.aborted) {
+      throw new ApiError('Сервер долго не отвечает. Проверьте соединение и попробуйте запросить код ещё раз.', 408);
+    }
     throw new ApiError('Нет соединения с сервером', 0);
+  } finally {
+    if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
   }
 
   let data: unknown = null;

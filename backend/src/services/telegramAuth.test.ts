@@ -4,6 +4,7 @@ import { createHmac } from 'node:crypto';
 import {
   createLoginCode,
   digestChallengeCode,
+  getCookies,
   shouldUseSecureTelegramCookies,
   telegramUserIdFromInitData,
 } from './telegramAuth';
@@ -46,6 +47,13 @@ test('generates six-digit codes including leading zeroes and stores keyed digest
   assert.match(code, /^\d{6}$/);
   assert.match(digestChallengeCode(code), /^[a-f0-9]{64}$/);
   assert.notEqual(digestChallengeCode(code), code);
+});
+
+test('reads every valid duplicate cookie and skips malformed values', () => {
+  const request = {
+    headers: { cookie: 'learner_session=%E0%A4%A; learner_session=old-token; learner_session=new%20token' },
+  } as unknown as Request;
+  assert.deepEqual(getCookies(request, 'learner_session'), ['old-token', 'new token']);
 });
 
 test('uses secure Telegram cookies by default in production behind an HTTP-terminating proxy', () => {

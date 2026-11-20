@@ -112,7 +112,7 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.equal(wrongBrowserComplete.status, 409);
 
   const statusResponse = await fetch(`${base}/api/learner-auth/telegram/challenge/status`, {
-    headers: { Cookie: browserCookie },
+    headers: { Cookie: `telegram_challenge=stale-binding; ${browserCookie}` },
   });
   assert.equal(statusResponse.status, 200);
   const statusData = await statusResponse.json() as { status: string; expiresAt: string };
@@ -121,7 +121,7 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
 
   const complete = () => fetch(`${base}/api/learner-auth/telegram/challenge/complete`, {
     method: 'POST',
-    headers: { ...headerOrigin(base), Cookie: browserCookie, 'content-type': 'application/json' },
+    headers: { ...headerOrigin(base), Cookie: `telegram_challenge=stale-binding; ${browserCookie}`, 'content-type': 'application/json' },
     body: '{}',
   });
   const completionResponses = await Promise.all([complete(), complete()]);
@@ -134,7 +134,9 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.equal(completionBody.user.isAdmin, false);
   const sessionCookie = `learner_session=${cookieValue(successfulResponse.headers.get('set-cookie'), 'learner_session')}`;
 
-  const meResponse = await fetch(`${base}/api/learner-auth/me`, { headers: { Cookie: sessionCookie } });
+  const meResponse = await fetch(`${base}/api/learner-auth/me`, {
+    headers: { Cookie: `learner_session=stale-session; ${sessionCookie}` },
+  });
   assert.equal(meResponse.status, 200);
 
   const logoutResponse = await fetch(`${base}/api/learner-auth/logout`, {
@@ -261,7 +263,7 @@ test('learner progress is stored on the Telegram account without legacy sync imp
   };
   const firstResponse = await fetch(`${base}/api/learner-auth/progress/srs`, {
     method: 'POST',
-    headers: { ...headerOrigin(base), Cookie: firstCookie, 'content-type': 'application/json' },
+    headers: { ...headerOrigin(base), Cookie: `learner_session=stale-session; ${firstCookie}`, 'content-type': 'application/json' },
     body: JSON.stringify({ data: incoming, legacyKey: 'legacy-progress-key' }),
   });
   assert.equal(firstResponse.status, 200);
