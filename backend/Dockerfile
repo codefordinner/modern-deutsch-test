@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22.12.0-alpine3.20 AS builder
 WORKDIR /app
 
 RUN apk add --no-cache openssl libc6-compat
@@ -12,9 +12,10 @@ RUN npm ci
 
 COPY backend ./backend
 COPY packages/shared ./packages/shared
+RUN npm --workspace packages/shared run build
 RUN npm --prefix backend run build
 
-FROM node:22-alpine
+FROM node:22.12.0-alpine3.20
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -31,7 +32,8 @@ RUN npm ci --omit=dev
 WORKDIR /app/backend
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
-COPY --from=builder /app/packages/shared /app/packages/shared
+COPY --from=builder /app/packages/shared/package.json /app/packages/shared/package.json
+COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 

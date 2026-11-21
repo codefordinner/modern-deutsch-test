@@ -1,39 +1,68 @@
-import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
-import { createPicture, deletePicture, generatePictureDescription, getAdminPictures, updatePicture, type Picture } from '../../api/pictures';
-import { reportError, showToast } from '../../utils/toast';
-import { useConfirm } from '../../hooks/useConfirm';
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Pencil, Sparkles, Trash2 } from "lucide-react";
+import {
+  createPicture,
+  deletePicture,
+  generatePictureDescription,
+  getAdminPictures,
+  updatePicture,
+  type Picture,
+} from "../../api/pictures";
+import { reportError, showToast } from "../../utils/toast";
+import { useConfirm } from "../../hooks/useConfirm";
 
 // The API limits the resulting Base64 Data URL to 5 MiB. Base64 is larger
 // than the source file, so the practical source-file limit is lower.
 const MAX_DATA_URL_LENGTH = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = Math.floor(MAX_DATA_URL_LENGTH * 0.72);
-const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_FILE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 const MAX_SIDE = 1600;
 const KEEP_AS_IS_BYTES = 600 * 1024;
-const readFile = (file: File) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать файл')); reader.readAsDataURL(file);
-});
+const readFile = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
 
 async function prepareImage(file: File): Promise<string> {
   try {
     const bitmap = await createImageBitmap(file);
     try {
-      const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-      if (scale === 1 && file.size <= KEEP_AS_IS_BYTES && file.type !== 'image/gif') return readFile(file);
-      const canvas = document.createElement('canvas');
+      const scale = Math.min(
+        1,
+        MAX_SIDE / Math.max(bitmap.width, bitmap.height),
+      );
+      if (
+        scale === 1 &&
+        file.size <= KEEP_AS_IS_BYTES &&
+        file.type !== "image/gif"
+      )
+        return readFile(file);
+      const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Не удалось обработать изображение');
-      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Не удалось обработать изображение");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const result = canvas.toDataURL('image/jpeg', 0.85);
-      if (result.length > MAX_DATA_URL_LENGTH) throw new Error('Изображение слишком большое даже после сжатия');
+      const result = canvas.toDataURL("image/jpeg", 0.85);
+      if (result.length > MAX_DATA_URL_LENGTH)
+        throw new Error("Изображение слишком большое даже после сжатия");
       return result;
-    } finally { bitmap.close(); }
+    } finally {
+      bitmap.close();
+    }
   } catch (error) {
-    if (error instanceof Error && error.message.includes('слишком большое')) throw error;
+    if (error instanceof Error && error.message.includes("слишком большое"))
+      throw error;
     const original = await readFile(file);
     if (original.length <= MAX_DATA_URL_LENGTH) return original;
     throw new Error(`Не удалось обработать «${file.name}»`, { cause: error });
@@ -46,8 +75,8 @@ export function PicturesTab() {
   const [files, setFiles] = useState<File[]>([]);
   const [autoDescribe, setAutoDescribe] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const aiBusyRef = useRef(false);
   const [loading, setLoading] = useState(true);
@@ -59,7 +88,7 @@ export function PicturesTab() {
       setPictures(await getAdminPictures());
     } catch (error) {
       setLoadError(true);
-      reportError(error, 'Не удалось загрузить картинки');
+      reportError(error, "Не удалось загрузить картинки");
     } finally {
       setLoading(false);
     }
@@ -70,7 +99,10 @@ export function PicturesTab() {
   }, []);
 
   const add = async () => {
-    if (!files.length) { showToast('Выберите хотя бы одну картинку'); return; }
+    if (!files.length) {
+      showToast("Выберите хотя бы одну картинку");
+      return;
+    }
     setBusy(true);
     let added = 0;
     try {
@@ -80,52 +112,91 @@ export function PicturesTab() {
         added += 1;
         if (autoDescribe) await generatePictureDescription(picture.id);
       }
-      setFiles([]); setAutoDescribe(false); await load(); showToast(`Добавлено картинок: ${files.length}`, 'success');
+      setFiles([]);
+      setAutoDescribe(false);
+      await load();
+      showToast(`Добавлено картинок: ${files.length}`, "success");
     } catch (error) {
-      if (added > 0) showToast(`Добавлено картинок: ${added} из ${files.length}. Остальные не удалось обработать.`);
+      if (added > 0)
+        showToast(
+          `Добавлено картинок: ${added} из ${files.length}. Остальные не удалось обработать.`,
+        );
       // Do not leave successfully created files selected: retrying would
       // create duplicates. The current file is considered processed once its
       // record has been created, even if AI metadata generation failed.
       setFiles(files.slice(added));
       setAutoDescribe(false);
-      reportError(error, autoDescribe ? 'Не удалось добавить или описать картинки' : 'Не удалось добавить картинки');
+      reportError(
+        error,
+        autoDescribe
+          ? "Не удалось добавить или описать картинки"
+          : "Не удалось добавить картинки",
+      );
       await load();
+    } finally {
+      setBusy(false);
     }
-    finally { setBusy(false); }
   };
 
-  const openEdit = (picture: Picture) => { setEditingId(picture.id); setEditTitle(picture.title || ''); setEditDescription(picture.description || ''); };
+  const openEdit = (picture: Picture) => {
+    setEditingId(picture.id);
+    setEditTitle(picture.title || "");
+    setEditDescription(picture.description || "");
+  };
   const fillWithAI = async (id: string) => {
     if (aiBusyRef.current) return;
     aiBusyRef.current = true;
     setBusy(true);
-    try { const result = await generatePictureDescription(id); setPictures((items) => items.map((item) => item.id === id ? result : item)); setEditTitle(result.title || ''); setEditDescription(result.description || ''); showToast('Название и описание заполнены ИИ', 'success'); }
-    catch (error) { reportError(error, 'Не удалось заполнить описание через ИИ'); }
-    finally { aiBusyRef.current = false; setBusy(false); }
+    try {
+      const result = await generatePictureDescription(id);
+      setPictures((items) =>
+        items.map((item) => (item.id === id ? result : item)),
+      );
+      setEditTitle(result.title || "");
+      setEditDescription(result.description || "");
+      showToast("Название и описание заполнены ИИ", "success");
+    } catch (error) {
+      reportError(error, "Не удалось заполнить описание через ИИ");
+    } finally {
+      aiBusyRef.current = false;
+      setBusy(false);
+    }
   };
   const saveEdit = async (id: string) => {
     setBusy(true);
     try {
-      const result = await updatePicture(id, { title: editTitle, description: editDescription });
-      setPictures((items) => items.map((item) => item.id === id ? result : item));
+      const result = await updatePicture(id, {
+        title: editTitle,
+        description: editDescription,
+      });
+      setPictures((items) =>
+        items.map((item) => (item.id === id ? result : item)),
+      );
       setEditingId(null);
-      showToast('Картинка обновлена', 'success');
+      showToast("Картинка обновлена", "success");
     } catch (error) {
-      reportError(error, 'Не удалось сохранить картинку');
+      reportError(error, "Не удалось сохранить картинку");
     } finally {
       setBusy(false);
     }
   };
   const remove = async (picture: Picture) => {
-    if (!await confirm('Удалить картинку?', { title: 'Удалить картинку', confirmLabel: 'Удалить', danger: true })) return;
+    if (
+      !(await confirm("Удалить картинку?", {
+        title: "Удалить картинку",
+        confirmLabel: "Удалить",
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await deletePicture(picture.id);
       if (editingId === picture.id) setEditingId(null);
       await load();
-      showToast('Картинка удалена', 'success');
+      showToast("Картинка удалена", "success");
     } catch (error) {
-      reportError(error, 'Не удалось удалить картинку');
+      reportError(error, "Не удалось удалить картинку");
     } finally {
       setBusy(false);
     }
@@ -136,35 +207,191 @@ export function PicturesTab() {
       await updatePicture(picture.id, { isActive: !picture.isActive });
       await load();
     } catch (error) {
-      reportError(error, 'Не удалось изменить статус картинки');
+      reportError(error, "Не удалось изменить статус картинки");
     } finally {
       setBusy(false);
     }
   };
 
-  return <div className="pictures-admin">
-    <div className="section-toolbar"><h3 className="section-heading">Картинки для описания ({pictures.length})</h3></div>
-    <div className="picture-upload card">
-      <label className="picture-file-label" htmlFor="picture-file"><ImagePlus size={18} /> Выбрать изображения (до 3,7 МБ каждое)</label>
-      <input id="picture-file" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const selected = Array.from(event.target.files ?? []); const invalid = selected.find((file) => file.size > MAX_FILE_SIZE || !ALLOWED_FILE_TYPES.has(file.type)); if (invalid) { event.target.value = ''; showToast(`Файл «${invalid.name}» имеет неподдерживаемый формат или превышает 3,7 МБ`); return; } setFiles(selected); }} />
-      {files.length > 0 && <span className="setting-toggle-desc">Выбрано файлов: {files.length}</span>}
-      <label className="picture-ai-checkbox"><input type="checkbox" checked={autoDescribe} onChange={(event) => setAutoDescribe(event.target.checked)} /> Автоматически заполнить название и описание через ИИ</label>
-      <button type="button" className="btn-primary" disabled={busy || !files.length} onClick={() => void add()}><ImagePlus size={16} /> {busy ? 'Обработка…' : 'Добавить картинки'}</button>
+  return (
+    <div className="pictures-admin">
+      <div className="section-toolbar">
+        <h3 className="section-heading">
+          Картинки для описания ({pictures.length})
+        </h3>
+      </div>
+      <div className="picture-upload card">
+        <label className="picture-file-label" htmlFor="picture-file">
+          <ImagePlus size={18} /> Выбрать изображения (до 3,7 МБ каждое)
+        </label>
+        <input
+          id="picture-file"
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          onChange={(event) => {
+            const selected = Array.from(event.target.files ?? []);
+            const invalid = selected.find(
+              (file) =>
+                file.size > MAX_FILE_SIZE || !ALLOWED_FILE_TYPES.has(file.type),
+            );
+            if (invalid) {
+              event.target.value = "";
+              showToast(
+                `Файл «${invalid.name}» имеет неподдерживаемый формат или превышает 3,7 МБ`,
+              );
+              return;
+            }
+            setFiles(selected);
+          }}
+        />
+        {files.length > 0 && (
+          <span className="setting-toggle-desc">
+            Выбрано файлов: {files.length}
+          </span>
+        )}
+        <label className="picture-ai-checkbox">
+          <input
+            type="checkbox"
+            checked={autoDescribe}
+            onChange={(event) => setAutoDescribe(event.target.checked)}
+          />{" "}
+          Автоматически заполнить название и описание через ИИ
+        </label>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={busy || !files.length}
+          onClick={() => void add()}
+        >
+          <ImagePlus size={16} /> {busy ? "Обработка…" : "Добавить картинки"}
+        </button>
+      </div>
+      {loading && (
+        <div className="centered-message pictures-admin-message">
+          Загрузка картинок…
+        </div>
+      )}
+      {!loading && loadError && (
+        <div className="pictures-admin-empty">
+          <p>Не удалось загрузить список картинок.</p>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void load()}
+          >
+            Повторить
+          </button>
+        </div>
+      )}
+      {!loading && !loadError && pictures.length === 0 && (
+        <div className="pictures-admin-empty">
+          <p>Картинки ещё не добавлены.</p>
+          <span>
+            Загрузите изображения выше, чтобы они появились в тренажёре.
+          </span>
+        </div>
+      )}
+      {!loading && !loadError && pictures.length > 0 && (
+        <div className="pictures-admin-grid">
+          {pictures.map((picture) => (
+            <div
+              className={`card picture-admin-card ${picture.isActive ? "" : "is-inactive"}`}
+              key={picture.id}
+            >
+              <img
+                src={picture.imageUrl}
+                alt={picture.title || "Картинка"}
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="picture-admin-card-footer">
+                <div className="picture-admin-card-title">
+                  <span>{picture.title || "Без названия"}</span>
+                  <small>
+                    {picture.isActive
+                      ? "Показывается в тренажёре"
+                      : "Скрыта из тренажёра"}
+                  </small>
+                </div>
+                <div className="picture-admin-card-tools">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    disabled={busy}
+                    aria-label="Редактировать картинку"
+                    onClick={() => openEdit(picture)}
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn--danger"
+                    disabled={busy}
+                    aria-label="Удалить картинку"
+                    onClick={() => void remove(picture)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+              {picture.description && (
+                <p className="picture-admin-description">
+                  {picture.description}
+                </p>
+              )}
+              {editingId === picture.id && (
+                <div className="picture-edit-form">
+                  <input
+                    className="text-input"
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    placeholder="Название"
+                    aria-label="Название картинки"
+                  />
+                  <textarea
+                    className="text-input"
+                    value={editDescription}
+                    onChange={(event) => setEditDescription(event.target.value)}
+                    placeholder="Описание на русском"
+                    rows={5}
+                    aria-label="Описание картинки"
+                  />
+                  <div className="picture-edit-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={busy}
+                      onClick={() => void fillWithAI(picture.id)}
+                    >
+                      <Sparkles size={14} />{" "}
+                      {busy ? "ИИ обрабатывает…" : "Заполнить с помощью ИИ"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={busy}
+                      onClick={() => void saveEdit(picture.id)}
+                    >
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn-secondary picture-status-button"
+                disabled={busy}
+                onClick={() => void toggleActive(picture)}
+              >
+                {picture.isActive
+                  ? "Скрыть из тренажёра"
+                  : "Показывать в тренажёре"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-    {loading && <div className="centered-message pictures-admin-message">Загрузка картинок…</div>}
-    {!loading && loadError && <div className="pictures-admin-empty"><p>Не удалось загрузить список картинок.</p><button type="button" className="btn-secondary" onClick={() => void load()}>Повторить</button></div>}
-    {!loading && !loadError && pictures.length === 0 && <div className="pictures-admin-empty"><p>Картинки ещё не добавлены.</p><span>Загрузите изображения выше, чтобы они появились в тренажёре.</span></div>}
-    {!loading && !loadError && pictures.length > 0 && <div className="pictures-admin-grid">{pictures.map((picture) => <div className={`card picture-admin-card ${picture.isActive ? '' : 'is-inactive'}`} key={picture.id}>
-       <img src={picture.imageUrl} alt={picture.title || 'Картинка'} loading="lazy" decoding="async" />
-      <div className="picture-admin-card-footer"><div className="picture-admin-card-title"><span>{picture.title || 'Без названия'}</span><small>{picture.isActive ? 'Показывается в тренажёре' : 'Скрыта из тренажёра'}</small></div><div className="picture-admin-card-tools"><button type="button" className="icon-btn" disabled={busy} aria-label="Редактировать картинку" onClick={() => openEdit(picture)}><Pencil size={16} /></button><button type="button" className="icon-btn icon-btn--danger" disabled={busy} aria-label="Удалить картинку" onClick={() => void remove(picture)}><Trash2 size={16} /></button></div></div>
-      {picture.description && <p className="picture-admin-description">{picture.description}</p>}
-      {editingId === picture.id && <div className="picture-edit-form">
-        <input className="text-input" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} placeholder="Название" aria-label="Название картинки" />
-        <textarea className="text-input" value={editDescription} onChange={(event) => setEditDescription(event.target.value)} placeholder="Описание на русском" rows={5} aria-label="Описание картинки" />
-        <div className="picture-edit-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={() => void fillWithAI(picture.id)}><Sparkles size={14} /> {busy ? 'ИИ обрабатывает…' : 'Заполнить с помощью ИИ'}</button>
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveEdit(picture.id)}>Сохранить</button></div>
-      </div>}
-      <button type="button" className="btn-secondary picture-status-button" disabled={busy} onClick={() => void toggleActive(picture)}>{picture.isActive ? 'Скрыть из тренажёра' : 'Показывать в тренажёре'}</button>
-    </div>)}</div>}
-  </div>;
+  );
 }

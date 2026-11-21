@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm --workspace @sprachfunke/shared run build",
+    "pretypecheck": "npm --workspace @sprachfunke/shared run build",
+    "pretest": "npm --workspace @sprachfunke/shared run build",
     "build": "node scripts/build.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -b",
