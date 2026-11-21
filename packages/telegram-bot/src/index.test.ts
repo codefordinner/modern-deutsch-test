@@ -6,9 +6,27 @@ import { handleAuthMessage } from './handlers/auth';
 test('extracts only a six-digit one-time code', () => {
   assert.equal(extractLoginCode('004219'), '004219');
   assert.equal(extractLoginCode('/start 004219'), '004219');
+  assert.equal(extractLoginCode('/start@sprachfunke_bot 004219'), '004219');
   assert.equal(extractLoginCode(' 004219 '), '004219');
   assert.equal(extractLoginCode('4219'), null);
   assert.equal(extractLoginCode('004219 extra'), null);
+});
+
+test('welcomes a new private-chat user instead of treating the first /start as a code', async () => {
+  const replies: string[] = [];
+  const handled = await handleAuthMessage({
+    text: '/start',
+    chat: { id: 123, type: 'private' },
+    from: { id: 123 },
+  }, {
+    sendText: async (_chatId, text) => { replies.push(text); },
+    confirmCode: async () => false,
+  });
+
+  assert.equal(handled, true);
+  assert.match(replies[0], /Привет!/);
+  assert.match(replies[0], /BlitzDeutsch/);
+  assert.doesNotMatch(replies[0], /неверн|не найден|истёк/i);
 });
 
 test('only confirms codes received in private chat from the message sender', async () => {

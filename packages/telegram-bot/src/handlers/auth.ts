@@ -20,8 +20,14 @@ export async function handleAuthMessage(
   if (typeof message.from?.id !== 'number' || message.from.is_bot || message.from.id !== chatId) return false;
 
   const text = message.text?.trim() ?? '';
-  if (text === '/start' || text === '/help') {
-    await sendText(chatId, 'Чтобы войти, запросите код на сайте и отправьте его сюда одним сообщением.');
+  const command = text.match(/^\/(start|help)(?:@\w+)?(?:\s+(.*))?$/);
+  if (command && !command[2]) {
+    await sendText(
+      chatId,
+      command[1] === 'start'
+        ? 'Привет! Я бот BlitzDeutsch — помогу войти в тренажёр немецкого языка.\n\nЧтобы начать, вернитесь на сайт и нажмите «Получить код», затем откройте бота по ссылке. Код подтвердится автоматически. Если ссылка не сработала, отправьте сюда шестизначный код с сайта.'
+        : 'Для входа в BlitzDeutsch запросите шестизначный код на сайте и отправьте его сюда. Если вы открыли бота по ссылке с сайта, код подтвердится автоматически.',
+    );
     return true;
   }
   const code = extractLoginCode(text);
