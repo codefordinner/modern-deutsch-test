@@ -218,7 +218,7 @@ export function useWordsQuizEngine(onAnswer: (isCorrect: boolean) => void) {
       message: `Отлично! ${expectedTarget} = ${currentWord.ru}${hintSuffix}`,
       checks: [check],
     });
-    onAnswer(isCorrect);
+    if (!isCorrect || hintLevel === 0) onAnswer(isCorrect);
   };
 
   const currentSrsItem: SRSRecord | undefined = currentWord

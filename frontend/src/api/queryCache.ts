@@ -30,8 +30,6 @@ interface Entry<T> {
   inFlight: Promise<void> | null;
   fetcher: (() => Promise<T>) | null;
   listeners: Set<() => void>;
-  /** Cheap structural hash of the last stored data, so refetches don't JSON.stringify big lists. */
-  dataHash: number | undefined;
 }
 
 const DEFAULT_STALE_MS = 60_000;
@@ -50,7 +48,6 @@ function getEntry<T>(key: string): Entry<T> {
       inFlight: null,
       fetcher: null,
       listeners: new Set(),
-      dataHash: undefined,
     };
     entries.set(key, entry);
   }
@@ -60,43 +57,6 @@ function getEntry<T>(key: string): Entry<T> {
 function setState<T>(entry: Entry<T>, patch: Partial<QueryState<T>>): void {
   entry.state = { ...entry.state, ...patch };
   entry.listeners.forEach((listener) => listener());
-}
-
-/**
- * A stable, cheap structural hash used to detect whether a refetch brought back
- * the same data. JSON.stringify over a dictionary of thousands of words on every
- * refetch (and every service-worker DICTIONARY_UPDATED message) was measurable.
- * The hash is not a guarantee of deep equality — a rare collision only means we
- * replace the object (an extra render), never wrong data.
- */
-function hashData(value: unknown): number {
-  if (value === null || value === undefined) return 0;
-  const seen = new Set<unknown>();
-  let h = 0x811c9dc5;
-  const mix = (n: number) => { h ^= n; h = Math.imul(h, 0x01000193); };
-  const visit = (v: unknown): void => {
-    if (v === null) { mix(0); return; }
-    const t = typeof v;
-    if (t === 'number') { mix(v as number); return; }
-    if (t === 'boolean') { mix(v ? 1 : 2); return; }
-    if (t === 'string') { for (let i = 0; i < (v as string).length; i++) mix((v as string).charCodeAt(i)); return; }
-    if (t !== 'object') return;
-    if (seen.has(v)) { mix(7); return; }
-    seen.add(v);
-    if (Array.isArray(v)) { mix(3); for (const item of v) visit(item); return; }
-    mix(4);
-    const record = v as Record<string, unknown>;
-    for (const key of Object.keys(record).sort()) { visit(key); visit(record[key]); }
-  };
-  visit(value);
-  return h;
-}
-
-function isSameData(entry: Entry<unknown>, previous: unknown, next: unknown): boolean {
-  if (previous === next) return true;
-  // A hash match is enough to keep the old object identity. Collisions only cause
-  // an extra render, never wrong data — and the huge lists skip JSON.stringify.
-  return entry.dataHash !== undefined && entry.dataHash === hashData(next);
 }
 
 function runFetch<T>(entry: Entry<T>, fetcher: () => Promise<T>): Promise<void> {
@@ -111,10 +71,9 @@ function runFetch<T>(entry: Entry<T>, fetcher: () => Promise<T>): Promise<void> 
         entry.updatedAt = Date.now();
         entry.invalidated = false;
         const previous = entry.state.data;
-        if (previous !== undefined && isSameData(entry, previous, data)) {
+        if (previous === data) {
           setState(entry, { error: undefined, isFetching: false });
         } else {
-          entry.dataHash = hashData(data);
           setState(entry, { data, error: undefined, isFetching: false });
         }
       },

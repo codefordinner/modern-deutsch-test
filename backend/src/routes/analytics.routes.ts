@@ -261,7 +261,8 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
     const dailyStats = [...daily.entries()].map(([date, b]) => ({ date, ...toStat(b) }));
     const visits = dailyStats.reduce((sum, d) => sum + d.visits, 0);
     const activeLearners = rangeLearners.size;
-    const returningLearners = [...learnerDays.values()].filter((set) => set.size >= 2).length;
+    const selectedDays = new Set(daily.keys());
+    const returningLearners = [...learnerDays.values()].filter((set) => [...set].filter((day) => selectedDays.has(day)).length >= 2).length;
     const today = daily.get(todayKey);
 
     res.json({

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireAdmin } from '../middleware/auth.middleware';
@@ -59,7 +60,12 @@ router.get('/', async (req: Request, res: Response) => {
       words = matched.slice(skip, skip + take);
     }
 
-    res.json({ words: words.map(serializeWord), total, page: pageNumber, limit: take });
+    const payload = { words: words.map(serializeWord), total, page: pageNumber, limit: take };
+    const etag = `"${createHash('sha256').update(JSON.stringify(payload)).digest('base64url')}"`;
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'no-cache');
+    if (req.fresh) return res.status(304).end();
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ error: 'Не удалось загрузить слова' });
   }

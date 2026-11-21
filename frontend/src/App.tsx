@@ -127,6 +127,12 @@ export function App() {
       await logoutLearner();
       clearAccountTrainerSettings(learner?.id);
       resetAccountStudyPrefs();
+      try {
+        localStorage.removeItem('picture_draft');
+        localStorage.removeItem('admin_last_word_category_id');
+      } catch {
+        // Session data will not persist when browser storage is unavailable.
+      }
       setLearner(null);
     } catch (error) {
       setLogoutError(getErrorMessage(error, 'Не удалось завершить сеанс. Попробуйте ещё раз.'));

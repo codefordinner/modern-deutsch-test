@@ -70,15 +70,6 @@ async function trimCache(cache, maxEntries) {
   await Promise.all(keys.slice(0, Math.max(0, keys.length - maxEntries)).map((key) => cache.delete(key)));
 }
 
-async function sameBody(a, b) {
-  if (!a || !b) return false;
-  try {
-    return (await a.clone().text()) === (await b.clone().text());
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Dictionary requests. Online and fast: the fresh response. Slow (> API_NETWORK_TIMEOUT_MS), failing
  * or offline: the cached copy, while the real request finishes in the background (kept alive with
@@ -91,13 +82,17 @@ async function dictionaryRequest(event) {
   const cached = await cache.match(request);
   const cachedCopy = cached ? cached.clone() : null; // `cached` itself is handed to the page and gets consumed
 
-  const network = fetch(request);
+  const headers = new Headers(request.headers);
+  const cachedTag = cached?.headers.get('ETag');
+  if (cachedTag) headers.set('If-None-Match', cachedTag);
+  const network = fetch(new Request(request, { headers })).then((response) =>
+    response.status === 304 && cached ? cached.clone() : response
+  );
 
   const bookkeeping = network.then(async (response) => {
     if (!response.ok) return;
-    const forCompare = response.clone();
     const forStore = response.clone();
-    const unchanged = await sameBody(cachedCopy, forCompare);
+    const unchanged = cachedCopy?.headers.get('ETag') === response.headers.get('ETag');
     await cache.delete(request); // re-insert so this entry becomes the newest
     await cache.put(request, forStore);
     await trimCache(cache, MAX_API_ENTRIES);

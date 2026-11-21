@@ -26,9 +26,11 @@ describe('account trainer settings store', () => {
     vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     const settings = emptySyncData().settings;
     setAccountTrainerSettings(settings, 'learner-1');
+    const originalPrefs = settings.trainerPrefs;
     updateAccountSetting('time_display_mode', 'digital');
     updateAccountSetting('verbs_praesens_submode', 'form_to_infinitive');
 
+    expect(settings.trainerPrefs).toBe(originalPrefs);
     expect(getAccountSettingValue('time_display_mode')).toBe('digital');
     expect(getAccountSettingValue('verbs_praesens_submode')).toBe('form_to_infinitive');
   });

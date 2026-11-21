@@ -74,40 +74,43 @@ export function updateAccountDailyGoal(value: number): void {
 
 export function updateAccountSetting(key: string, value: unknown): void {
   if (!settings) return;
+  const original = settings;
   const prefs = settings.trainerPrefs;
+  let next = settings;
   switch (key) {
     case 'words_settings': {
       const raw = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
-      prefs.words = {
+      next = { ...next, trainerPrefs: { ...prefs, words: {
         directionMode: raw.directionMode as typeof prefs.words.directionMode,
         requireArticle: raw.requireArticle as boolean,
         enableBase: raw.enableBase as boolean,
         enablePlural: raw.enablePlural as boolean,
         enableFeminine: raw.enableFeminine as boolean,
-      };
-      if (Array.isArray(raw.selectedCats)) settings.wordsCategories = raw.selectedCats.filter((item): item is string => typeof item === 'string');
+      } } };
+      if (Array.isArray(raw.selectedCats)) next = { ...next, wordsCategories: raw.selectedCats.filter((item): item is string => typeof item === 'string') };
       break;
     }
     case 'articles_category':
-      if (Array.isArray(value)) settings.articlesCategories = value.filter((item): item is string => typeof item === 'string');
+      if (Array.isArray(value)) next = { ...next, articlesCategories: value.filter((item): item is string => typeof item === 'string') };
       break;
-    case 'numbers_direction': prefs.numbers.directionMode = value as typeof prefs.numbers.directionMode; break;
-    case 'numbers_range': prefs.numbers.range = value as typeof prefs.numbers.range; break;
-    case 'verbs_mode': prefs.verbs.mode = value as typeof prefs.verbs.mode; break;
-    case 'verbs_praesens_submode': prefs.verbs.praesensSubMode = value as typeof prefs.verbs.praesensSubMode; break;
-    case 'time_display_mode': prefs.time.displayMode = value as typeof prefs.time.displayMode; break;
-    case 'time_step_mode': prefs.time.stepMode = value as typeof prefs.time.stepMode; break;
+    case 'numbers_direction': next = { ...next, trainerPrefs: { ...prefs, numbers: { ...prefs.numbers, directionMode: value as typeof prefs.numbers.directionMode } } }; break;
+    case 'numbers_range': next = { ...next, trainerPrefs: { ...prefs, numbers: { ...prefs.numbers, range: value as typeof prefs.numbers.range } } }; break;
+    case 'verbs_mode': next = { ...next, trainerPrefs: { ...prefs, verbs: { ...prefs.verbs, mode: value as typeof prefs.verbs.mode } } }; break;
+    case 'verbs_praesens_submode': next = { ...next, trainerPrefs: { ...prefs, verbs: { ...prefs.verbs, praesensSubMode: value as typeof prefs.verbs.praesensSubMode } } }; break;
+    case 'time_display_mode': next = { ...next, trainerPrefs: { ...prefs, time: { ...prefs.time, displayMode: value as typeof prefs.time.displayMode } } }; break;
+    case 'time_step_mode': next = { ...next, trainerPrefs: { ...prefs, time: { ...prefs.time, stepMode: value as typeof prefs.time.stepMode } } }; break;
     case 'words_use_srs':
     case 'verbs_use_srs':
     case 'articles_use_srs': {
       const trainer = key.replace('_use_srs', '') as SrsTrainer;
-      prefs.srs[trainer] = value === true;
+      next = { ...next, trainerPrefs: { ...prefs, srs: { ...prefs.srs, [trainer]: value === true } } };
       break;
     }
     default: return;
   }
   const timestamp = Date.now();
-  settings = { ...settings, updatedAt: timestamp, trainerPrefsUpdatedAt: timestamp };
+  settings = { ...next, updatedAt: timestamp, trainerPrefsUpdatedAt: timestamp };
+  if (settings !== original) window.dispatchEvent(new CustomEvent('app-storage-updated', { detail: { keys: [key] } }));
 }
 
 export function clearLocalAccountSettings(): void {

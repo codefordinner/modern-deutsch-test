@@ -13,7 +13,10 @@ const PULL_THROTTLE_MS = 30_000;
  */
 export function useSrsSync(userId: string | null): void {
   const lastPullAt = useRef(0);
-  setLearnerSyncUser(userId);
+
+  useEffect(() => {
+    setLearnerSyncUser(userId);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {

@@ -37,6 +37,7 @@ COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 
 COPY backend/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
+USER node
 
-EXPOSE 3000
+EXPOSE 3001
 CMD ["./entrypoint.sh"]

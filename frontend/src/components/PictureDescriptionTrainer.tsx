@@ -6,6 +6,7 @@ import { reportError } from '../utils/toast';
 import { withRetry } from '../utils/withRetry';
 import { useAudioVisualizer } from '../hooks/useAudioVisualizer';
 import { useSpeechDictation } from '../hooks/useSpeechDictation';
+import { getSpeechRecognition } from '../utils/dictation';
 
 /**
  * Runs the picture-answer check with a short retry for transient failures.
@@ -19,6 +20,7 @@ const isRetryablePictureError = (error: unknown): boolean =>
   error instanceof ApiError && (error.status === 0 || RETRYABLE_STATUS.has(error.status));
 
 export function PictureDescriptionTrainer() {
+  const speechSupported = Boolean(getSpeechRecognition());
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -167,7 +169,7 @@ export function PictureDescriptionTrainer() {
        </div>
       {!isRevealed && <div className="picture-input-mode-selector">
         <button className="picture-mode-button" onClick={() => start('text')}><span className="picture-mode-icon">✍️</span><span className="picture-mode-title">Текстом</span><span className="picture-mode-desc">Вводить описание с клавиатуры</span></button>
-        <button className="picture-mode-button" onClick={() => start('voice')}><span className="picture-mode-icon">🎤</span><span className="picture-mode-title">Голосом</span><span className="picture-mode-desc">Диктовать описание с микрофона</span></button>
+        {speechSupported && <button className="picture-mode-button" onClick={() => start('voice')}><span className="picture-mode-icon">🎤</span><span className="picture-mode-title">Голосом</span><span className="picture-mode-desc">Диктовать описание с микрофона</span></button>}
       </div>}
        {hasTimedOut && !result && <div className="picture-timeout-message" role="alert">Время вышло. Проверьте описание и отправьте ответ.</div>}
        {(startedAt !== null || (isFinished && !result)) && <label className="picture-answer-label" htmlFor="picture-answer">Ваше описание</label>}

@@ -4,7 +4,7 @@ import { randomInt, shuffle } from './random';
 const OPTION_COUNT = 4;
 
 const shapeOf = (form: string) => ({
-  ending: form.toLowerCase().endsWith('en') ? 'en' : form.toLowerCase().endsWith('t') ? 't' : 'other',
+  ending: form.toLowerCase().endsWith('n') ? 'n' : form.toLowerCase().endsWith('t') ? 't' : 'other',
   hasGe: form.toLowerCase().startsWith('ge'),
 });
 
