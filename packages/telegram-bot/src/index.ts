@@ -7,7 +7,7 @@ type TelegramUpdate = {
     id: string;
     data?: string;
     from?: { id?: number; is_bot?: boolean };
-    message?: { chat?: { id?: number; type?: string } };
+    message?: { message_id?: number; text?: string; chat?: { id?: number; type?: string } };
   };
 };
 
@@ -60,10 +60,10 @@ const notifyDueReminders = async () => {
     const chatId = Number(reminder.telegramId);
     if (!Number.isSafeInteger(chatId)) continue;
     try {
-      await sendText(chatId, reminder.text, {
+      await sendText(chatId, `${reminder.text}\n\nЧерез сколько хотите получить напоминание снова?`, {
         inline_keyboard: [[
-          { text: 'Повторить через 15 минут', callback_data: 'snooze:15' },
-          { text: 'Повторить через час', callback_data: 'snooze:60' },
+          { text: '15 мин', callback_data: 'snooze:15' },
+          { text: '1 час', callback_data: 'snooze:60' },
         ]],
       });
     } catch {
@@ -81,9 +81,22 @@ const handleSnooze = async (update: NonNullable<TelegramUpdate['callback_query']
     || typeof telegramId !== 'number' || update.from?.is_bot || chatId !== telegramId
   ) return;
   const result = await botRequest<{ success: boolean }>('reminders/snooze', { telegramId: String(telegramId), minutes });
+  const confirmation = `✅ Напомним через ${minutes === 15 ? '15 минут' : 'час'}.`;
+  if (result.success && typeof update.message?.message_id === 'number') {
+    try {
+      await telegramRequest('editMessageText', {
+        chat_id: chatId,
+        message_id: update.message.message_id,
+        text: `${update.message.text ?? ''}\n\n${confirmation}`.trim(),
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch {
+      // Still acknowledge the action if Telegram cannot edit the original message.
+    }
+  }
   await telegramRequest('answerCallbackQuery', {
     callback_query_id: update.id,
-    text: result.success ? `Напомним через ${minutes === 15 ? '15 минут' : 'час'}.` : 'Напоминания отключены.',
+    text: result.success ? confirmation : 'Напоминания отключены.',
   });
 };
 

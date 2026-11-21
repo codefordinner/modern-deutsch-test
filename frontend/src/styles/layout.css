@@ -70,6 +70,20 @@
   margin-left: 4px;
 }
 
+/* Time controls have longer labels than other trainer modes. Let each group
+   wrap instead of squeezing the step and display options over one another. */
+.time-trainer-toolbar .toolbar-filters {
+  flex-wrap: wrap;
+}
+
+.time-trainer-toolbar .toolbar-filters .mode-switch {
+  flex: 1 1 280px;
+}
+
+.time-trainer-toolbar .mode-switch-pills {
+  flex-wrap: wrap;
+}
+
 /* ---- Tablet / narrow desktop: only the active tab keeps its label ------------- */
 
 @media (max-width: 1100px) {
