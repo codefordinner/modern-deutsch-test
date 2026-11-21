@@ -6,7 +6,7 @@ import { TAB_IDS, type AppTab } from '../config/tabs';
 // you where you were. Nothing to install and it works behind any static host.
 
 export const TABS: readonly AppTab[] = TAB_IDS;
-export const DEFAULT_TAB: AppTab = 'numbers';
+export const DEFAULT_TAB: AppTab = 'trainers';
 
 export const tabHref = (tab: AppTab): string => `#/${tab}`;
 

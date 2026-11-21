@@ -1,44 +1,30 @@
 import React from 'react';
 import { APP_TABS } from '../config/tabs';
 import type { AppTab } from '../config/tabs';
+import { getTabDefinition } from '../config/tabs';
 import { tabHref } from '../hooks/useHashRoute';
 import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
-import { Sun, Moon, Settings, BarChart3, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: AppTab;
-  isDark: boolean;
-  onToggleTheme: () => void;
-  onOpenStats: () => void;
-  showStats: boolean;
-  onOpenSettings: () => void;
-  isLearnerSignedIn?: boolean;
-  isAdmin?: boolean;
-  onLearnerLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
-  isDark,
-  onToggleTheme,
-  onOpenStats,
-  showStats,
-  onOpenSettings,
-  isLearnerSignedIn = false,
-  isAdmin = false,
-  onLearnerLogout,
 }) => {
-  const themeLabel = isDark ? 'Включить светлую тему' : 'Включить тёмную тему';
   const [{ dailyGoal }] = useStudyPrefs();
   const answeredToday = useDailyCount();
-  const visibleTabs = APP_TABS.filter((tab) => tab.id !== 'admin' || isAdmin);
+  const visibleTabs = APP_TABS.filter((tab) => tab.surface === 'primary');
+  const activePrimary = getTabDefinition(activeTab).surface === 'trainer'
+    ? 'trainers'
+    : activeTab === 'admin' ? 'profile' : activeTab;
 
   return (
     <>
       <header className="app-header">
         <a className="sr-only" href="#main">Перейти к содержимому</a>
         <div className="header-inner">
-          <a className="brand-area" href={tabHref('numbers')} aria-label="BlitzDeutsch — на главную">
+          <a className="brand-area" href={tabHref('trainers')} aria-label="BlitzDeutsch — на главную">
             <img className="brand-logo" src="/icons/blitzdeutsch-logo.svg" alt="" aria-hidden="true" />
             <div className="brand-text">
               <h1 className="brand-title">BlitzDeutsch</h1>
@@ -50,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="nav-tabs" aria-label="Разделы">
             {visibleTabs.map((t) => {
               const Icon = t.icon;
-              const isActive = activeTab === t.id;
+              const isActive = activePrimary === t.id;
               return (
                 <a
                   key={t.id}
@@ -69,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           <div className="header-actions">
-            {showStats && dailyGoal > 0 && (
+            {activeTab !== 'profile' && dailyGoal > 0 && (
               <span
                 className={`daily-chip ${answeredToday >= dailyGoal ? 'is-done' : ''}`}
                 title={`Цель на сегодня: ${answeredToday} из ${dailyGoal} ответов`}
@@ -77,49 +63,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 🎯 {answeredToday}/{dailyGoal}
               </span>
             )}
-            {isLearnerSignedIn && onLearnerLogout && (
-              <button
-                className="icon-btn"
-                type="button"
-                onClick={onLearnerLogout}
-                title="Выйти из аккаунта"
-                aria-label="Выйти из аккаунта"
-              >
-                <LogOut size={18} />
-              </button>
-            )}
-            {showStats && (
-              <button
-                id="open-stats-btn"
-                className="icon-btn"
-                onClick={onOpenStats}
-                title="Статистика"
-                aria-label="Статистика"
-                type="button"
-              >
-                <BarChart3 size={18} />
-              </button>
-            )}
-            <button
-              id="open-settings-btn"
-              className="icon-btn"
-              onClick={onOpenSettings}
-              title="Настройки"
-              aria-label="Настройки"
-              type="button"
-            >
-              <Settings size={18} />
-            </button>
-            <button
-              id="theme-toggle-btn"
-              className="icon-btn"
-              onClick={onToggleTheme}
-              title={themeLabel}
-              aria-label={themeLabel}
-              type="button"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
           </div>
         </div>
       </header>
@@ -127,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <nav className="bottom-nav" aria-label="Разделы" style={{ '--bottom-nav-count': visibleTabs.length } as React.CSSProperties}>
         {visibleTabs.map((t) => {
           const Icon = t.icon;
-          const isActive = activeTab === t.id;
+          const isActive = activePrimary === t.id;
           return (
             <a
               key={t.id}

@@ -1,8 +1,7 @@
 /* ==========================================================================
    Layout / navigation.
 
-   - Header: no scrollbar any more. Tabs shrink step by step (full labels →
-     icons with a label only on the active tab → bottom bar on phones).
+   - Header: three primary sections; trainer modes live in the trainer catalog.
    - Phones: tabs move to a bottom bar, every "pick a mode" row becomes ONE
      dropdown (<ModeSwitch>), toolbar buttons become icon-only (<ToolbarButton>).
    - Colours and shapes are untouched: everything uses the variables from index.css.
@@ -121,7 +120,7 @@
   /* Bottom tab bar */
   .bottom-nav {
     display: grid;
-    grid-template-columns: repeat(var(--bottom-nav-count, 6), minmax(0, 1fr));
+     grid-template-columns: repeat(var(--bottom-nav-count, 3), minmax(0, 1fr));
     position: fixed;
     left: 0;
     right: 0;

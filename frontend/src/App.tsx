@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
-import { StatsPanel } from './components/StatsPanel';
 import { GeneralSettingsModal } from './components/GeneralSettingsModal';
 import { TrainerContent } from './components/routing/TrainerContent';
 import { ToastHost } from './components/ToastHost';
@@ -45,7 +44,6 @@ export function App() {
       return true;
     }
   });
-  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const closeOnboarding = () => {
@@ -135,7 +133,7 @@ export function App() {
     }
   }, [learner]);
 
-  const { scores, recordAnswer, resetScore } = useScores();
+  const { scores, recordAnswer } = useScores();
   const scoredTab: ScoredTab | null = getTabDefinition(activeTab).scored ? activeTab as ScoredTab : null;
 
   // Leitner box probabilities configured by the admin (defaults until loaded).
@@ -178,7 +176,7 @@ export function App() {
   useEffect(() => {
     if (previousTab.current === activeTab) return;
     previousTab.current = activeTab;
-    trackEvent('tab_switch', activeTab);
+    if (getTabDefinition(activeTab).surface !== 'primary') trackEvent('tab_switch', activeTab);
   }, [activeTab]);
 
   useEffect(() => {
@@ -222,29 +220,22 @@ export function App() {
     <div className="app-shell">
       <Navbar
         activeTab={activeTab}
-        isDark={isDark}
-        onToggleTheme={() => setIsDark((p) => !p)}
-        onOpenStats={() => setIsStatsOpen(true)}
-        showStats={scoredTab !== null}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        isLearnerSignedIn={Boolean(learner)}
-        isAdmin={Boolean(learner?.isAdmin)}
-        onLearnerLogout={handleLearnerLogout}
       />
 
        <main className="app-container" id="main">
-         <TrainerContent activeTab={activeTab} onAnswer={handleAnswer} />
-       </main>
-
-      {isStatsOpen && scoredTab && (
-        <StatsPanel
-           score={scores[scoredTab]}
+         <TrainerContent
+           activeTab={activeTab}
+           onAnswer={handleAnswer}
            scores={scores}
-          onReset={() => resetScore(scoredTab)}
-           trainerName={getTabDefinition(activeTab).title}
-          onClose={() => setIsStatsOpen(false)}
-        />
-      )}
+           profileProps={{
+             isAdmin: Boolean(learner?.isAdmin),
+             onOpenSettings: () => setIsSettingsOpen(true),
+             onToggleTheme: () => setIsDark((value) => !value),
+             isDark,
+             onLogout: () => { void handleLearnerLogout(); },
+           }}
+         />
+       </main>
 
       {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} isLearnerSignedIn={Boolean(learner)} />}
       {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}

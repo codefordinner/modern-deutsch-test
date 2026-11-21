@@ -1,14 +1,17 @@
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Clock, Hash, Images, ShieldCheck, Type, Zap } from 'lucide-react';
+import { BookOpen, Clock, Hash, Images, LayoutGrid, ShieldCheck, Type, UserRound, Zap, ChartNoAxesColumn } from 'lucide-react';
 
 export const APP_TABS = [
-  { id: 'numbers', label: 'Числа', title: '🔢 Числительные', pageTitle: 'Числительные', icon: Hash, scored: true, srs: false },
-  { id: 'words', label: 'Слова', title: '📚 Словарь', pageTitle: 'Словарь', icon: BookOpen, scored: true, srs: true },
-  { id: 'articles', label: 'Артикли', title: '🔤 Артикли (der / die / das)', pageTitle: 'Артикли', icon: Type, scored: true, srs: true },
-  { id: 'verbs', label: 'Глаголы', title: '⚡ Глаголы (Präsens, Präteritum, Partizip II)', pageTitle: 'Глаголы', icon: Zap, scored: true, srs: true },
-  { id: 'time', label: 'Время', title: '⏰ Немецкое время (Uhrzeit)', pageTitle: 'Время', icon: Clock, scored: false, srs: false },
-  { id: 'pictures', label: 'Картинки', title: '🖼️ Описание картинки', pageTitle: 'Описание картинки', icon: Images, scored: false, srs: false },
-  { id: 'admin', label: 'Админка', title: '⚙️ Панель управления', pageTitle: 'Админка', icon: ShieldCheck, scored: false, srs: false },
+  { id: 'trainers', label: 'Тренажёры', title: 'Тренажёры', pageTitle: 'Тренажёры', icon: LayoutGrid, scored: false, srs: false, surface: 'primary' },
+  { id: 'progress', label: 'Прогресс', title: 'Прогресс', pageTitle: 'Прогресс', icon: ChartNoAxesColumn, scored: false, srs: false, surface: 'primary' },
+  { id: 'profile', label: 'Профиль', title: 'Профиль', pageTitle: 'Профиль', icon: UserRound, scored: false, srs: false, surface: 'primary' },
+  { id: 'numbers', label: 'Числа', title: '🔢 Числительные', pageTitle: 'Числительные', icon: Hash, scored: true, srs: false, surface: 'trainer' },
+  { id: 'words', label: 'Слова', title: '📚 Словарь', pageTitle: 'Словарь', icon: BookOpen, scored: true, srs: true, surface: 'trainer' },
+  { id: 'articles', label: 'Артикли', title: '🔤 Артикли (der / die / das)', pageTitle: 'Артикли', icon: Type, scored: true, srs: true, surface: 'trainer' },
+  { id: 'verbs', label: 'Глаголы', title: '⚡ Глаголы (Präsens, Präteritum, Partizip II)', pageTitle: 'Глаголы', icon: Zap, scored: true, srs: true, surface: 'trainer' },
+  { id: 'time', label: 'Время', title: '⏰ Немецкое время (Uhrzeit)', pageTitle: 'Время', icon: Clock, scored: false, srs: false, surface: 'trainer' },
+  { id: 'pictures', label: 'Картинки', title: '🖼️ Описание картинки', pageTitle: 'Описание картинки', icon: Images, scored: false, srs: false, surface: 'trainer' },
+  { id: 'admin', label: 'Админка', title: '⚙️ Панель управления', pageTitle: 'Админка', icon: ShieldCheck, scored: false, srs: false, surface: 'admin' },
 ] as const satisfies readonly {
   id: string;
   label: string;
@@ -17,10 +20,11 @@ export const APP_TABS = [
   icon: LucideIcon;
   scored: boolean;
   srs: boolean;
+  surface: 'primary' | 'trainer' | 'admin';
 }[];
 
 export type AppTab = (typeof APP_TABS)[number]['id'];
-export type TrainerTab = Exclude<AppTab, 'admin'>;
+export type TrainerTab = Extract<(typeof APP_TABS)[number], { surface: 'trainer' }>['id'];
 export type ScoredTab = Extract<(typeof APP_TABS)[number], { scored: true }>['id'];
 
 export const TAB_IDS: readonly AppTab[] = APP_TABS.map((tab) => tab.id);
