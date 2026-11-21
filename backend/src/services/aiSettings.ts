@@ -6,8 +6,15 @@ import { normalizeCategoryName } from './wordCategories';
 /** Central AI configuration module. Provider calls must be added here, not in routes or UI. */
 export const AI_SETTINGS_KEY = 'aiSettings';
 export type GeminiModel = string;
-export interface GeminiModelInfo { name: string; displayName: string; supportedGenerationMethods: string[] }
-export interface PictureMetadata { title: string; description: string }
+export interface GeminiModelInfo {
+  name: string;
+  displayName: string;
+  supportedGenerationMethods: string[];
+}
+export interface PictureMetadata {
+  title: string;
+  description: string;
+}
 
 export interface AISettingsPublic {
   provider: 'gemini';
@@ -35,7 +42,12 @@ export interface PictureCheckResult {
   level: string;
   usefulExpressions: string[];
 }
-interface StoredAISettings { provider: 'gemini'; apiKey: string; requestsPerMinute: number; profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }> }
+interface StoredAISettings {
+  provider: 'gemini';
+  apiKey: string;
+  requestsPerMinute: number;
+  profiles: Record<string, { model: GeminiModel; prompt: string; severity?: number; batchSize?: number }>;
+}
 export const DEFAULT_AI_REQUESTS_PER_MINUTE = 10;
 const DEFAULT_MODEL = '';
 export const DEFAULT_PICTURE_PROMPT = [
@@ -47,8 +59,10 @@ export const DEFAULT_PICTURE_PROMPT = [
   'Не добавляй приветствие, оценку, советы, вопросы, объяснение своей работы и Markdown.',
   'Верни объект с ровно двумя строковыми полями: title и description.',
 ].join(' ');
-export const DEFAULT_PICTURE_FORMAT_PROMPT = 'Ты обрабатываешь распознанный голосом текст на немецком языке. Верни тот же текст без исправления слов, орфографии, грамматики или порядка слов. Разрешается только расставить пробелы, запятые и точки по смыслу. Не добавляй и не удаляй слова. Верни только готовый текст, без кавычек, пояснений и Markdown.';
-export const DEFAULT_PICTURE_CHECK_PROMPT = 'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Проверяй факты по самому изображению, а не только по эталону (эталон может быть неполным). Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; для каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для нейтральных/хороших сегментов correction опускай); severity: neutral|good|style|error|lie. note на русском: называй правило и/или давай правильный пример (например, «здесь Dativ, верно: dem Mann»), а не общие слова. Одну и ту же ошибку, повторённую несколько раз (например, неверный артикль в каждой фразе), штрафуй один раз и отметь в report, что она повторяется. report на русском, доброжелательно и конкретно: сначала что удалось, затем что исправить с примерами, без общих фраз. correctedText — полный исправленный немецкий текст, если нужны исправления; если в ответе нет знаков препинания (пользователь диктовал голосом), расставь в correctedText запятые и точки по смыслу, не меняя при этом слова и их порядок без необходимости. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. Оценивай по эталону уровня B1: баллы должны отражать полноту, сложность и длину ответа, а не только отсутствие ошибок. Не давай баллы «впустую» — если пользователь написал 2–3 коротких простых предложения без ошибок, это всё равно низкий балл за content и fluency (ответ не раскрывает картинку), поэтому суммарный балл должен быть заметно ниже 60. Если описание настолько общее, что подходит к любой картинке и не называет ни одной конкретной детали, — снизь content и укажи это в report. level — примерный CEFR A1–C1; согласуй level с оценками и сложностью ответа: короткий простой безошибочный текст — не выше A2, развёрнутый ответ с разнообразной лексикой и сложными конструкциями — B1 и выше. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель); подбирай выражения под эту картинку и уровень ученика, которые реально улучшили бы именно этот ответ. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
+export const DEFAULT_PICTURE_FORMAT_PROMPT =
+  'Ты обрабатываешь распознанный голосом текст на немецком языке. Верни тот же текст без исправления слов, орфографии, грамматики или порядка слов. Разрешается только расставить пробелы, запятые и точки по смыслу. Не добавляй и не удаляй слова. Верни только готовый текст, без кавычек, пояснений и Markdown.';
+export const DEFAULT_PICTURE_CHECK_PROMPT =
+  'Ты проверяешь описание изображения, которое пользователь написал НА НЕМЕЦКОМ ЯЗЫКЕ. Эталонное описание и обратная связь на русском, пользовательский текст анализируй как немецкий. Проверь грамматику, артикли der/die/das, падежи, окончания, порядок слов, глаголы, лексику, орфографию и естественность. Отдельно отмечай фактическую ошибку или ложь. Проверяй факты по самому изображению, а не только по эталону (эталон может быть неполным). Не штрафуй за синонимы, другой естественный порядок слов и отсутствие деталей, которых пользователь не упомянул. Возвращай JSON. segments должны покрывать исходный текст непрерывно и дословно; для каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для нейтральных/хороших сегментов correction опускай); severity: neutral|good|style|error|lie. note на русском: называй правило и/или давай правильный пример (например, «здесь Dativ, верно: dem Mann»), а не общие слова. Одну и ту же ошибку, повторённую несколько раз (например, неверный артикль в каждой фразе), штрафуй один раз и отметь в report, что она повторяется. report на русском, доброжелательно и конкретно: сначала что удалось, затем что исправить с примерами, без общих фраз. correctedText — полный исправленный немецкий текст, если нужны исправления; если в ответе нет знаков препинания (пользователь диктовал голосом), расставь в correctedText запятые и точки по смыслу, не меняя при этом слова и их порядок без необходимости. categories — четыре целых оценки 0–25: content, grammar, vocabulary, fluency. Оценивай по эталону уровня B1: баллы должны отражать полноту, сложность и длину ответа, а не только отсутствие ошибок. Не давай баллы «впустую» — если пользователь написал 2–3 коротких простых предложения без ошибок, это всё равно низкий балл за content и fluency (ответ не раскрывает картинку), поэтому суммарный балл должен быть заметно ниже 60. Если описание настолько общее, что подходит к любой картинке и не называет ни одной конкретной детали, — снизь content и укажи это в report. level — примерный CEFR A1–C1; согласуй level с оценками и сложностью ответа: короткий простой безошибочный текст — не выше A2, развёрнутый ответ с разнообразной лексикой и сложными конструкциями — B1 и выше. usefulExpressions — массив до 5 строк, каждая строка вида «немецкое выражение — русский перевод» (тире-разделитель); подбирай выражения под эту картинку и уровень ученика, которые реально улучшили бы именно этот ответ. score — сумма категорий. Не добавляй в segments текст, которого нет в ответе.';
 export const DEFAULT_WORD_FILL_PROMPT = [
   'Ты наполняешь словарь тренажёра немецкого языка. Ниже — список слов (немецкие, русские или вперемешку).',
   'Преврати его в JSON и верни ТОЛЬКО JSON — одним блоком кода, без пояснений до и после.',
@@ -72,9 +86,12 @@ export const DEFAULT_WORD_FILL_PROMPT = [
   ']',
   '```',
 ].join(' ');
-export const DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT = 'Ты распределяешь слова немецкого учебного словаря по существующим категориям. Верни только JSON-массив объектов {"id":"...","categories":["точное название категории"]}. Для каждого слова выбери одну или несколько наиболее подходящих категорий только из переданного списка. Не придумывай категории, не меняй id, не пропускай слова.';
-export const DEFAULT_REQUIRED_CASE_PROMPT = 'Ты определяешь управление немецких глаголов. Верни только JSON-массив объектов {"id":"...","requiredCase":"nominativ|akkusativ|dativ|genitiv|null"}. Выбери падеж, который требует глагол в типичном значении; если глагол не требует объекта или уверенности нет, верни null. Не угадывай, не меняй id и не пропускай слова.';
-export const DEFAULT_WORD_CHECK_PROMPT = 'Ты проверяешь и аккуратно исправляешь записи немецкого учебного словаря. Проверь именно переданные данные, не выдумывай отсутствующие формы. Для глаголов проверь Infinitiv, Präteritum, Partizip II, Hilfsverb, все Präsens-формы и управление (падеж). Проверь перевод и часть речи. Верни только JSON-массив объектов {"id":"...","issues":[{"field":"...","severity":"error|warning","message":"...","suggestion":"..."}],"corrections":[{"field":"...","value":"..."}]}. В corrections добавляй только исправления, в которых уверен: value — готовое новое значение поля; null разрешён только для необязательного поля, которое действительно нужно очистить. Никогда не исправляй наугад и не добавляй отсутствующие немецкие формы. Допустимые поля corrections: de, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb, praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, requiredCase. Для partOfSpeech используй noun|verb|adjective|adverb|other|null, для hilfsverb — haben|sein|null, для requiredCase — nominativ|akkusativ|dativ|genitiv|null. Если проблем нет, issues=[] и corrections=[]; не меняй id и не пропускай записи. Сообщения на русском, немецкие формы — только если уверен.';
+export const DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT =
+  'Ты распределяешь слова немецкого учебного словаря по существующим категориям. Верни только JSON-массив объектов {"id":"...","categories":["точное название категории"]}. Для каждого слова выбери одну или несколько наиболее подходящих категорий только из переданного списка. Не придумывай категории, не меняй id, не пропускай слова.';
+export const DEFAULT_REQUIRED_CASE_PROMPT =
+  'Ты определяешь управление немецких глаголов. Верни только JSON-массив объектов {"id":"...","requiredCase":"nominativ|akkusativ|dativ|genitiv|null"}. Выбери падеж, который требует глагол в типичном значении; если глагол не требует объекта или уверенности нет, верни null. Не угадывай, не меняй id и не пропускай слова.';
+export const DEFAULT_WORD_CHECK_PROMPT =
+  'Ты проверяешь и аккуратно исправляешь записи немецкого учебного словаря. Проверь именно переданные данные, не выдумывай отсутствующие формы. Для глаголов проверь Infinitiv, Präteritum, Partizip II, Hilfsverb, все Präsens-формы и управление (падеж). Проверь перевод и часть речи. Верни только JSON-массив объектов {"id":"...","issues":[{"field":"...","severity":"error|warning","message":"...","suggestion":"..."}],"corrections":[{"field":"...","value":"..."}]}. В corrections добавляй только исправления, в которых уверен: value — готовое новое значение поля; null разрешён только для необязательного поля, которое действительно нужно очистить. Никогда не исправляй наугад и не добавляй отсутствующие немецкие формы. Допустимые поля corrections: de, ru, hint, partOfSpeech, plural, feminine, praeteritum, partizip2, hilfsverb, praesensIch, praesensDu, praesensErSieEs, praesensWir, praesensIhr, praesensSie, requiredCase. Для partOfSpeech используй noun|verb|adjective|adverb|other|null, для hilfsverb — haben|sein|null, для requiredCase — nominativ|akkusativ|dativ|genitiv|null. Если проблем нет, issues=[] и corrections=[]; не меняй id и не пропускай записи. Сообщения на русском, немецкие формы — только если уверен.';
 export const MAX_PICTURE_ANSWER_LENGTH = 10_000;
 export const MAX_WORD_FILL_CHARS = 50_000;
 export const MAX_WORD_FILL_WORDS = 1000;
@@ -82,18 +99,40 @@ export const MAX_AI_BATCH_WORDS = 5000;
 export const DEFAULT_AI_BATCH_SIZE = 100;
 
 export const PROFILES = {
-  [AI_PROFILE_PICTURE_DESCRIPTION]: { defaultPrompt: DEFAULT_PICTURE_PROMPT, hasSeverity: false, hasBatch: false },
-  [AI_PROFILE_PICTURE_FORMAT]: { defaultPrompt: DEFAULT_PICTURE_FORMAT_PROMPT, hasSeverity: false, hasBatch: false },
-  [AI_PROFILE_PICTURE_CHECK]: { defaultPrompt: DEFAULT_PICTURE_CHECK_PROMPT, hasSeverity: true, hasBatch: false },
+  [AI_PROFILE_PICTURE_DESCRIPTION]: {
+    defaultPrompt: DEFAULT_PICTURE_PROMPT,
+    hasSeverity: false,
+    hasBatch: false,
+  },
+  [AI_PROFILE_PICTURE_FORMAT]: {
+    defaultPrompt: DEFAULT_PICTURE_FORMAT_PROMPT,
+    hasSeverity: false,
+    hasBatch: false,
+  },
+  [AI_PROFILE_PICTURE_CHECK]: {
+    defaultPrompt: DEFAULT_PICTURE_CHECK_PROMPT,
+    hasSeverity: true,
+    hasBatch: false,
+  },
   [AI_PROFILE_WORD_FILL]: { defaultPrompt: DEFAULT_WORD_FILL_PROMPT, hasSeverity: false, hasBatch: false },
-  [AI_PROFILE_CATEGORY_REDISTRIBUTION]: { defaultPrompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT, hasSeverity: false, hasBatch: true },
-  [AI_PROFILE_REQUIRED_CASE]: { defaultPrompt: DEFAULT_REQUIRED_CASE_PROMPT, hasSeverity: false, hasBatch: true },
+  [AI_PROFILE_CATEGORY_REDISTRIBUTION]: {
+    defaultPrompt: DEFAULT_CATEGORY_REDISTRIBUTION_PROMPT,
+    hasSeverity: false,
+    hasBatch: true,
+  },
+  [AI_PROFILE_REQUIRED_CASE]: {
+    defaultPrompt: DEFAULT_REQUIRED_CASE_PROMPT,
+    hasSeverity: false,
+    hasBatch: true,
+  },
   [AI_PROFILE_WORD_CHECK]: { defaultPrompt: DEFAULT_WORD_CHECK_PROMPT, hasSeverity: false, hasBatch: true },
 } as const;
 export type AIProfileId = keyof typeof PROFILES;
 
 export function isGeminiModel(value: unknown): value is GeminiModel {
-  return typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200;
+  return (
+    typeof value === 'string' && /^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.trim()) && value.length <= 200
+  );
 }
 
 function isValidApiKey(value: unknown): value is string {
@@ -101,41 +140,88 @@ function isValidApiKey(value: unknown): value is string {
 }
 
 function defaultProfiles(): StoredAISettings['profiles'] {
-  return Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => [id, {
-    model: DEFAULT_MODEL,
-    prompt: config.defaultPrompt,
-    ...(config.hasSeverity ? { severity: 3 } : {}),
-    ...(config.hasBatch ? { batchSize: DEFAULT_AI_BATCH_SIZE } : {}),
-  }])) as StoredAISettings['profiles'];
+  return Object.fromEntries(
+    Object.entries(PROFILES).map(([id, config]) => [
+      id,
+      {
+        model: DEFAULT_MODEL,
+        prompt: config.defaultPrompt,
+        ...(config.hasSeverity ? { severity: 3 } : {}),
+        ...(config.hasBatch ? { batchSize: DEFAULT_AI_BATCH_SIZE } : {}),
+      },
+    ]),
+  ) as StoredAISettings['profiles'];
 }
 
 function sanitizeStored(value: unknown): StoredAISettings | null {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Record<string, unknown>;
-  if (raw.provider !== 'gemini' || (raw.model !== undefined && raw.model !== '' && !isGeminiModel(raw.model)) || !isValidApiKey(raw.apiKey)) return null;
-  const legacyPrompt = typeof raw.prompt === 'string' && raw.prompt.trim() ? raw.prompt.trim().slice(0, 10_000) : DEFAULT_PICTURE_PROMPT;
-  const profiles = typeof raw.profiles === 'object' && raw.profiles !== null ? raw.profiles as Record<string, Record<string, unknown>> : {};
+  if (
+    raw.provider !== 'gemini' ||
+    (raw.model !== undefined && raw.model !== '' && !isGeminiModel(raw.model)) ||
+    !isValidApiKey(raw.apiKey)
+  )
+    return null;
+  const legacyPrompt =
+    typeof raw.prompt === 'string' && raw.prompt.trim()
+      ? raw.prompt.trim().slice(0, 10_000)
+      : DEFAULT_PICTURE_PROMPT;
+  const profiles =
+    typeof raw.profiles === 'object' && raw.profiles !== null
+      ? (raw.profiles as Record<string, Record<string, unknown>>)
+      : {};
   const legacyModel = typeof raw.model === 'string' && isGeminiModel(raw.model) ? raw.model.trim() : '';
-  const batchSizeOf = (profile: { batchSize?: number } | undefined) => Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)));
-  const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(raw.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
-  const cleanProfiles = Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => {
-    const profile = profiles[id];
-    const model = typeof profile?.model === 'string' && isGeminiModel(profile.model) ? profile.model.trim() : legacyModel;
-    const prompt = typeof profile?.prompt === 'string' && profile.prompt.trim() ? profile.prompt.trim().slice(0, 10_000) : id === AI_PROFILE_PICTURE_DESCRIPTION ? legacyPrompt : config.defaultPrompt;
-    return [id, {
-      model,
-      prompt,
-      ...(config.hasSeverity ? { severity: Math.max(1, Math.min(5, Math.round(Number(profile?.severity) || 3))) } : {}),
-      ...(config.hasBatch ? { batchSize: batchSizeOf(profile) } : {}),
-    }];
-  }));
-  return { provider: 'gemini', apiKey: raw.apiKey.trim(), requestsPerMinute, profiles: cleanProfiles as StoredAISettings['profiles'] };
+  const batchSizeOf = (profile: { batchSize?: number } | undefined) =>
+    Math.max(
+      10,
+      Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile?.batchSize) || DEFAULT_AI_BATCH_SIZE)),
+    );
+  const requestsPerMinute = Math.max(
+    1,
+    Math.min(60, Math.round(Number(raw.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)),
+  );
+  const cleanProfiles = Object.fromEntries(
+    Object.entries(PROFILES).map(([id, config]) => {
+      const profile = profiles[id];
+      const model =
+        typeof profile?.model === 'string' && isGeminiModel(profile.model)
+          ? profile.model.trim()
+          : legacyModel;
+      const prompt =
+        typeof profile?.prompt === 'string' && profile.prompt.trim()
+          ? profile.prompt.trim().slice(0, 10_000)
+          : id === AI_PROFILE_PICTURE_DESCRIPTION
+            ? legacyPrompt
+            : config.defaultPrompt;
+      return [
+        id,
+        {
+          model,
+          prompt,
+          ...(config.hasSeverity
+            ? { severity: Math.max(1, Math.min(5, Math.round(Number(profile?.severity) || 3))) }
+            : {}),
+          ...(config.hasBatch ? { batchSize: batchSizeOf(profile) } : {}),
+        },
+      ];
+    }),
+  );
+  return {
+    provider: 'gemini',
+    apiKey: raw.apiKey.trim(),
+    requestsPerMinute,
+    profiles: cleanProfiles as StoredAISettings['profiles'],
+  };
 }
 
 async function readStored(): Promise<StoredAISettings | null> {
   const row = await prisma.setting.findUnique({ where: { key: AI_SETTINGS_KEY } });
   if (!row) return null;
-  try { return sanitizeStored(JSON.parse(row.value)); } catch { return null; }
+  try {
+    return sanitizeStored(JSON.parse(row.value));
+  } catch {
+    return null;
+  }
 }
 
 async function readConfigured(): Promise<StoredAISettings | null> {
@@ -155,29 +241,79 @@ export async function readAISettings(): Promise<AISettingsPublic> {
   };
 }
 
-export async function writeAISettings(input: { apiKey?: unknown; profiles: Record<string, { model?: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown }>; requestsPerMinute?: unknown }): Promise<AISettingsPublic> {
+export async function writeAISettings(input: {
+  apiKey?: unknown;
+  profiles: Record<string, { model?: unknown; prompt?: unknown; severity?: unknown; batchSize?: unknown }>;
+  requestsPerMinute?: unknown;
+}): Promise<AISettingsPublic> {
   const current = await readStored();
   const apiKey = input.apiKey === undefined || input.apiKey === '' ? current?.apiKey : input.apiKey;
   if (!isValidApiKey(apiKey)) throw new Error('INVALID_API_KEY');
-  const profiles = Object.fromEntries(Object.entries(PROFILES).map(([id, config]) => {
-    const supplied = input.profiles[id];
-    const old = current?.profiles[id];
-    const model = supplied?.model === undefined ? old?.model ?? '' : supplied.model;
-    if (model !== '' && !isGeminiModel(model)) throw new Error('INVALID_MODEL');
-    const prompt = supplied?.prompt === undefined ? old?.prompt ?? config.defaultPrompt : supplied.prompt;
-    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000) throw new Error('INVALID_PROMPT');
-    return [id, {
-      model,
-      prompt: prompt.trim(),
-      ...(config.hasSeverity ? { severity: Math.max(1, Math.min(5, Math.round(Number(supplied?.severity ?? old?.severity) || 3))) } : {}),
-      ...(config.hasBatch ? { batchSize: Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(supplied?.batchSize ?? old?.batchSize) || DEFAULT_AI_BATCH_SIZE))) } : {}),
-    }];
-  }));
-  const requestsPerMinute = Math.max(1, Math.min(60, Math.round(Number(input.requestsPerMinute ?? current?.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE)));
-  const value: StoredAISettings = { provider: 'gemini', apiKey: apiKey.trim(), requestsPerMinute, profiles: profiles as StoredAISettings['profiles'] };
+  const profiles = Object.fromEntries(
+    Object.entries(PROFILES).map(([id, config]) => {
+      const supplied = input.profiles[id];
+      const old = current?.profiles[id];
+      const model = supplied?.model === undefined ? (old?.model ?? '') : supplied.model;
+      if (model !== '' && !isGeminiModel(model)) throw new Error('INVALID_MODEL');
+      const prompt = supplied?.prompt === undefined ? (old?.prompt ?? config.defaultPrompt) : supplied.prompt;
+      if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10_000)
+        throw new Error('INVALID_PROMPT');
+      return [
+        id,
+        {
+          model,
+          prompt: prompt.trim(),
+          ...(config.hasSeverity
+            ? {
+                severity: Math.max(
+                  1,
+                  Math.min(5, Math.round(Number(supplied?.severity ?? old?.severity) || 3)),
+                ),
+              }
+            : {}),
+          ...(config.hasBatch
+            ? {
+                batchSize: Math.max(
+                  10,
+                  Math.min(
+                    MAX_AI_BATCH_WORDS,
+                    Math.round(Number(supplied?.batchSize ?? old?.batchSize) || DEFAULT_AI_BATCH_SIZE),
+                  ),
+                ),
+              }
+            : {}),
+        },
+      ];
+    }),
+  );
+  const requestsPerMinute = Math.max(
+    1,
+    Math.min(
+      60,
+      Math.round(
+        Number(input.requestsPerMinute ?? current?.requestsPerMinute) || DEFAULT_AI_REQUESTS_PER_MINUTE,
+      ),
+    ),
+  );
+  const value: StoredAISettings = {
+    provider: 'gemini',
+    apiKey: apiKey.trim(),
+    requestsPerMinute,
+    profiles: profiles as StoredAISettings['profiles'],
+  };
   configureAIRequestRateLimit(requestsPerMinute);
-  await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
-  return { provider: 'gemini', hasApiKey: true, isDefault: false, requestsPerMinute, profiles: value.profiles };
+  await prisma.setting.upsert({
+    where: { key: AI_SETTINGS_KEY },
+    create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) },
+    update: { value: JSON.stringify(value) },
+  });
+  return {
+    provider: 'gemini',
+    hasApiKey: true,
+    isDefault: false,
+    requestsPerMinute,
+    profiles: value.profiles,
+  };
 }
 
 export async function resetAIProfile(profileId: string): Promise<AISettingsPublic> {
@@ -193,8 +329,18 @@ export async function resetAIProfile(profileId: string): Promise<AISettingsPubli
     ...(config.hasBatch ? { batchSize: currentProfile?.batchSize ?? DEFAULT_AI_BATCH_SIZE } : {}),
   };
   const value: StoredAISettings = { ...current, profiles: { ...current.profiles, [profileId]: profile } };
-  await prisma.setting.upsert({ where: { key: AI_SETTINGS_KEY }, create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) }, update: { value: JSON.stringify(value) } });
-  return { provider: 'gemini', hasApiKey: true, isDefault: false, requestsPerMinute: value.requestsPerMinute, profiles: value.profiles };
+  await prisma.setting.upsert({
+    where: { key: AI_SETTINGS_KEY },
+    create: { key: AI_SETTINGS_KEY, value: JSON.stringify(value) },
+    update: { value: JSON.stringify(value) },
+  });
+  return {
+    provider: 'gemini',
+    hasApiKey: true,
+    isDefault: false,
+    requestsPerMinute: value.requestsPerMinute,
+    profiles: value.profiles,
+  };
 }
 
 async function readApiKey(): Promise<string | null> {
@@ -204,24 +350,43 @@ async function readApiKey(): Promise<string | null> {
 
 /** Gets the current model catalog from Gemini. It never calls generateContent. */
 export async function fetchGeminiModels(apiKey?: string): Promise<GeminiModelInfo[]> {
-  const key = apiKey ?? await readApiKey();
+  const key = apiKey ?? (await readApiKey());
   if (!key) throw new Error('MISSING_API_KEY');
   try {
-    const response = await enqueueAI('models', undefined, () => fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-      headers: { 'x-goog-api-key': key },
-      signal: AbortSignal.timeout(15_000),
-    }));
-    if (!response.ok) throw new AIServiceError(response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
-      providerStatus: response.status,
-      response: await response.clone().text().catch(() => undefined),
-    });
-    const body = await response.json() as { models?: Array<{ name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }> };
+    const response = await enqueueAI('models', undefined, () =>
+      fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: { 'x-goog-api-key': key },
+        signal: AbortSignal.timeout(15_000),
+      }),
+    );
+    if (!response.ok)
+      throw new AIServiceError(
+        response.status === 401 || response.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE',
+        {
+          providerStatus: response.status,
+          response: await response
+            .clone()
+            .text()
+            .catch(() => undefined),
+        },
+      );
+    const body = (await response.json()) as {
+      models?: Array<{ name?: unknown; displayName?: unknown; supportedGenerationMethods?: unknown }>;
+    };
     return (body.models ?? []).flatMap((model) => {
       const fullName = typeof model.name === 'string' ? model.name : '';
       const name = fullName.startsWith('models/') ? fullName.slice('models/'.length) : fullName;
-      const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods.filter((item): item is string => typeof item === 'string') : [];
+      const methods = Array.isArray(model.supportedGenerationMethods)
+        ? model.supportedGenerationMethods.filter((item): item is string => typeof item === 'string')
+        : [];
       if (!isGeminiModel(name) || !methods.includes('generateContent')) return [];
-      return [{ name, displayName: typeof model.displayName === 'string' ? model.displayName : name, supportedGenerationMethods: methods }];
+      return [
+        {
+          name,
+          displayName: typeof model.displayName === 'string' ? model.displayName : name,
+          supportedGenerationMethods: methods,
+        },
+      ];
     });
   } catch (error) {
     const normalized = normalizeAIError(error);
@@ -230,15 +395,28 @@ export async function fetchGeminiModels(apiKey?: string): Promise<GeminiModelInf
   }
 }
 
-export async function checkAISettings(): Promise<{ ok: boolean; message: string; settings: AISettingsPublic; models: GeminiModelInfo[] }> {
+export async function checkAISettings(): Promise<{
+  ok: boolean;
+  message: string;
+  settings: AISettingsPublic;
+  models: GeminiModelInfo[];
+}> {
   const settings = await readAISettings();
   if (!settings.hasApiKey) return { ok: false, message: 'Ключ Gemini не задан', settings, models: [] };
   try {
     const models = await fetchGeminiModels();
-    return { ok: true, message: `Подключение Gemini работает. Доступно моделей: ${models.length}.`, settings, models };
+    return {
+      ok: true,
+      message: `Подключение Gemini работает. Доступно моделей: ${models.length}.`,
+      settings,
+      models,
+    };
   } catch (error) {
     // Checking the catalog is a connectivity probe, not a prompt-based AI call.
-    const message = error instanceof Error && error.message === 'INVALID_API_KEY' ? 'Ключ Gemini недействителен или не имеет доступа.' : 'Не удалось получить список моделей Gemini.';
+    const message =
+      error instanceof Error && error.message === 'INVALID_API_KEY'
+        ? 'Ключ Gemini недействителен или не имеет доступа.'
+        : 'Не удалось получить список моделей Gemini.';
     return { ok: false, message, settings, models: [] };
   }
 }
@@ -253,41 +431,75 @@ export async function generatePictureMetadata(dataUrl: string): Promise<PictureM
   if (!match) throw new Error('INVALID_IMAGE');
   let response: Response;
   try {
-    response = await enqueueAI('picture-description', AI_PROFILE_PICTURE_DESCRIPTION, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { text: [profile.prompt].join(' ') },
-          { inline_data: { mime_type: match[1], data: match[2] } },
-        ] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              title: { type: 'STRING' },
-              description: { type: 'STRING' },
-            },
-            required: ['title', 'description'],
+    response = await enqueueAI(
+      'picture-description',
+      AI_PROFILE_PICTURE_DESCRIPTION,
+      () =>
+        fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: [profile.prompt].join(' ') },
+                    { inline_data: { mime_type: match[1], data: match[2] } },
+                  ],
+                },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: 'OBJECT',
+                  properties: {
+                    title: { type: 'STRING' },
+                    description: { type: 'STRING' },
+                  },
+                  required: ['title', 'description'],
+                },
+              },
+            }),
+            signal: AbortSignal.timeout(60_000),
           },
-        },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    }), profile.model, { prompt: profile.prompt });
+        ),
+      profile.model,
+      { prompt: profile.prompt },
+    );
   } catch (error) {
     throw normalizeAIError(error, { model: profile.model, prompt: profile.prompt });
   }
-  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt: profile.prompt });
-  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  if (!response.ok)
+    throw new AIServiceError('GEMINI_UNAVAILABLE', {
+      providerStatus: response.status,
+      model: profile.model,
+      prompt: profile.prompt,
+    });
+  const body = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string') throw new Error('INVALID_AI_RESPONSE');
-  const jsonText = text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+  const jsonText = text
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
   let parsed: unknown;
-  try { parsed = JSON.parse(jsonText); } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error('INVALID_AI_RESPONSE');
+  }
   if (typeof parsed !== 'object' || parsed === null) throw new Error('INVALID_AI_RESPONSE');
   const result = parsed as Record<string, unknown>;
-  if (typeof result.title !== 'string' || typeof result.description !== 'string' || !result.title.trim() || !result.description.trim()) throw new Error('INVALID_AI_RESPONSE');
+  if (
+    typeof result.title !== 'string' ||
+    typeof result.description !== 'string' ||
+    !result.title.trim() ||
+    !result.description.trim()
+  )
+    throw new Error('INVALID_AI_RESPONSE');
   return { title: result.title.trim().slice(0, 200), description: result.description.trim().slice(0, 5000) };
 }
 
@@ -300,28 +512,62 @@ export async function formatPictureAnswer(answer: string): Promise<string> {
   if (answer.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('ANSWER_TOO_LONG');
   let response: Response;
   try {
-    response = await enqueueAI('picture-format', AI_PROFILE_PICTURE_FORMAT, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-      body: JSON.stringify({ contents: [{ parts: [{ text: `${profile.prompt}\n\nТекст пользователя:\n${answer}` }] }] }),
-      signal: AbortSignal.timeout(120_000),
-    }), profile.model, { prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
+    response = await enqueueAI(
+      'picture-format',
+      AI_PROFILE_PICTURE_FORMAT,
+      () =>
+        fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${profile.prompt}\n\nТекст пользователя:\n${answer}` }] }],
+            }),
+            signal: AbortSignal.timeout(120_000),
+          },
+        ),
+      profile.model,
+      { prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` },
+    );
   } catch (error) {
-    throw normalizeAIError(error, { model: profile.model, prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
+    throw normalizeAIError(error, {
+      model: profile.model,
+      prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}`,
+    });
   }
-  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}` });
-  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  if (!response.ok)
+    throw new AIServiceError('GEMINI_UNAVAILABLE', {
+      providerStatus: response.status,
+      model: profile.model,
+      prompt: `${profile.prompt}\n\nТекст пользователя:\n${answer}`,
+    });
+  const body = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string' || !text.trim()) throw new Error('INVALID_AI_RESPONSE');
-  const formatted = text.replace(/^```(?:text)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const formatted = text
+    .replace(/^```(?:text)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
   if (formatted.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('INVALID_AI_RESPONSE');
   const sourceWords = answer.match(/[\p{L}\p{N}]+/gu) ?? [];
   const formattedWords = formatted.match(/[\p{L}\p{N}]+/gu) ?? [];
-  if (sourceWords.length !== formattedWords.length || sourceWords.some((word, index) => word !== formattedWords[index])) throw new Error('INVALID_AI_RESPONSE');
+  if (
+    sourceWords.length !== formattedWords.length ||
+    sourceWords.some((word, index) => word !== formattedWords[index])
+  )
+    throw new Error('INVALID_AI_RESPONSE');
   return formatted;
 }
 
-export async function checkPictureAnswer(input: { imageDataUrl: string; reference: string; answer: string; severity?: number }): Promise<PictureCheckResult> {
+export async function checkPictureAnswer(input: {
+  imageDataUrl: string;
+  reference: string;
+  answer: string;
+  severity?: number;
+}): Promise<PictureCheckResult> {
   const stored = await readStored();
   const profile = stored?.profiles[AI_PROFILE_PICTURE_CHECK];
   if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
@@ -333,43 +579,116 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
   const prompt = `${profile.prompt}\n\nДля каждого сегмента с severity error|style|lie укажи поле correction — правильный немецкий вариант этого фрагмента (для остальных опускай).\n\nЖёсткость проверки: ${Math.max(1, Math.min(5, Math.round(input.severity || profile.severity || 3)))} из 5. Эталонное описание:\n${input.reference}\n\nОтвет пользователя:\n${input.answer}`;
   let response: Response;
   try {
-       response = await enqueueAI('picture-check', AI_PROFILE_PICTURE_CHECK, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] }], generationConfig: { responseMimeType: 'application/json' } }), signal: AbortSignal.timeout(120_000) }), profile.model, { prompt });
-   } catch (error) {
-     throw normalizeAIError(error, { model: profile.model, prompt });
+    response = await enqueueAI(
+      'picture-check',
+      AI_PROFILE_PICTURE_CHECK,
+      () =>
+        fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+            body: JSON.stringify({
+              contents: [
+                { parts: [{ text: prompt }, { inline_data: { mime_type: match[1], data: match[2] } }] },
+              ],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+            signal: AbortSignal.timeout(120_000),
+          },
+        ),
+      profile.model,
+      { prompt },
+    );
+  } catch (error) {
+    throw normalizeAIError(error, { model: profile.model, prompt });
   }
-  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
-  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  if (!response.ok)
+    throw new AIServiceError('GEMINI_UNAVAILABLE', {
+      providerStatus: response.status,
+      model: profile.model,
+      prompt,
+    });
+  const body = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  };
   const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof text !== 'string') throw new Error('INVALID_AI_RESPONSE');
   let parsed: unknown;
-  try { parsed = JSON.parse(text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()); } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  try {
+    parsed = JSON.parse(
+      text
+        .replace(/^```json\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim(),
+    );
+  } catch {
+    throw new Error('INVALID_AI_RESPONSE');
+  }
   if (typeof parsed !== 'object' || parsed === null) throw new Error('INVALID_AI_RESPONSE');
   const result = parsed as Record<string, unknown>;
-  if (!Array.isArray(result.segments) || typeof result.report !== 'string' || result.report.length > 5_000 || !Number.isInteger(result.score)) throw new Error('INVALID_AI_RESPONSE');
+  if (
+    !Array.isArray(result.segments) ||
+    typeof result.report !== 'string' ||
+    result.report.length > 5_000 ||
+    !Number.isInteger(result.score)
+  )
+    throw new Error('INVALID_AI_RESPONSE');
   const segments = result.segments.map((segment) => {
     if (typeof segment !== 'object' || segment === null) throw new Error('INVALID_AI_RESPONSE');
     const item = segment as Record<string, unknown>;
     const severity = item.severity;
-    if (typeof item.text !== 'string' || !item.text || !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))) throw new Error('INVALID_AI_RESPONSE');
-    if (item.note !== undefined && (typeof item.note !== 'string' || item.note.length > 500)) throw new Error('INVALID_AI_RESPONSE');
-    if (item.correction !== undefined && (typeof item.correction !== 'string' || !item.correction.trim() || item.correction.length > 500)) throw new Error('INVALID_AI_RESPONSE');
-    return { text: item.text, severity: severity as PictureCheckSeverity, ...(typeof item.note === 'string' ? { note: item.note } : {}), ...(typeof item.correction === 'string' ? { correction: item.correction.trim() } : {}) };
+    if (
+      typeof item.text !== 'string' ||
+      !item.text ||
+      !['neutral', 'good', 'style', 'error', 'lie'].includes(String(severity))
+    )
+      throw new Error('INVALID_AI_RESPONSE');
+    if (item.note !== undefined && (typeof item.note !== 'string' || item.note.length > 500))
+      throw new Error('INVALID_AI_RESPONSE');
+    if (
+      item.correction !== undefined &&
+      (typeof item.correction !== 'string' || !item.correction.trim() || item.correction.length > 500)
+    )
+      throw new Error('INVALID_AI_RESPONSE');
+    return {
+      text: item.text,
+      severity: severity as PictureCheckSeverity,
+      ...(typeof item.note === 'string' ? { note: item.note } : {}),
+      ...(typeof item.correction === 'string' ? { correction: item.correction.trim() } : {}),
+    };
   });
   const covered = segments.map((segment) => segment.text).join('');
   if (covered !== input.answer) throw new Error('INVALID_AI_RESPONSE');
-  if (typeof result.categories !== 'object' || result.categories === null) throw new Error('INVALID_AI_RESPONSE');
+  if (typeof result.categories !== 'object' || result.categories === null)
+    throw new Error('INVALID_AI_RESPONSE');
   const rawCategories = result.categories as Record<string, unknown>;
   const category = (key: string) => {
     const value = rawCategories[key];
-    if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > 25) throw new Error('INVALID_AI_RESPONSE');
+    if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > 25)
+      throw new Error('INVALID_AI_RESPONSE');
     return Number(value);
   };
-  const categories = { content: category('content'), grammar: category('grammar'), vocabulary: category('vocabulary'), fluency: category('fluency') };
+  const categories = {
+    content: category('content'),
+    grammar: category('grammar'),
+    vocabulary: category('vocabulary'),
+    fluency: category('fluency'),
+  };
   const score = categories.content + categories.grammar + categories.vocabulary + categories.fluency;
   if (result.score !== score) throw new Error('INVALID_AI_RESPONSE');
-  if (typeof result.correctedText !== 'string' || result.correctedText.length > MAX_PICTURE_ANSWER_LENGTH) throw new Error('INVALID_AI_RESPONSE');
-  if (typeof result.level !== 'string' || !/^(?:A[12]|B[12]|C1)$/.test(result.level)) throw new Error('INVALID_AI_RESPONSE');
-  if (!Array.isArray(result.usefulExpressions) || result.usefulExpressions.length > 5 || result.usefulExpressions.some((item) => typeof item !== 'string' && (typeof item !== 'object' || item === null))) throw new Error('INVALID_AI_RESPONSE');
+  if (typeof result.correctedText !== 'string' || result.correctedText.length > MAX_PICTURE_ANSWER_LENGTH)
+    throw new Error('INVALID_AI_RESPONSE');
+  if (typeof result.level !== 'string' || !/^(?:A[12]|B[12]|C1)$/.test(result.level))
+    throw new Error('INVALID_AI_RESPONSE');
+  if (
+    !Array.isArray(result.usefulExpressions) ||
+    result.usefulExpressions.length > 5 ||
+    result.usefulExpressions.some(
+      (item) => typeof item !== 'string' && (typeof item !== 'object' || item === null),
+    )
+  )
+    throw new Error('INVALID_AI_RESPONSE');
   const usefulExpressions = result.usefulExpressions.map((item) => {
     if (typeof item === 'string') return item.trim().slice(0, 300);
     const object = item as Record<string, unknown>;
@@ -379,14 +698,27 @@ export async function checkPictureAnswer(input: { imageDataUrl: string; referenc
     if (!value) throw new Error('INVALID_AI_RESPONSE');
     return value.slice(0, 300);
   });
-  return { segments, report: result.report, score, maxScore: 100, categories, correctedText: result.correctedText, level: result.level, usefulExpressions };
+  return {
+    segments,
+    report: result.report,
+    score,
+    maxScore: 100,
+    categories,
+    correctedText: result.correctedText,
+    level: result.level,
+    usefulExpressions,
+  };
 }
 
 /**
  * Turns a raw word list into structured word entries via Gemini (the `wordFill`
  * profile). Returns the generated JSON text plus the word count, or an error code.
  */
-export async function generateWordFill(input: { words: string; categories: string[]; defaultCategory?: string }): Promise<{ json: string; count: number }> {
+export async function generateWordFill(input: {
+  words: string;
+  categories: string[];
+  defaultCategory?: string;
+}): Promise<{ json: string; count: number }> {
   const stored = await readStored();
   if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
   const profile = stored.profiles[AI_PROFILE_WORD_FILL];
@@ -396,29 +728,55 @@ export async function generateWordFill(input: { words: string; categories: strin
   if (!text) throw new Error('EMPTY_WORDS');
   if (text.length > MAX_WORD_FILL_CHARS) throw new Error('WORDS_TOO_LONG');
 
-  const categoryLine = input.categories.length > 0
-    ? input.categories.map((c) => `«${c}»`).join(', ')
-    : input.defaultCategory
-      ? `«${input.defaultCategory}»`
-      : '(категорий пока нет — придумай короткие подходящие названия)';
+  const categoryLine =
+    input.categories.length > 0
+      ? input.categories.map((c) => `«${c}»`).join(', ')
+      : input.defaultCategory
+        ? `«${input.defaultCategory}»`
+        : '(категорий пока нет — придумай короткие подходящие названия)';
 
   const prompt = `${profile.prompt}\n\nДоступные категории: ${categoryLine}.${input.defaultCategory ? ` Если в слове не указана категория — используй «${input.defaultCategory}».` : ''}\n\nСписок слов:\n${text}`;
 
-  const response = await enqueueAI('word-fill', AI_PROFILE_WORD_FILL, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    signal: AbortSignal.timeout(240_000),
-  }), profile.model, { prompt });
-  if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
+  const response = await enqueueAI(
+    'word-fill',
+    AI_PROFILE_WORD_FILL,
+    () =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+          signal: AbortSignal.timeout(240_000),
+        },
+      ),
+    profile.model,
+    { prompt },
+  );
+  if (!response.ok)
+    throw new AIServiceError('GEMINI_UNAVAILABLE', {
+      providerStatus: response.status,
+      model: profile.model,
+      prompt,
+    });
 
-  const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+  const body = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  };
   const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
   if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
 
-  const json = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
+  const json = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
   let parsed: unknown;
-  try { parsed = JSON.parse(json); } catch { throw new Error('INVALID_AI_RESPONSE'); }
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error('INVALID_AI_RESPONSE');
+  }
   if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('INVALID_AI_RESPONSE');
   if (parsed.length > MAX_WORD_FILL_WORDS) throw new Error('WORDS_TOO_MANY');
 
@@ -427,44 +785,95 @@ export async function generateWordFill(input: { words: string; categories: strin
 
 type AiWordInput = { id: string; de: string; ru: string; [key: string]: unknown };
 
-async function generateBatchJson(profileId: string, words: AiWordInput[], context: string): Promise<unknown[]> {
+async function generateBatchJson(
+  profileId: string,
+  words: AiWordInput[],
+  context: string,
+): Promise<unknown[]> {
   const stored = await readStored();
   if (!stored?.apiKey) throw new Error('MISSING_API_KEY');
   const profile = stored.profiles[profileId];
   if (!profile?.model) throw new Error('MISSING_MODEL');
   if (!words.length) throw new Error('EMPTY_WORDS');
   if (words.length > MAX_AI_BATCH_WORDS) throw new Error('WORDS_TOO_MANY');
-  const batchSize = Math.max(10, Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile.batchSize) || DEFAULT_AI_BATCH_SIZE)));
+  const batchSize = Math.max(
+    10,
+    Math.min(MAX_AI_BATCH_WORDS, Math.round(Number(profile.batchSize) || DEFAULT_AI_BATCH_SIZE)),
+  );
   const chunks: AiWordInput[][] = [];
   for (let i = 0; i < words.length; i += batchSize) chunks.push(words.slice(i, i + batchSize));
   const generate = async (chunk: AiWordInput[]) => {
     const prompt = `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(chunk)}`;
-    return enqueueAI(profileId === AI_PROFILE_REQUIRED_CASE ? 'required-case' : profileId === AI_PROFILE_WORD_CHECK ? 'word-check' : 'category-redistribution', profileId, () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }),
-      signal: AbortSignal.timeout(240_000),
-    }), profile.model, { prompt });
+    return enqueueAI(
+      profileId === AI_PROFILE_REQUIRED_CASE
+        ? 'required-case'
+        : profileId === AI_PROFILE_WORD_CHECK
+          ? 'word-check'
+          : 'category-redistribution',
+      profileId,
+      () =>
+        fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(profile.model)}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': stored.apiKey },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+            signal: AbortSignal.timeout(240_000),
+          },
+        ),
+      profile.model,
+      { prompt },
+    );
   };
-  const responses = await Promise.all(chunks.map(async (chunk) => ({ response: await generate(chunk), prompt: `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(chunk)}` })));
+  const responses = await Promise.all(
+    chunks.map(async (chunk) => ({
+      response: await generate(chunk),
+      prompt: `${profile.prompt}\n\n${context}\n\nСлова:\n${JSON.stringify(chunk)}`,
+    })),
+  );
   const all: unknown[] = [];
   for (const item of responses) {
     const response = item.response;
     const prompt = item.prompt;
-    if (!response.ok) throw new AIServiceError('GEMINI_UNAVAILABLE', { providerStatus: response.status, model: profile.model, prompt });
-    const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+    if (!response.ok)
+      throw new AIServiceError('GEMINI_UNAVAILABLE', {
+        providerStatus: response.status,
+        model: profile.model,
+        prompt,
+      });
+    const body = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+    };
     const raw = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
     if (typeof raw !== 'string') throw new Error('INVALID_AI_RESPONSE');
     try {
-      const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim());
+      const parsed = JSON.parse(
+        raw
+          .replace(/^```json\s*/i, '')
+          .replace(/\s*```$/, '')
+          .trim(),
+      );
       if (!Array.isArray(parsed)) throw new Error();
       all.push(...parsed);
-    } catch { throw new Error('INVALID_AI_RESPONSE'); }
+    } catch {
+      throw new Error('INVALID_AI_RESPONSE');
+    }
   }
   return all;
 }
 
-export async function redistributeCategories(words: AiWordInput[], categories: string[]): Promise<Array<{ id: string; categories: string[] }>> {
-  const result = await generateBatchJson(AI_PROFILE_CATEGORY_REDISTRIBUTION, words, `Разрешённые категории: ${JSON.stringify(categories)}`);
+export async function redistributeCategories(
+  words: AiWordInput[],
+  categories: string[],
+): Promise<Array<{ id: string; categories: string[] }>> {
+  const result = await generateBatchJson(
+    AI_PROFILE_CATEGORY_REDISTRIBUTION,
+    words,
+    `Разрешённые категории: ${JSON.stringify(categories)}`,
+  );
   const allowed = new Map(categories.map((category) => [normalizeCategoryName(category), category]));
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
@@ -472,22 +881,33 @@ export async function redistributeCategories(words: AiWordInput[], categories: s
   const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    if (!Array.isArray(row.categories) || row.categories.length === 0 || row.categories.some((value) => typeof value !== 'string' || !allowed.has(normalizeCategoryName(value)))) {
+    if (
+      !Array.isArray(row.categories) ||
+      row.categories.length === 0 ||
+      row.categories.some((value) => typeof value !== 'string' || !allowed.has(normalizeCategoryName(value)))
+    ) {
       throw new Error('INVALID_AI_RESPONSE');
     }
     const names = row.categories.flatMap((value) => {
       const canonical = allowed.get(normalizeCategoryName(value as string));
       return canonical ? [canonical] : [];
     });
-    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || names.length === 0) throw new Error('INVALID_AI_RESPONSE');
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || names.length === 0)
+      throw new Error('INVALID_AI_RESPONSE');
     seen.add(row.id);
     return { id: row.id, categories: [...new Set(names)] };
   });
   return normalized;
 }
 
-export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{ id: string; requiredCase: 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null }>> {
-  const result = await generateBatchJson(AI_PROFILE_REQUIRED_CASE, words, 'Допустимые значения requiredCase: nominativ, akkusativ, dativ, genitiv или null.');
+export async function detectRequiredCases(
+  words: AiWordInput[],
+): Promise<Array<{ id: string; requiredCase: 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null }>> {
+  const result = await generateBatchJson(
+    AI_PROFILE_REQUIRED_CASE,
+    words,
+    'Допустимые значения requiredCase: nominativ, akkusativ, dativ, genitiv или null.',
+  );
   const valid = new Set(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
@@ -495,22 +915,78 @@ export async function detectRequiredCases(words: AiWordInput[]): Promise<Array<{
   const normalized = result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-    const requiredCase = row.requiredCase === null || row.requiredCase === 'null' ? null : typeof row.requiredCase === 'string' ? row.requiredCase.trim().toLowerCase() : row.requiredCase;
-    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || (requiredCase !== null && (typeof requiredCase !== 'string' || !valid.has(requiredCase)))) throw new Error('INVALID_AI_RESPONSE');
+    const requiredCase =
+      row.requiredCase === null || row.requiredCase === 'null'
+        ? null
+        : typeof row.requiredCase === 'string'
+          ? row.requiredCase.trim().toLowerCase()
+          : row.requiredCase;
+    if (
+      typeof row.id !== 'string' ||
+      !expected.has(row.id) ||
+      seen.has(row.id) ||
+      (requiredCase !== null && (typeof requiredCase !== 'string' || !valid.has(requiredCase)))
+    )
+      throw new Error('INVALID_AI_RESPONSE');
     seen.add(row.id);
-    return { id: row.id, requiredCase: requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null };
+    return {
+      id: row.id,
+      requiredCase: requiredCase as 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv' | null,
+    };
   });
   return normalized;
 }
 
-export interface WordCheckIssue { field: string; severity: 'error' | 'warning'; message: string; suggestion?: string }
-export type WordCheckField = 'de' | 'ru' | 'hint' | 'partOfSpeech' | 'plural' | 'feminine' | 'praeteritum' | 'partizip2' | 'hilfsverb' | 'praesensIch' | 'praesensDu' | 'praesensErSieEs' | 'praesensWir' | 'praesensIhr' | 'praesensSie' | 'requiredCase';
-export interface WordCheckCorrection { field: WordCheckField; value: string | null }
-export interface WordCheckResult { id: string; issues: WordCheckIssue[]; corrections: WordCheckCorrection[] }
+export interface WordCheckIssue {
+  field: string;
+  severity: 'error' | 'warning';
+  message: string;
+  suggestion?: string;
+}
+export type WordCheckField =
+  | 'de'
+  | 'ru'
+  | 'hint'
+  | 'partOfSpeech'
+  | 'plural'
+  | 'feminine'
+  | 'praeteritum'
+  | 'partizip2'
+  | 'hilfsverb'
+  | 'praesensIch'
+  | 'praesensDu'
+  | 'praesensErSieEs'
+  | 'praesensWir'
+  | 'praesensIhr'
+  | 'praesensSie'
+  | 'requiredCase';
+export interface WordCheckCorrection {
+  field: WordCheckField;
+  value: string | null;
+}
+export interface WordCheckResult {
+  id: string;
+  issues: WordCheckIssue[];
+  corrections: WordCheckCorrection[];
+}
 
 const WORD_CHECK_FIELDS = new Set<WordCheckField>([
-  'de', 'ru', 'hint', 'partOfSpeech', 'plural', 'feminine', 'praeteritum', 'partizip2', 'hilfsverb',
-  'praesensIch', 'praesensDu', 'praesensErSieEs', 'praesensWir', 'praesensIhr', 'praesensSie', 'requiredCase',
+  'de',
+  'ru',
+  'hint',
+  'partOfSpeech',
+  'plural',
+  'feminine',
+  'praeteritum',
+  'partizip2',
+  'hilfsverb',
+  'praesensIch',
+  'praesensDu',
+  'praesensErSieEs',
+  'praesensWir',
+  'praesensIhr',
+  'praesensSie',
+  'requiredCase',
 ]);
 const PART_OF_SPEECH_VALUES = new Set(['noun', 'verb', 'adjective', 'adverb', 'other']);
 const REQUIRED_CASE_VALUES = new Set(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
@@ -524,34 +1000,55 @@ function parseWordCheckCorrections(value: unknown): WordCheckCorrection[] {
     const row = item as Record<string, unknown>;
     const field = row.field;
     const rawValue = row.value;
-    if (typeof field !== 'string' || !WORD_CHECK_FIELDS.has(field as WordCheckField) || seen.has(field)) throw new Error('INVALID_AI_RESPONSE');
+    if (typeof field !== 'string' || !WORD_CHECK_FIELDS.has(field as WordCheckField) || seen.has(field))
+      throw new Error('INVALID_AI_RESPONSE');
     if (rawValue !== null && typeof rawValue !== 'string') throw new Error('INVALID_AI_RESPONSE');
     if (typeof rawValue === 'string' && rawValue.length > 2000) throw new Error('INVALID_AI_RESPONSE');
-    if ((field === 'de' || field === 'ru') && (typeof rawValue !== 'string' || !rawValue.trim())) throw new Error('INVALID_AI_RESPONSE');
-    if (field === 'partOfSpeech' && rawValue !== null && !PART_OF_SPEECH_VALUES.has(rawValue)) throw new Error('INVALID_AI_RESPONSE');
-    if (field === 'hilfsverb' && rawValue !== null && rawValue !== 'haben' && rawValue !== 'sein') throw new Error('INVALID_AI_RESPONSE');
-    if (field === 'requiredCase' && rawValue !== null && !REQUIRED_CASE_VALUES.has(rawValue)) throw new Error('INVALID_AI_RESPONSE');
+    if ((field === 'de' || field === 'ru') && (typeof rawValue !== 'string' || !rawValue.trim()))
+      throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'partOfSpeech' && rawValue !== null && !PART_OF_SPEECH_VALUES.has(rawValue))
+      throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'hilfsverb' && rawValue !== null && rawValue !== 'haben' && rawValue !== 'sein')
+      throw new Error('INVALID_AI_RESPONSE');
+    if (field === 'requiredCase' && rawValue !== null && !REQUIRED_CASE_VALUES.has(rawValue))
+      throw new Error('INVALID_AI_RESPONSE');
     seen.add(field);
     return { field: field as WordCheckField, value: typeof rawValue === 'string' ? rawValue.trim() : null };
   });
 }
 
 export async function checkWordsWithAI(words: AiWordInput[]): Promise<WordCheckResult[]> {
-  const result = await generateBatchJson(AI_PROFILE_WORD_CHECK, words, 'Проверяй каждую запись полностью, включая все переданные формы и категорию. Помимо issues обязательно верни corrections: массив безопасных исправлений с полями field и value. Добавляй туда только изменения, в которых уверен; если уверенного исправления нет, верни corrections=[].');
+  const result = await generateBatchJson(
+    AI_PROFILE_WORD_CHECK,
+    words,
+    'Проверяй каждую запись полностью, включая все переданные формы и категорию. Помимо issues обязательно верни corrections: массив безопасных исправлений с полями field и value. Добавляй туда только изменения, в которых уверен; если уверенного исправления нет, верни corrections=[].',
+  );
   const expected = new Set(words.map((word) => word.id));
   if (result.length !== words.length) throw new Error('INVALID_AI_RESPONSE');
   const seen = new Set<string>();
   return result.map((item) => {
     if (typeof item !== 'object' || item === null) throw new Error('INVALID_AI_RESPONSE');
     const row = item as Record<string, unknown>;
-     if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || !Array.isArray(row.issues)) throw new Error('INVALID_AI_RESPONSE');
-     seen.add(row.id);
+    if (typeof row.id !== 'string' || !expected.has(row.id) || seen.has(row.id) || !Array.isArray(row.issues))
+      throw new Error('INVALID_AI_RESPONSE');
+    seen.add(row.id);
     const issues = row.issues.map((issue) => {
       if (typeof issue !== 'object' || issue === null) throw new Error('INVALID_AI_RESPONSE');
       const value = issue as Record<string, unknown>;
-      if (typeof value.field !== 'string' || (value.severity !== 'error' && value.severity !== 'warning') || typeof value.message !== 'string' || (value.suggestion !== undefined && typeof value.suggestion !== 'string')) throw new Error('INVALID_AI_RESPONSE');
-      return { field: value.field, severity: value.severity as 'error' | 'warning', message: value.message, ...(value.suggestion ? { suggestion: value.suggestion } : {}) };
+      if (
+        typeof value.field !== 'string' ||
+        (value.severity !== 'error' && value.severity !== 'warning') ||
+        typeof value.message !== 'string' ||
+        (value.suggestion !== undefined && typeof value.suggestion !== 'string')
+      )
+        throw new Error('INVALID_AI_RESPONSE');
+      return {
+        field: value.field,
+        severity: value.severity as 'error' | 'warning',
+        message: value.message,
+        ...(value.suggestion ? { suggestion: value.suggestion } : {}),
+      };
     });
-     return { id: row.id, issues, corrections: parseWordCheckCorrections(row.corrections) };
-   });
+    return { id: row.id, issues, corrections: parseWordCheckCorrections(row.corrections) };
+  });
 }

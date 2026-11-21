@@ -133,10 +133,11 @@ export function generateRandomTime(stepMode: 'any' | '5min' = 'any'): { hours: n
     const multiples = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
     minutes = multiples[Math.floor(Math.random() * multiples.length)];
   } else {
-    // 'any' minute: bias slightly towards interesting "kurz" and specific minutes
+    // Use documented five-minute marks plus established "kurz" ranges. Avoid
+    // ad-hoc minute-by-minute "N nach" forms around halb.
     const pool = [
-      ...Array.from({ length: 60 }, (_, i) => i),
-      1, 2, 3, 4, 28, 29, 31, 32, 57, 58, 59, // extra weight on kurz
+      0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55,
+      1, 2, 3, 4, 26, 27, 28, 29, 31, 32, 33, 34, 56, 57, 58, 59,
     ];
     minutes = pool[Math.floor(Math.random() * pool.length)];
   }

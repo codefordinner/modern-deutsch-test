@@ -19,7 +19,7 @@
 │     ├─ middleware/         auth (Telegram session cookie), csrf (Origin/Referer), normalizeWordBody
 │     ├─ routes/             telegram-auth, users-admin, words, words-admin, categories, pictures, audio, analytics, settings, internal
 │     └─ services/           audio, audioSettings, aiSettings, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
-├─ packages/shared/            @sprachfunke/shared: общая чистая логика SRS-синхронизации и веса по умолчанию
+├─ packages/shared/            @sprachfunke/shared: SRS-синхронизация/веса, типы Word, enum’ы и общие списки
 ├─ packages/telegram-bot/       общий long-polling бот; обработчик подтверждения входа, без доступа к SQLite
 ├─ deploy/                       примеры Quadlet и runbook (не применяются автоматически)
 └─ frontend/
@@ -113,7 +113,7 @@
 
 ## Frontend
 ### Поток данных
-Доменные модули `api/*.ts` используют общий транспорт `api/request.ts`; словарь идёт через `api/queryCache.ts` (общий кэш, stale-while-revalidate, `invalidateQueries`) → `hooks/useDictionary.ts` → тренажёры и админка. `api/client.ts` оставлен как совместимый фасад.
+Доменные модули `api/*.ts` используют общий транспорт `api/request.ts`; словарь идёт через `api/queryCache.ts` (общий кэш, stale-while-revalidate, `invalidateQueries`) → `hooks/useDictionary.ts` → тренажёры и админка. `api/client.ts` оставлен как совместимый фасад. Настройки проходят через единый внешний store в `usePersistentState`: иммутабельные account-настройки обновляются в памяти и синхронизируются, а настройки устройства сохраняются через store в `localStorage`.
 
 ### Навигация и экраны (hash-роутинг)
 
@@ -172,7 +172,7 @@
 
 Тема (`theme`) и UI-параметры, включая громкость озвучки, являются устройственными и не синхронизируются аккаунтом. Направление/формы слов, режимы чисел/глаголов/времени, диапазон чисел, выбранные категории, флаги SRS и дневная цель принадлежат аккаунту; `onboardingSeen` хранится только в `LearnerProgress`. Настройки тренажёров не читаются и не записываются в `localStorage`; старые локальные значения не импортируются в аккаунт и удаляются при загрузке серверных настроек. Вход обязателен. SRS-карточки, счёт и ответы за день по-прежнему имеют отдельный локальный кэш.
 
-`picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом.
+`picture_draft` — временный черновик ответа в тренажёре картинок; он не считается прогрессом и очищается при выходе из аккаунта. `admin_last_word_category_id` также очищается при выходе, чтобы не раскрывать последнюю категорию следующему пользователю устройства.
 
 Веса ящиков SRS в `localStorage` не хранятся — это серверная настройка. Настройки тренажёров хранятся только в аккаунте на сервере; локальные копии старых настроек игнорируются и удаляются.
 
@@ -190,7 +190,7 @@
 
 ## Известные ограничения / идеи
 - Legacy UI-ключ, `/sync/srs`, одноразовый импорт `legacyKey`, таблица `SyncProfile` и колонка `LearnerProgress.legacyKeyHash` удалены. При применении схемы `prisma db push` удаляет эти legacy-данные из БД.
-- Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются отдельными командами из `frontend/`.
+- Основная чистая логика покрывается Vitest; frontend typecheck, ESLint и тесты запускаются из `frontend/`, backend ESLint/Prettier — из `backend/` (`npm run lint`, `npm run format`).
 - `prisma db push --accept-data-loss` выполняется при каждом старте (`entrypoint.sh`, `npm start`, `server.ts`) — делайте бэкап БД перед изменением схемы.
 - Метаданные вкладок централизованы в `frontend/src/config/tabs.ts`; отдельные списки в Navbar, routing и аналитике не создаются.
 - Вкладка «Время» не ведёт счёт.

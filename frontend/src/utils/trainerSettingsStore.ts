@@ -5,6 +5,33 @@ const ACCOUNT_KEYS = [
   'verbs_mode', 'verbs_praesens_submode', 'time_display_mode', 'time_step_mode',
   'words_use_srs', 'verbs_use_srs', 'articles_use_srs',
 ] as const;
+const deviceSettings = new Map<string, unknown>();
+
+export function readDeviceSetting<T>(key: string, fallback: T, sanitize: (raw: unknown) => T): T {
+  if (deviceSettings.has(key)) return deviceSettings.get(key) as T;
+  try {
+    const stored = localStorage.getItem(key);
+    const value = stored === null ? fallback : sanitize(JSON.parse(stored));
+    deviceSettings.set(key, value);
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeDeviceSetting(key: string, value: unknown): void {
+  deviceSettings.set(key, value);
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // The in-memory setting remains usable when browser storage is unavailable.
+  }
+}
+
+export function refreshDeviceSetting<T>(key: string, fallback: T, sanitize: (raw: unknown) => T): T {
+  deviceSettings.delete(key);
+  return readDeviceSetting(key, fallback, sanitize);
+}
 
 let settings: SyncSettings | null = null;
 let settingsUserId: string | null = null;

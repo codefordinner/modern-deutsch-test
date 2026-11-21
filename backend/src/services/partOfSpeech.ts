@@ -1,3 +1,5 @@
+import { PARTS_OF_SPEECH, type SharedPartOfSpeech } from '@sprachfunke/shared';
+
 /**
  * Explicit part of speech of a dictionary entry. Trainers rely on it instead of
  * guessing from category names ("глагол…") or from which form fields happen to
@@ -5,8 +7,8 @@
  *
  * Stored as a plain string (Prisma 5 has no enums for SQLite) and validated here.
  */
-export const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'other'] as const;
-export type PartOfSpeech = (typeof PARTS_OF_SPEECH)[number];
+export { PARTS_OF_SPEECH };
+export type PartOfSpeech = SharedPartOfSpeech;
 
 export const isPartOfSpeech = (value: unknown): value is PartOfSpeech =>
   typeof value === 'string' && (PARTS_OF_SPEECH as readonly string[]).includes(value);

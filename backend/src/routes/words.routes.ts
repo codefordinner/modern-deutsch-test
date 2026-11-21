@@ -60,9 +60,12 @@ router.get('/', async (req: Request, res: Response) => {
       words = matched.slice(skip, skip + take);
     }
 
-    const payload = { words: words.map(serializeWord), total, page: pageNumber, limit: take };
+    const payloadWords = words.map(serializeWord);
+    const lastUpdated = await prisma.word.aggregate({ _max: { updatedAt: true } });
+    const payload = { words: payloadWords, total, page: pageNumber, limit: take };
     const etag = `"${createHash('sha256').update(JSON.stringify(payload)).digest('base64url')}"`;
     res.setHeader('ETag', etag);
+    if (lastUpdated._max.updatedAt) res.setHeader('Last-Modified', lastUpdated._max.updatedAt.toUTCString());
     res.setHeader('Cache-Control', 'no-cache');
     if (req.fresh) return res.status(304).end();
     res.json(payload);

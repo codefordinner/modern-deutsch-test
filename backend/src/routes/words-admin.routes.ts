@@ -16,6 +16,7 @@ import {
 import { WORD_INCLUDE, serializeWord } from '../services/wordCategories';
 import { checkWordsWithAI, detectRequiredCases, redistributeCategories } from '../services/aiSettings';
 import type { WordCheckField } from '../services/aiSettings';
+import { REQUIRED_CASES } from '@sprachfunke/shared';
 import { recordAIError } from '../services/aiErrorLog';
 import { AIServiceError } from '../services/aiErrorLog';
 import rateLimit from 'express-rate-limit';
@@ -184,7 +185,7 @@ router.post('/ai/check', requireAdmin, aiBulkLimiter, async (req: Request, res: 
         if (!text(word.praesensWir)) issues.push({ field: 'praesensWir', severity: 'warning', message: 'Не заполнена форма Präsens для wir' });
         if (!text(word.praesensSie)) issues.push({ field: 'praesensSie', severity: 'warning', message: 'Не заполнена форма Präsens для sie/Sie' });
         if (word.hilfsverb && word.hilfsverb !== 'haben' && word.hilfsverb !== 'sein') issues.push({ field: 'hilfsverb', severity: 'error', message: 'Недопустимый вспомогательный глагол' });
-        if (word.requiredCase && !['nominativ', 'akkusativ', 'dativ', 'genitiv'].includes(word.requiredCase)) issues.push({ field: 'requiredCase', severity: 'error', message: 'Недопустимый падеж' });
+        if (word.requiredCase && !REQUIRED_CASES.includes(word.requiredCase as (typeof REQUIRED_CASES)[number])) issues.push({ field: 'requiredCase', severity: 'error', message: 'Недопустимый падеж' });
       }
       return { id: word.id, issues };
     });

@@ -3,6 +3,10 @@ export const SCORE_TRAINERS = Object.freeze(['numbers', 'words', 'articles', 've
 export const DEFAULT_SRS_WEIGHTS = Object.freeze([60, 15, 10, 5, 10]);
 export const SRS_BOX_COUNT = 5;
 export const MAX_BOX_WEIGHT = 1000;
+export const PARTS_OF_SPEECH = Object.freeze(['noun', 'verb', 'adjective', 'adverb', 'other']);
+export const REQUIRED_CASES = Object.freeze(['nominativ', 'akkusativ', 'dativ', 'genitiv']);
+export const ADMIN_TABS = Object.freeze(['words', 'categories', 'import', 'duplicates', 'srs', 'audio', 'pictures', 'ai-settings', 'ai-logs', 'analytics', 'users']);
+export const WORD_TEXT_FIELDS = Object.freeze(['hint', 'plural', 'feminine', 'praeteritum', 'partizip2', 'hilfsverb', 'praesensIch', 'praesensDu', 'praesensErSieEs', 'praesensWir', 'praesensIhr', 'praesensSie', 'requiredCase']);
 
 export function sanitizeWeights(raw) {
   if (!Array.isArray(raw) || raw.length !== SRS_BOX_COUNT) return null;

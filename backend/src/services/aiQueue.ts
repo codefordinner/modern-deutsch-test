@@ -14,7 +14,13 @@ export interface AIQueueItem {
   error?: string;
 }
 
-type Task = { item: AIQueueItem; run: () => Promise<unknown>; prompt?: string; resolve: (value: unknown) => void; reject: (error: unknown) => void };
+type Task = {
+  item: AIQueueItem;
+  run: () => Promise<unknown>;
+  prompt?: string;
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
+};
 const tasks: Task[] = [];
 const items = new Map<string, AIQueueItem>();
 const listeners = new Set<(snapshot: AIQueueItem[]) => void>();
@@ -22,23 +28,38 @@ const MAX_HISTORY = 100;
 let active = 0;
 let starting = 0;
 const configuredConcurrency = Number(process.env.AI_QUEUE_CONCURRENCY ?? 2);
-const CONCURRENCY = Number.isFinite(configuredConcurrency) ? Math.max(1, Math.min(8, Math.floor(configuredConcurrency))) : 2;
+const CONCURRENCY = Number.isFinite(configuredConcurrency)
+  ? Math.max(1, Math.min(8, Math.floor(configuredConcurrency)))
+  : 2;
 const DEFAULT_REQUESTS_PER_MINUTE = 10;
 let requestsPerMinute = DEFAULT_REQUESTS_PER_MINUTE;
 const requestStarts: number[] = [];
-const retryRuns = new Map<string, { operation: string; profileId?: string; model?: string; prompt?: string; run: () => Promise<unknown> }>();
+const retryRuns = new Map<
+  string,
+  { operation: string; profileId?: string; model?: string; prompt?: string; run: () => Promise<unknown> }
+>();
 const retriedItems = new Set<string>();
 
-function snapshot(): AIQueueItem[] { return [...items.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
+function snapshot(): AIQueueItem[] {
+  return [...items.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
 function notify(): void {
   const value = snapshot();
   for (const listener of listeners) {
-    try { listener(value); } catch { /* A disconnected SSE client must not affect queue processing. */ }
+    try {
+      listener(value);
+    } catch {
+      /* A disconnected SSE client must not affect queue processing. */
+    }
   }
 }
 function trim(): void {
   const finished = snapshot().filter((item) => item.status === 'completed' || item.status === 'failed');
-  for (const item of finished.slice(0, Math.max(0, finished.length - MAX_HISTORY))) { items.delete(item.id); retryRuns.delete(item.id); retriedItems.delete(item.id); }
+  for (const item of finished.slice(0, Math.max(0, finished.length - MAX_HISTORY))) {
+    items.delete(item.id);
+    retryRuns.delete(item.id);
+    retriedItems.delete(item.id);
+  }
 }
 
 async function pump(): Promise<void> {
@@ -49,53 +70,85 @@ async function pump(): Promise<void> {
     notify();
     let started = false;
     let startedAtMs = 0;
-    void waitForRequestSlot().then(() => {
-      starting--;
-      active++;
-      started = true;
-      startedAtMs = Date.now();
-      task.item.status = 'running';
-      task.item.startedAt = new Date(startedAtMs).toISOString();
-      notify();
-      return task.run();
-    }).then(async (result) => {
-      const response = result instanceof Response ? await result.clone().text().catch(() => undefined) : undefined;
-      if (result instanceof Response && !result.ok) {
-        if (task.item.operation === 'models') {
-          task.item.status = 'failed';
-          task.item.error = `HTTP_${result.status}`;
-          task.item.finishedAt = new Date().toISOString();
-          task.resolve(result);
-          return;
+    void waitForRequestSlot()
+      .then(() => {
+        starting--;
+        active++;
+        started = true;
+        startedAtMs = Date.now();
+        task.item.status = 'running';
+        task.item.startedAt = new Date(startedAtMs).toISOString();
+        notify();
+        return task.run();
+      })
+      .then(async (result) => {
+        const response =
+          result instanceof Response
+            ? await result
+                .clone()
+                .text()
+                .catch(() => undefined)
+            : undefined;
+        if (result instanceof Response && !result.ok) {
+          if (task.item.operation === 'models') {
+            task.item.status = 'failed';
+            task.item.error = `HTTP_${result.status}`;
+            task.item.finishedAt = new Date().toISOString();
+            task.resolve(result);
+            return;
+          }
+          throw new AIServiceError(
+            result.status === 401 || result.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE',
+            {
+              providerStatus: result.status,
+              model: task.item.model,
+              prompt: task.prompt,
+              response,
+            },
+          );
         }
-        throw new AIServiceError(result.status === 401 || result.status === 403 ? 'INVALID_API_KEY' : 'GEMINI_UNAVAILABLE', {
-          providerStatus: result.status,
-          model: task.item.model,
-          prompt: task.prompt,
-          response,
-        });
-      }
 
-      task.item.status = 'completed';
-      if (task.item.operation !== 'models') {
-        await recordAIRequest({ operation: task.item.operation, profileId: task.item.profileId, model: task.item.model, responseStatus: result instanceof Response ? result.status : undefined, prompt: task.prompt, response, durationMs: Date.now() - startedAtMs, success: true });
-      }
-      task.item.finishedAt = new Date().toISOString(); task.resolve(result);
-    }).catch(async (error) => {
-      task.item.status = 'failed'; task.item.finishedAt = new Date().toISOString();
-      const durationMs = startedAtMs ? Date.now() - startedAtMs : Date.now() - Date.parse(task.item.createdAt);
-      const failure = normalizeAIError(error, { model: task.item.model, prompt: task.prompt });
-      if (failure && typeof failure === 'object') {
-        const details = failure as { durationMs?: number; model?: string; prompt?: string };
-        details.durationMs = durationMs;
-        if (!details.model && task.item.model) details.model = task.item.model;
-        if (!details.prompt && task.prompt) details.prompt = task.prompt;
-      }
-      if (!(failure instanceof AIServiceError) || !failure.logged) {
-        await recordAIError({ operation: task.item.operation, profileId: task.item.profileId, error: failure, durationMs });
-      }
-      task.item.error = failure instanceof Error ? failure.message : 'AI_ERROR'; task.reject(failure);
-      }).finally(() => {
+        task.item.status = 'completed';
+        if (task.item.operation !== 'models') {
+          await recordAIRequest({
+            operation: task.item.operation,
+            profileId: task.item.profileId,
+            model: task.item.model,
+            responseStatus: result instanceof Response ? result.status : undefined,
+            prompt: task.prompt,
+            response,
+            durationMs: Date.now() - startedAtMs,
+            success: true,
+          });
+        }
+        task.item.finishedAt = new Date().toISOString();
+        task.resolve(result);
+      })
+      .catch(async (error) => {
+        task.item.status = 'failed';
+        task.item.finishedAt = new Date().toISOString();
+        const durationMs = startedAtMs
+          ? Date.now() - startedAtMs
+          : Date.now() - Date.parse(task.item.createdAt);
+        const failure = normalizeAIError(error, { model: task.item.model, prompt: task.prompt });
+        if (failure && typeof failure === 'object') {
+          const details = failure as { durationMs?: number; model?: string; prompt?: string };
+          details.durationMs = durationMs;
+          if (!details.model && task.item.model) details.model = task.item.model;
+          if (!details.prompt && task.prompt) details.prompt = task.prompt;
+        }
+        if (!(failure instanceof AIServiceError) || !failure.logged) {
+          await recordAIError({
+            operation: task.item.operation,
+            profileId: task.item.profileId,
+            error: failure,
+            durationMs,
+          });
+        }
+        task.item.error = failure instanceof Error ? failure.message : 'AI_ERROR';
+        task.reject(failure);
+      })
+      .finally(() => {
         if (started) active--;
         else starting--;
         trim();
@@ -123,12 +176,34 @@ async function waitForRequestSlot(): Promise<void> {
   }
 }
 
-export function enqueueAI<T>(operation: string, profileId: string | undefined, run: () => Promise<T>, model?: string, trace?: { prompt?: string }): Promise<T> {
-  const item: AIQueueItem = { id: randomUUID(), operation, ...(profileId ? { profileId } : {}), ...(model ? { model } : {}), status: 'queued', createdAt: new Date().toISOString() };
+export function enqueueAI<T>(
+  operation: string,
+  profileId: string | undefined,
+  run: () => Promise<T>,
+  model?: string,
+  trace?: { prompt?: string },
+): Promise<T> {
+  const item: AIQueueItem = {
+    id: randomUUID(),
+    operation,
+    ...(profileId ? { profileId } : {}),
+    ...(model ? { model } : {}),
+    status: 'queued',
+    createdAt: new Date().toISOString(),
+  };
   items.set(item.id, item);
   retryRuns.set(item.id, { operation, profileId, model, prompt: trace?.prompt, run });
   notify();
-  return new Promise<T>((resolve, reject) => { tasks.push({ item, run: run as () => Promise<unknown>, prompt: trace?.prompt, resolve: resolve as (value: unknown) => void, reject }); void pump(); });
+  return new Promise<T>((resolve, reject) => {
+    tasks.push({
+      item,
+      run: run as () => Promise<unknown>,
+      prompt: trace?.prompt,
+      resolve: resolve as (value: unknown) => void,
+      reject,
+    });
+    void pump();
+  });
 }
 
 /** Re-enqueues a failed request while its in-memory input/closure is still available. */
@@ -137,16 +212,37 @@ export function retryAI(id: string): AIQueueItem | null {
   const retry = retryRuns.get(id);
   if (!previous || previous.status !== 'failed' || !retry || retriedItems.has(id)) return null;
   retriedItems.add(id);
-  const item: AIQueueItem = { id: randomUUID(), operation: retry.operation, ...(retry.profileId ? { profileId: retry.profileId } : {}), ...(retry.model ? { model: retry.model } : {}), status: 'queued', createdAt: new Date().toISOString() };
+  const item: AIQueueItem = {
+    id: randomUUID(),
+    operation: retry.operation,
+    ...(retry.profileId ? { profileId: retry.profileId } : {}),
+    ...(retry.model ? { model: retry.model } : {}),
+    status: 'queued',
+    createdAt: new Date().toISOString(),
+  };
   items.set(item.id, item);
   retryRuns.set(item.id, retry);
-  tasks.push({ item, run: retry.run, prompt: retry.prompt, resolve: () => undefined, reject: () => undefined });
+  tasks.push({
+    item,
+    run: retry.run,
+    prompt: retry.prompt,
+    resolve: () => undefined,
+    reject: () => undefined,
+  });
   notify();
   void pump();
   return item;
 }
 
-export function readAIQueue(): { items: AIQueueItem[]; active: number; waiting: number; concurrency: number } {
+export function readAIQueue(): {
+  items: AIQueueItem[];
+  active: number;
+  waiting: number;
+  concurrency: number;
+} {
   return { items: snapshot(), active, waiting: tasks.length + starting, concurrency: CONCURRENCY };
 }
-export function subscribeAIQueue(listener: (items: AIQueueItem[]) => void): () => void { listeners.add(listener); return () => listeners.delete(listener); }
+export function subscribeAIQueue(listener: (items: AIQueueItem[]) => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PARTS_OF_SPEECH, REQUIRED_CASES } from '@sprachfunke/shared';
 
 /** Shared zod schemas for request bodies (see middleware/validate.ts). */
 
@@ -8,7 +9,7 @@ const emptyableString = z.string().trim().max(2000).optional();
 // before validation, so only the canonical values (plus '' for "clear") are legal here.
 const hilfsverbSchema = z.union([z.literal('haben'), z.literal('sein'), z.literal('')]).nullable().optional();
 const requiredCaseSchema = z.union([
-  z.enum(['nominativ', 'akkusativ', 'dativ', 'genitiv']), z.literal(''), z.null(),
+  z.enum(REQUIRED_CASES), z.literal(''), z.null(),
 ]).optional();
 
 // A word's text fields are all optional strings; the API normalises '' to null.
@@ -32,7 +33,7 @@ export const wordFieldsSchema = {
 
 // `partOfSpeech` accepts the five known values plus null/'' for "auto".
 export const partOfSpeechSchema = z
-  .union([z.enum(['noun', 'verb', 'adjective', 'adverb', 'other']), z.literal(''), z.null()])
+  .union([z.enum(PARTS_OF_SPEECH), z.literal(''), z.null()])
   .optional();
 
 const categoryIdsSchema = z.array(z.string().min(1)).min(1, 'нужна хотя бы одна категория').optional();

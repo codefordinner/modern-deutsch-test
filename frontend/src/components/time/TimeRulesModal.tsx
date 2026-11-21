@@ -17,6 +17,7 @@ export const TimeRulesModal: React.FC<TimeRulesModalProps> = ({ onClose }) => {
             <li><strong>Половина:</strong> halb vier = 3:30 (<em>половина следующего часа!</em>)</li>
             <li><strong>Минуты до/после половины:</strong> fünf vor halb vier (3:25), fünf nach halb vier (3:35)</li>
             <li><strong>nach</strong> (после) для минут 1–20, <strong>vor</strong> (до) для минут 40–59</li>
+            <li>Тренажёр выбирает шаги по 5 минут и диапазоны «kurz»; произвольные минуты около половины часа не используются.</li>
           </ul>
 
           <h4 className="rules-heading rules-heading--spaced">Официальный формат (Offiziell):</h4>

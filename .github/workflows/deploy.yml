@@ -35,7 +35,9 @@ jobs:
         run: npm ci
 
       - name: Check backend
-        run: npm --prefix backend run build
+        run: |
+          npm --prefix backend run lint
+          npm --prefix backend run build
 
       - name: Test backend
         run: npm --prefix backend test

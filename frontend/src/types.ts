@@ -1,46 +1,12 @@
-export interface Category {
-  id: string;
-  name: string;
-  icon?: string | null;
-  color?: string | null;
-  isBuiltin: boolean;
-  _count?: {
-    words: number;
-  };
-}
+import type { SharedCategory, SharedPartOfSpeech, SharedRequiredCase, SharedWord } from '@sprachfunke/shared';
+
+export type Category = SharedCategory;
 
 /** Explicit part of speech of a dictionary entry (`null`/missing = not specified). */
-export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
-export type RequiredCase = 'nominativ' | 'akkusativ' | 'dativ' | 'genitiv';
+export type PartOfSpeech = SharedPartOfSpeech;
+export type RequiredCase = SharedRequiredCase;
 
-export interface Word {
-  id: string;
-  de: string;
-  ru: string;
-  /** Short clarifying note (e.g. meaning/context) to tell apart words that translate the same way. */
-  hint?: string | null;
-  /** Which trainers the entry belongs to — the verbs trainer only takes `'verb'`. */
-  partOfSpeech?: PartOfSpeech | null;
-  plural?: string | null;
-  feminine?: string | null;
-  praeteritum?: string | null;
-  partizip2?: string | null;
-  /** Always 'haben' | 'sein' (the server normalises legacy 'hat' / 'ist'). */
-  hilfsverb?: 'haben' | 'sein' | null;
-  praesensIch?: string | null;
-  praesensDu?: string | null;
-  praesensErSieEs?: string | null;
-  praesensWir?: string | null;
-  praesensIhr?: string | null;
-  praesensSie?: string | null;
-  requiredCase?: RequiredCase | null;
-  /** The PRIMARY category (the first of the word's categories). Read all of them via utils/wordCategories.ts. */
-  categoryId: string;
-  category?: Category;
-  /** Every category of the word, primary first. Absent in responses of an older server / cache. */
-  categories?: Category[];
-  categoryIds?: string[];
-}
+export type Word = SharedWord;
 
 export interface SRSRecord {
   box: number; // 1 to 5

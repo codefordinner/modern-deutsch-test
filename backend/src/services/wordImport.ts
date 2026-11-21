@@ -1,6 +1,7 @@
 import { inferPartOfSpeech, isPartOfSpeech } from './partOfSpeech';
 import type { PartOfSpeech } from './partOfSpeech';
 import { normalizeCategoryName } from './wordCategories';
+import { WORD_TEXT_FIELDS } from '@sprachfunke/shared';
 
 /**
  * Разбор данных для массового импорта слов.
@@ -17,21 +18,7 @@ import { normalizeCategoryName } from './wordCategories';
 
 export const MAX_IMPORT_ROWS = 5000;
 
-export const TEXT_FIELDS = [
-  'hint',
-  'plural',
-  'feminine',
-  'praeteritum',
-  'partizip2',
-  'hilfsverb',
-  'praesensIch',
-  'praesensDu',
-  'praesensErSieEs',
-  'praesensWir',
-  'praesensIhr',
-  'praesensSie',
-  'requiredCase',
-] as const;
+export const TEXT_FIELDS = WORD_TEXT_FIELDS;
 export type TextField = (typeof TEXT_FIELDS)[number];
 
 export class ImportFormatError extends Error {}
