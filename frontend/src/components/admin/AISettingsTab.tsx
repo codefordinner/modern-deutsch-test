@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Bot, CheckCircle, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { checkAISettings, clearAIErrorLogs, fetchAIErrorLogs, fetchAIModels, fetchAISettings, resetAIPrompt, retryAIQueueItem, saveAISettings, type AIErrorLog, type AIModel, type AISettingsResponse, type AIQueueSnapshot } from '../../api/settings';
 import { reportError, showToast } from '../../utils/toast';
@@ -245,7 +246,7 @@ export function AISettingsTab({ view = 'settings' }: AISettingsTabProps) {
     setHasChosenLogTab(true);
     setLogSubtab(nextTab);
   };
-  const handleLogTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+  const handleLogTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const tabs: LogSubtab[] = ['active', 'completed', 'errors'];
     const currentIndex = tabs.indexOf(event.currentTarget.dataset.tab as LogSubtab);
     let nextIndex: number;

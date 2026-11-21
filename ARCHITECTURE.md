@@ -16,11 +16,11 @@
 │     ├─ index.ts            отдельный запуск бэкенда (порт 3001, за nginx)
 │     ├─ api.ts              сборка роутера /api (порядок монтирования важен)
 │     ├─ db.ts               PrismaClient
-│     ├─ middleware/         auth (JWT, cookie), csrf (Origin/Referer), normalizeWordBody
-│     ├─ routes/             auth, telegram-auth, users-admin, words, words-admin, categories, pictures, audio, analytics, settings, sync
+│     ├─ middleware/         auth (Telegram session cookie), csrf (Origin/Referer), normalizeWordBody
+│     ├─ routes/             telegram-auth, users-admin, words, words-admin, categories, pictures, audio, analytics, settings, internal
 │     └─ services/           audio, audioSettings, aiSettings, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
 ├─ packages/shared/            @sprachfunke/shared: общая чистая логика SRS-синхронизации и веса по умолчанию
-├─ packages/telegram-bot/       общий long-polling бот; auth handler сейчас, без доступа к SQLite
+├─ packages/telegram-bot/       общий long-polling бот; обработчик подтверждения входа, без доступа к SQLite
 ├─ deploy/                       примеры Quadlet и runbook (не применяются автоматически)
 └─ frontend/
    ├─ nginx.conf, Dockerfile статика + прокси /api → app-backend:3001
@@ -30,7 +30,7 @@
        │  ├─ config/tabs.ts   единый registry вкладок и их возможностей
        │  └─ components/routing/TrainerContent.tsx  выбор содержимого вкладки
       ├─ types.ts            общие типы
-       ├─ api/                request.ts + доменные модули (auth, dictionary, adminWords, analytics, audio, settings, srs), client.ts (совместимый фасад), queryCache.ts
+       ├─ api/                request.ts + доменные модули (telegramAuth, adminUsers, dictionary, adminWords, analytics, audio, settings, srs), client.ts (совместимый фасад), queryCache.ts
       ├─ hooks/              useDictionary, useSRSProgress, useSrsWeightsSync, useSrsSync, useScores, useHashRoute,
       │                      useUISettings, usePersistentState, useServiceWorkerUpdates, use{Words,Verbs}QuizEngine
       ├─ utils/              чистая логика (см. «Утилиты»)
@@ -75,13 +75,16 @@
 | `PIPER_URL` | URL Piper в Podman-сети | `http://piper-tts:5000` |
  | `PIPER_VOICE` | голос Piper по умолчанию | `de_DE-thorsten-medium` |
 | `PIPER_TIMEOUT_MS` | таймаут генерации WAV | `30000` |
+| `AUDIO_REGEN_CONCURRENCY` | параллельность массовой регенерации аудио (1–8) | `2` |
+| `AI_QUEUE_CONCURRENCY` | число одновременных запросов Gemini | `2` |
+| `AI_DAILY_CHECK_CAP` | общий дневной лимит платных AI-проверок | `500` |
 
 Пустое значение (`TRUST_PROXY=`) не равно «не задано» — оно превращается в 0. Необязательные переменные не оставляйте пустыми.
 
 ## Backend
-- Express 4, JSON-лимит 5 МБ (массовый импорт); nginx — `client_max_body_size 6m`.
+- Express 4, JSON-лимит 6 МБ (массовый импорт и API); nginx — `client_max_body_size 6m`.
 - **Аутентификация админа**: отдельного пароля нет. `requireAdmin` проверяет действующую Telegram-сессию и актуальный `TelegramUser.isAdmin` в БД для каждого защищённого запроса.
-- **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. Пользовательская HttpOnly-cookie содержит случайный токен, в SQLite хранится только его digest; logout отзывает сессию. По HTTPS cookies имеют `SameSite=None; Secure; Partitioned` для Telegram WebView; по HTTP в dev сохраняется `SameSite=Lax`. Админская авторизация и cookie остаются независимыми.
+- **Ученические аккаунты Telegram**: отдельные таблицы `TelegramUser`, `TelegramChallenge`, `UserSession`. HttpOnly-cookie содержит случайный токен сессии, в SQLite хранится только его digest; logout отзывает сессию. По HTTPS cookie имеет `SameSite=None; Secure; Partitioned` для Telegram WebView; по HTTP в dev сохраняется `SameSite=Lax`. Админские права определяются ролью того же Telegram-пользователя.
 - У `TelegramUser.isAdmin` по умолчанию `false`; `/learner-auth/me` и успешные входы возвращают этот флаг, frontend показывает вкладку «Админка» только таким Telegram-пользователям. Выдать/снять флаг можно внутри backend-контейнера: `npm run admin:set -- <telegramId> grant|revoke`. Админские API используют ту же HttpOnly Telegram-cookie и проверяют флаг через `requireAdmin`.
 - `GET /learner-auth/config` сообщает frontend, что вход через Telegram обязателен. Клиент работает fail-closed и не открывает тренажёры, если endpoint отсутствует.
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
@@ -91,7 +94,7 @@
 - **Пользователи админки**: `/users` и `/users/:id/{progress,admin,ban}` доступны только через `requireAdmin`; раздел показывает Telegram ID (профиль Telegram по ID получить нельзя), позволяет смотреть SRS/счёт/настройки прогресса, сбрасывать прогресс, блокировать/разблокировать, выдавать/снимать админку и удалять аккаунт. Самого себя и последнего администратора нельзя лишить доступа или удалить; блокировка отзывает сессии. Удаление аккаунта каскадно удаляет прогресс, сессии и challenge.
 - `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly, режимы тренажёров и `onboardingSeen` синхронизируются с сервером. Начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.
 - **CSRF**: `requireSameOrigin` для не-GET: `Origin`/`Referer` должен совпасть с `Host`/`X-Forwarded-Host` или `ALLOWED_ORIGINS`; запрос без обоих заголовков (curl) пропускается.
-- Порядок в `api.ts`: csrf → auth (`/auth`, алиас `/admin`) → `normalizeWordBody` (ist/hat → sein/haben) → `words-admin` → `words` → categories → analytics → settings → sync.
+- Порядок в `api.ts`: CSRF → `/learner-auth` → `/users` → `normalizeWordBody` → `words-admin` → `words` → categories → analytics → settings → audio → pictures → internal.
 - **words-admin**: `POST /words/bulk/{category,part-of-speech,delete}`, `POST /words/ai/check` (фоновая проверка выбранных слов; безопасные исправления сохраняются сервером даже после закрытия вкладки; конфликты немецких форм отображаются как замечания к словам и не отменяют остальные исправления), `GET /words/duplicates`, `POST /words/duplicates/merge`, `POST /words/import/preview`.
 - **words**: публичный `GET /words` (поиск в JS, Unicode-aware; страницы до 1000), админские POST/PUT/DELETE, `POST /words/import`, `GET /words/export`.
 - **settings**: `GET/PUT/DELETE /settings/audio-settings` управляют озвучкой; `/settings/ai` управляет конфигурацией Gemini и профилями промптов, `/settings/ai/models` получает актуальный каталог моделей Gemini, `/settings/ai/check` проверяет ключ через этот каталог, а `/settings/ai/logs` читает и очищает журнал AI. Чтение журнала возвращает единый снимок последних записей и общие счётчики `{completed, errors}` по всей таблице; вкладки «Выполненные» и «Ошибки» фильтруют этот снимок только на клиенте, поэтому переключение вкладки не создаёт конкурирующих запросов. AI-операции централизованы в `services/aiSettings.ts`; каждый профиль может использовать свою модель. Для всех prompt-based вызовов в журнал сохраняются отправленный промпт и ответ Gemini (с удалением ключей и inline-изображений). Администратор может повторить завершившуюся ошибкой задачу через `POST /settings/ai/queue/:id/retry`: исходные данные хранятся только в памяти процесса и повторно ставятся в общую очередь.
@@ -110,7 +113,7 @@
 
 ## Frontend
 ### Поток данных
-`api/client.ts` → `api/queryCache.ts` (общий кэш, stale-while-revalidate, `invalidateQueries`) → `hooks/useDictionary.ts` → тренажёры и админка. Один запрос словаря обслуживает все вкладки.
+Доменные модули `api/*.ts` используют общий транспорт `api/request.ts`; словарь идёт через `api/queryCache.ts` (общий кэш, stale-while-revalidate, `invalidateQueries`) → `hooks/useDictionary.ts` → тренажёры и админка. `api/client.ts` оставлен как совместимый фасад.
 
 ### Навигация и экраны (hash-роутинг)
 

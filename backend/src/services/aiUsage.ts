@@ -52,9 +52,3 @@ export async function registerAiUsage(): Promise<{ allowed: boolean }> {
   });
   return { allowed: true };
 }
-
-/** How many checks happened today and the cap (for the admin panel / diagnostics). */
-export async function readAiUsage(): Promise<{ day: string; count: number; cap: number }> {
-  const current = await readCounter();
-  return { day: current.day, count: current.day === localDay(new Date()) ? current.count : 0, cap: GLOBAL_DAILY_CAP };
-}
