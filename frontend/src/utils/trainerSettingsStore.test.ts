@@ -8,6 +8,11 @@ describe('account trainer settings store', () => {
   it('reads account preferences instead of local storage representations', () => {
     vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     const settings = emptySyncData().settings;
+    expect(settings.trainerPrefs.words).toMatchObject({
+      enableBase: true,
+      enablePlural: false,
+      enableFeminine: false,
+    });
     settings.wordsCategories = ['cat-1'];
     settings.trainerPrefs.words.directionMode = 'de_to_ru';
     settings.trainerPrefs.numbers.range = { min: 20, max: 500 };

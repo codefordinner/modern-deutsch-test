@@ -50,7 +50,7 @@ export const TimeTrainer: React.FC = () => {
 
   return (
     <div>
-      <div className="trainer-toolbar">
+      <div className="trainer-toolbar time-trainer-toolbar">
         <div className="toolbar-filters">
           <ModeSwitch<StepMode>
             ariaLabel="Какие минуты"
@@ -72,7 +72,9 @@ export const TimeTrainer: React.FC = () => {
             ]}
           />
         </div>
-        <ToolbarButton icon={<HelpCircle size={15} />} label="Справка и правила" onClick={() => setIsRulesOpen(true)} />
+        <div className="time-trainer-actions">
+          <ToolbarButton icon={<HelpCircle size={15} />} label="Справка и правила" onClick={() => setIsRulesOpen(true)} />
+        </div>
       </div>
 
       <TimeFlashCard

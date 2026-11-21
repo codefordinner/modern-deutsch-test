@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../db';
 import { syncLearnerProgress } from '../services/learnerProgress';
+import { getReminderPreferences, saveReminderPreferences } from '../services/reminders';
 import {
   CHALLENGE_TTL_MS,
   challengeCookieDigest,
@@ -43,7 +44,11 @@ const asyncRoute = (handler: (req: Request, res: Response) => Promise<unknown>) 
 
 router.get('/config', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ required: true });
+  const username = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '');
+  return res.json({
+    required: true,
+    botUrl: username && /^[A-Za-z0-9_]{5,32}$/.test(username) ? `https://t.me/${encodeURIComponent(username)}` : null,
+  });
 });
 
 router.post('/telegram/mini-app', miniAppLimiter, asyncRoute(async (req, res) => {
@@ -210,6 +215,27 @@ router.post('/progress/srs', limiter(60_000, 60, 'Слишком много за
   } catch (error) {
     if (error instanceof Error && error.message === 'Синхронизация занята. Повторите попытку.') {
       return res.status(409).json({ error: error.message });
+    }
+    throw error;
+  }
+}));
+
+router.get('/reminders', asyncRoute(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const user = await findCurrentUser(req);
+  if (!user) return res.status(401).json({ error: 'Требуется войти через Telegram.' });
+  return res.json(await getReminderPreferences(user.id));
+}));
+
+router.put('/reminders', asyncRoute(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const user = await findCurrentUser(req);
+  if (!user) return res.status(401).json({ error: 'Требуется войти через Telegram.' });
+  try {
+    return res.json(await saveReminderPreferences(user.id, req.body));
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Некорректные настройки напоминаний.') {
+      return res.status(400).json({ error: error.message });
     }
     throw error;
   }

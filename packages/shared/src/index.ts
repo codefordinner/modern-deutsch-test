@@ -180,8 +180,8 @@ export function emptySyncData(): SharedSyncData {
           directionMode: "ru_to_de",
           requireArticle: true,
           enableBase: true,
-          enablePlural: true,
-          enableFeminine: true,
+          enablePlural: false,
+          enableFeminine: false,
         },
         numbers: { directionMode: "num_to_de", range: { min: 0, max: 100 } },
         verbs: { mode: "stammformen", praesensSubMode: "both" },
@@ -356,8 +356,8 @@ function sanitizeTrainerPrefs(raw: unknown): SharedTrainerPrefs {
       ),
       requireArticle: bool(words.requireArticle, true),
       enableBase: bool(words.enableBase, true),
-      enablePlural: bool(words.enablePlural, true),
-      enableFeminine: bool(words.enableFeminine, true),
+      enablePlural: bool(words.enablePlural, false),
+      enableFeminine: bool(words.enableFeminine, false),
     },
     numbers: {
       directionMode: select(

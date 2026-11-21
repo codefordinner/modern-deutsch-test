@@ -216,6 +216,9 @@
   body .app-container .trainer-toolbar > .toolbar-actions {
     width: auto;
   }
+  body .app-container .time-trainer-toolbar > .time-trainer-actions {
+    justify-content: flex-start;
+  }
 
   /* Toolbar buttons: icon only, 44px tap target */
   body .app-container .toolbar-btn {

@@ -1,10 +1,13 @@
-import React from 'react';
-import { Focus, Keyboard, Languages, Palette, RefreshCw, Tag, Target, Type, Volume2, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bell, Focus, Keyboard, Languages, Palette, Plus, RefreshCw, Tag, Target, Type, Volume2, Layers, X } from 'lucide-react';
 import { Modal } from './Modal';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
 import { useSyncStatus } from '../hooks/useSrsSync';
 import { markSyncSettingsChanged } from '../utils/srsSync';
+import { getErrorMessage } from '../api/request';
+import { getReminderPreferences, saveReminderPreferences, type ReminderPreferences } from '../api/reminders';
+import { getLearnerAuthConfig } from '../api/telegramAuth';
 
 interface GeneralSettingsModalProps {
   onClose: () => void;
@@ -15,9 +18,49 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
   const [settings, updateSettings] = useUISettings();
   const [prefs, setPrefs] = useStudyPrefs();
   const syncStatus = useSyncStatus();
+  const [reminders, setReminders] = useState<ReminderPreferences>({
+    mode: 'off',
+    times: ['09:00'],
+    days: [0, 1, 2, 3, 4, 5, 6],
+    timezone: 'UTC',
+  });
+  const [reminderStatus, setReminderStatus] = useState('');
+  const [reminderError, setReminderError] = useState('');
+  const [remindersLoading, setRemindersLoading] = useState(true);
+  const [botUrl, setBotUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLearnerSignedIn) return;
+    Promise.all([getReminderPreferences(), getLearnerAuthConfig()])
+      .then(([value, config]) => {
+        setReminders(value);
+        setBotUrl(config.botUrl ?? null);
+      })
+      .catch((error: unknown) => setReminderError(getErrorMessage(error, 'Не удалось загрузить настройки напоминаний.')))
+      .finally(() => setRemindersLoading(false));
+  }, [isLearnerSignedIn]);
+
+  const updateReminder = (partial: Partial<ReminderPreferences>) => {
+    setReminderStatus('');
+    setReminderError('');
+    setReminders((current) => ({ ...current, ...partial }));
+  };
+
+  const saveReminders = async () => {
+    setReminderError('');
+    setReminderStatus('');
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const saved = await saveReminderPreferences({ ...reminders, timezone });
+      setReminders(saved);
+      setReminderStatus('Настройки напоминаний сохранены.');
+    } catch (error) {
+      setReminderError(getErrorMessage(error, 'Не удалось сохранить настройки напоминаний.'));
+    }
+  };
 
   return (
-    <Modal title="Общие настройки" size="sm" onClose={onClose}>
+    <Modal title="Общие настройки" size="sm" onClose={onClose} initialFocus="dialog">
       <div className="modal-body modal-body--stack">
         <div>
           <label className="setting-toggle-title" htmlFor="daily-goal-input">
@@ -34,6 +77,103 @@ export const GeneralSettingsModal: React.FC<GeneralSettingsModalProps> = ({ onCl
           />
           <span className="setting-toggle-desc">Считаются ответы во всех тренажёрах. 0 — без цели.</span>
         </div>
+
+        {isLearnerSignedIn && (
+          <form
+            className="reminder-settings"
+            aria-labelledby="reminder-settings-title"
+            method="post"
+            onSubmit={(event) => { event.preventDefault(); void saveReminders(); }}
+          >
+            <h3 id="reminder-settings-title" className="setting-toggle-title"><Bell size={14} /> Напоминания в Telegram</h3>
+            <label className="setting-field-label" htmlFor="reminder-mode">Режим</label>
+            <select
+              id="reminder-mode"
+              name="reminderMode"
+              className="text-input w-full"
+              value={reminders.mode}
+              disabled={remindersLoading}
+              onChange={(event) => updateReminder({ mode: event.target.value as ReminderPreferences['mode'] })}
+            >
+              <option value="off">Выключено</option>
+              <option value="incomplete">Если цель не выполнена</option>
+              <option value="always">Всегда</option>
+            </select>
+            <span className="setting-toggle-desc">
+              Если дневная цель выключена, режим «цель не выполнена» работает как «всегда».
+            </span>
+            {botUrl && (
+              <span className="setting-toggle-desc">
+                Чтобы бот мог присылать сообщения, откройте его и нажмите «Запустить»: <a href={botUrl} target="_blank" rel="noreferrer">перейти в Telegram-бот</a>.
+              </span>
+            )}
+
+            <fieldset className="reminder-days">
+              <legend className="setting-field-label">Дни недели</legend>
+              <div className="reminder-day-list">
+                {['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map((day, index) => (
+                  <label key={day} className="reminder-day">
+                    <input
+                      type="checkbox"
+                      name="reminderDays"
+                      checked={reminders.days.includes(index)}
+                      disabled={remindersLoading}
+                      onChange={(event) => updateReminder({
+                        days: event.target.checked
+                          ? [...reminders.days, index].sort((a, b) => a - b)
+                          : reminders.days.filter((value) => value !== index),
+                      })}
+                    />
+                    {day}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="reminder-times">
+              <legend className="setting-field-label">Время напоминаний</legend>
+              {reminders.times.map((time, index) => (
+                <div className="reminder-time-row" key={`${time}-${index}`}>
+                  <label className="sr-only" htmlFor={`reminder-time-${index}`}>Время напоминания {index + 1}</label>
+                  <input
+                    id={`reminder-time-${index}`}
+                    name="reminderTimes"
+                    type="time"
+                    className="text-input"
+                    value={time}
+                    disabled={remindersLoading}
+                    onChange={(event) => updateReminder({
+                      times: reminders.times.map((value, current) => current === index ? event.target.value : value),
+                    })}
+                  />
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Удалить время ${time}`}
+                    disabled={reminders.times.length <= 1 || remindersLoading}
+                    onClick={() => updateReminder({ times: reminders.times.filter((_, current) => current !== index) })}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn-secondary reminder-add-time"
+                disabled={reminders.times.length >= 8 || remindersLoading}
+                onClick={() => updateReminder({ times: [...reminders.times, '18:00'] })}
+              >
+                <Plus size={14} /> Добавить время
+              </button>
+              <span className="setting-toggle-desc">До 8 напоминаний в день. Время указано по часовому поясу устройства.</span>
+            </fieldset>
+            {reminderError && <p className="status-msg status-msg--error" role="alert">{reminderError}</p>}
+            {reminderStatus && <p className="status-msg status-msg--success" role="status">{reminderStatus}</p>}
+            <button type="submit" className="btn-secondary" disabled={remindersLoading}>
+              Сохранить напоминания
+            </button>
+          </form>
+        )}
 
         <label className="setting-toggle">
           <input

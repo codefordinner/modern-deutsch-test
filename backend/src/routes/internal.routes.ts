@@ -8,6 +8,7 @@ import { isPartOfSpeech } from '../services/partOfSpeech';
 import { ImportFormatError } from '../services/wordImport';
 import { importWords } from '../services/wordImportService';
 import { digestChallengeCode } from '../services/telegramAuth';
+import { snoozeReminder, takeDueReminders } from '../services/reminders';
 
 const router = Router();
 const requireHermesToken = (req: Request, res: Response, next: NextFunction) => {
@@ -145,6 +146,28 @@ router.post('/telegram/confirm', telegramConfirmLimiter, requireTelegramBotSecre
 
     if (!result) return res.status(404).json({ error: 'Код недействителен или истёк.' });
     return res.json({ confirmed: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/telegram/reminders/due', requireTelegramBotSecret, async (_req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ reminders: await takeDueReminders() });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/telegram/reminders/snooze', requireTelegramBotSecret, async (req, res, next) => {
+  try {
+    const telegramId = typeof req.body?.telegramId === 'string' ? req.body.telegramId : '';
+    const minutes = req.body?.minutes;
+    if (!/^\d{1,20}$/.test(telegramId) || (minutes !== 15 && minutes !== 60)) {
+      return res.status(400).json({ error: 'Некорректный запрос отсрочки.' });
+    }
+    return res.json({ success: await snoozeReminder(telegramId, minutes) });
   } catch (error) {
     return next(error);
   }

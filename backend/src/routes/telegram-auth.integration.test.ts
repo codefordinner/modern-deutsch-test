@@ -40,7 +40,10 @@ test('Telegram challenge is browser-bound, one-use, and sessions can be revoked'
   assert.ok(address && typeof address === 'object');
   const base = `http://127.0.0.1:${address.port}`;
   const authConfig = await fetch(`${base}/api/learner-auth/config`);
-  assert.deepEqual(await authConfig.json(), { required: true });
+  assert.deepEqual(await authConfig.json(), {
+    required: true,
+    botUrl: 'https://t.me/test_sprachfunke_bot',
+  });
 
   const previousCookieSecure = process.env.TELEGRAM_COOKIE_SECURE;
   process.env.TELEGRAM_COOKIE_SECURE = 'true';

@@ -9,7 +9,7 @@
 ├─ README.md, AGENTS.md      быстрый старт; правила разработки
 ├─ .github/workflows/        CI: сборка backend+frontend, push Docker-образов в GHCR
 ├─ backend/
-│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, LearnerProgress, TelegramUser, TelegramChallenge, UserSession (SQLite)
+│  ├─ prisma/schema.prisma   Category, Word, Picture, AnalyticsEvent, Setting, AiErrorLog, AiBulkJob, AudioCache, AudioRegenerationJob, LearnerProgress, ReminderSettings, TelegramUser, TelegramChallenge, UserSession (SQLite)
 │  ├─ prisma/seed.ts         стартовые категории/слова (только в пустую БД)
 │  ├─ entrypoint.sh          prisma db push → node dist/index.js
 │  └─ src/
@@ -18,7 +18,7 @@
 │     ├─ db.ts               PrismaClient
 │     ├─ middleware/         auth (Telegram session cookie), csrf (Origin/Referer), normalizeWordBody
 │     ├─ routes/             telegram-auth, users-admin, words, words-admin, categories, pictures, audio, analytics, settings, internal
-│     └─ services/           audio, audioSettings, aiSettings + ai/{gemini,picture,words}, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, srs*, visitor, userAgent
+│     └─ services/           audio, audioSettings, aiSettings + ai/{gemini,picture,words}, aiBulkJobs, aiUsage, wordImport, wordImportService, wordCategories, partOfSpeech, hilfsverb, backfill*, reminders, srs*, visitor, userAgent
 ├─ packages/shared/            @sprachfunke/shared (TypeScript, CJS/ESM): SRS-синхронизация/веса, типы Word, enum’ы и общие списки
 ├─ packages/telegram-bot/       общий long-polling бот; обработчик подтверждения входа, без доступа к SQLite
 ├─ deploy/                       примеры Quadlet и runbook (не применяются автоматически)
@@ -50,6 +50,7 @@
 - **AiBulkJob** `{id, status, total, completed, count, result, error, createdAt, finishedAt}` — устойчивый статус массовой проверки слов, распределения категорий и определения управления глаголов. Входные записи не сохраняются; незавершённые при рестарте становятся ошибкой `AI_JOB_INTERRUPTED` и остаются видимы в логах ИИ.
 - **TelegramUser** `{id, telegramId, isAdmin, isBanned, createdAt, updatedAt}` — Telegram-аккаунт ученика; `isAdmin` управляет показом вкладки админки, `isBanned` блокирует вход и действующие сессии.
 - **LearnerProgress** `{userId, data (JSON), revision, createdAt, updatedAt}` — SRS-прогресс, счёт, настройки и отметка прохождения обучения Telegram-пользователя. `revision` используется для optimistic locking.
+- **ReminderSettings** `{userId, mode, times (JSON), days (JSON), timezone, lastSentSlot, snoozeUntil}` — личное расписание Telegram-напоминаний пользователя; время — в сохранённом часовом поясе, дни недели: воскресенье `0` … суббота `6`.
 - **Picture** `{id, title, description, dataUrl, isActive, createdAt, updatedAt}` — изображения режима «Описание картинки».
 - **AudioCache** `{cacheKey, kind ('word'|'sentence'), text, audio (WAV), mimeType}` — постоянный серверный кэш Piper. Отсутствующая запись генерируется при первом прослушивании. Ключ учитывает выбранный голос и параметры синтеза. `AudioRegenerationJob` хранит фоновую регенерацию слов, прогресс и время; задача возобновляется после перезапуска backend.
 - Прогресс ученика кэшируется в `localStorage`; настройки режимов тренажёров при Telegram-входе загружаются в память из `LearnerProgress` и не записываются в браузер. Локальные настройки устройства не импортируются в аккаунт.
@@ -89,7 +90,8 @@
 - `GET /learner-auth/config` сообщает frontend, что вход через Telegram обязателен. Клиент работает fail-closed и не открывает тренажёры, если endpoint отсутствует.
 - **Mini App-вход**: `POST /learner-auth/telegram/mini-app` проверяет Telegram HMAC и свежесть `auth_date` на backend; токен не возвращается в JSON.
 - **Вход по коду**: `/learner-auth/telegram/challenge` выдаёт шестизначный код на 5 минут и ограничен 5 запросами в минуту на IP; в БД хранится HMAC digest. Challenge привязан к короткоживущей HttpOnly browser-cookie. Status и complete работают только с этой cookie; complete одноразово потребляет подтверждение, устанавливает session-cookie и возвращает `{authenticated, user: {id}}`.
-- **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро с отдельными handlers; сейчас реализован только handler авторизации. Публикуется отдельным GHCR-образом, принимает коды только в личном чате, вызывает `POST /internal/telegram/confirm` с отдельным `TELEGRAM_BOT_API_SECRET`; к SQLite бот доступа не имеет.
+- **Telegram-бот Sprachfunke**: `packages/telegram-bot/` — расширяемое long-polling ядро; обработка входа и напоминаний находится в отдельном процессе. Бот опрашивает защищённый `GET /internal/telegram/reminders/due`, отправляет напоминание с кнопками «через 15 минут» / «через час» и сохраняет отсрочку через `POST /internal/telegram/reminders/snooze`; к SQLite бот доступа не имеет. При входе/старте в личном чате пользователь разрешает боту отправлять сообщения.
+- `/learner-auth/reminders` (GET/PUT) читает и сохраняет личные настройки расписания через Telegram-сессию: режим `off|incomplete|always`, до 8 времён в сутки, выбранные дни и часовой пояс браузера. Для «цель не выполнена» проверяется синхронизированный дневной счётчик; если цель равна 0, напоминание отправляется как в режиме «всегда». Отсрочка одноразовая и не меняет расписание.
 - **Доступ**: Telegram-вход обязателен для тренажёров и админки; права администратора определяются флагом пользователя в БД. Прогресс ученика в `LearnerProgress` привязан к Telegram-аккаунту.
 - **Пользователи админки**: `/users` и `/users/:id/{progress,admin,ban}` доступны только через `requireAdmin`; раздел показывает Telegram ID (профиль Telegram по ID получить нельзя), позволяет смотреть SRS/счёт/настройки прогресса, сбрасывать прогресс, блокировать/разблокировать, выдавать/снимать админку и удалять аккаунт. Самого себя и последнего администратора нельзя лишить доступа или удалить; блокировка отзывает сессии. Удаление аккаунта каскадно удаляет прогресс, сессии и challenge.
 - `POST /learner-auth/progress/srs` требует ученическую HttpOnly-сессию и сливает снимок прогресса с `LearnerProgress`: SRS, счёт и ответы за день остаются в локальном кэше; категории, дневная цель, dueOnly, режимы тренажёров и `onboardingSeen` синхронизируются с сервером. Начальная загрузка выполняется до монтирования тренажёров. Настройки устройства (тема, громкость и прочие UI-параметры) остаются локальными. Одновременные записи защищены revision/CAS; endpoint ограничен 60 запросами в минуту на IP.

@@ -18,6 +18,7 @@ interface ModalProps {
   onClose: () => void;
   size?: ModalSize;
   closeOnBackdrop?: boolean;
+  initialFocus?: 'dialog' | 'first';
   /** The body: `.modal-body` and (optionally) `.modal-footer` blocks, or a form wrapping both. */
   children: React.ReactNode;
 }
@@ -57,7 +58,14 @@ function unlockPageScroll() {
   savedBodyStyle = null;
 }
 
-export const Modal: React.FC<ModalProps> = ({ title, onClose, size = 'lg', closeOnBackdrop = true, children }) => {
+export const Modal: React.FC<ModalProps> = ({
+  title,
+  onClose,
+  size = 'lg',
+  closeOnBackdrop = true,
+  initialFocus = 'first',
+  children,
+}) => {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -75,10 +83,13 @@ export const Modal: React.FC<ModalProps> = ({ title, onClose, size = 'lg', close
     openDialogs.push(dialog);
     lockPageScroll();
 
-    // Move focus into the dialog unless a field inside already took it (autoFocus).
-    if (!dialog.contains(document.activeElement)) {
+    // Settings dialogs start on the dialog itself so an unrelated numeric field
+    // doesn't open the on-screen keyboard. Other dialogs keep their first-field behavior.
+    if (initialFocus === 'dialog' || !dialog.contains(document.activeElement)) {
       const focusable = getFocusable(dialog);
-      const target = focusable.find((el) => !el.closest('.modal-header')) ?? focusable[0] ?? dialog;
+      const target = initialFocus === 'dialog'
+        ? dialog
+        : focusable.find((el) => !el.closest('.modal-header')) ?? focusable[0] ?? dialog;
       target.focus();
     }
 
@@ -119,7 +130,7 @@ export const Modal: React.FC<ModalProps> = ({ title, onClose, size = 'lg', close
       unlockPageScroll();
       if (opener?.isConnected) opener.focus();
     };
-  }, []);
+  }, [initialFocus]);
 
   return createPortal(
     <div

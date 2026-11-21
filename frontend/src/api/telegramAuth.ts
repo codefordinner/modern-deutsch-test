@@ -20,7 +20,7 @@ export interface LearnerSession {
 const basePath = '/learner-auth';
 
 export const getLearnerAuthConfig = () =>
-  request<{ required: boolean }>(`${basePath}/config`);
+  request<{ required: boolean; botUrl?: string | null }>(`${basePath}/config`);
 export const getLearnerSession = () => request<LearnerSession>(`${basePath}/me`);
 export const loginWithMiniApp = (initData: string) =>
   request<LearnerSession>(`${basePath}/telegram/mini-app`, { method: 'POST', body: { initData } });

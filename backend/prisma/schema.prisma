@@ -183,6 +183,23 @@ model TelegramUser {
   challenges TelegramChallenge[]
   sessions   UserSession[]
   progress   LearnerProgress?
+  reminderSettings ReminderSettings?
+}
+
+/// Per-learner Telegram reminder schedule and one-off snooze state.
+model ReminderSettings {
+  userId        String       @id
+  user          TelegramUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode          String       @default("off") // off | incomplete | always
+  times         String       @default("[\"09:00\"]")
+  days          String       @default("[0,1,2,3,4,5,6]") // Sunday = 0
+  timezone      String       @default("UTC")
+  lastSentSlot  String?
+  snoozeUntil   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([mode, snoozeUntil])
 }
 
 /// One-time browser login challenge. Digests are stored instead of secrets.

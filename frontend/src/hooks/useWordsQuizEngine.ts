@@ -40,8 +40,8 @@ const DEFAULT_SETTINGS: WordsSettings = {
   selectedCats: ['all'],
   requireArticle: true,
   enableBase: true,
-  enablePlural: true,
-  enableFeminine: true,
+  enablePlural: false,
+  enableFeminine: false,
 };
 
 function sanitizeSettings(raw: unknown): WordsSettings {

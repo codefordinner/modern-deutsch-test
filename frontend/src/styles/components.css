@@ -46,6 +46,67 @@
   width: 100%;
 }
 
+.reminder-settings {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.reminder-settings h3 {
+  margin: 0;
+}
+
+.setting-field-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.reminder-days,
+.reminder-times {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reminder-day-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.reminder-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.5rem;
+  background: var(--bg-secondary);
+}
+
+.reminder-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.reminder-time-row input {
+  min-height: 48px;
+  font: inherit;
+  font-size: max(1rem, 1em);
+}
+
+.reminder-add-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-block: 0.25rem 0.5rem;
+}
+
 .btn-lg {
   width: 100%;
   padding: 14px 20px;

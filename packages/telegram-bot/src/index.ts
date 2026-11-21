@@ -3,6 +3,12 @@ import { handleAuthMessage, type IncomingMessage } from './handlers/auth';
 type TelegramUpdate = {
   update_id: number;
   message?: IncomingMessage;
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: { id?: number; is_bot?: boolean };
+    message?: { chat?: { id?: number; type?: string } };
+  };
 };
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -31,8 +37,55 @@ const telegramRequest = async <T>(method: string, body: unknown, signal?: AbortS
   return result.result as T;
 };
 
-const sendText = (chatId: number, text: string) =>
-  telegramRequest('sendMessage', { chat_id: chatId, text });
+const sendText = (chatId: number, text: string, replyMarkup?: unknown) =>
+  telegramRequest('sendMessage', { chat_id: chatId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) });
+
+const botRequest = async <T>(path: string, body?: unknown): Promise<T> => {
+  const response = await fetch(`${backendUrl}/api/internal/telegram/${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      'x-telegram-bot-secret': backendSecret,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+  return response.json() as Promise<T>;
+};
+
+const notifyDueReminders = async () => {
+  const { reminders } = await botRequest<{ reminders: Array<{ telegramId: string; text: string }> }>('reminders/due');
+  for (const reminder of reminders) {
+    const chatId = Number(reminder.telegramId);
+    if (!Number.isSafeInteger(chatId)) continue;
+    try {
+      await sendText(chatId, reminder.text, {
+        inline_keyboard: [[
+          { text: 'Повторить через 15 минут', callback_data: 'snooze:15' },
+          { text: 'Повторить через час', callback_data: 'snooze:60' },
+        ]],
+      });
+    } catch {
+      // Keep a blocked or unavailable chat from preventing delivery to other learners.
+    }
+  }
+};
+
+const handleSnooze = async (update: NonNullable<TelegramUpdate['callback_query']>) => {
+  const chatId = update.message?.chat?.id;
+  const telegramId = update.from?.id;
+  const minutes = update.data === 'snooze:15' ? 15 : update.data === 'snooze:60' ? 60 : null;
+  if (
+    !minutes || typeof chatId !== 'number' || update.message?.chat?.type !== 'private'
+    || typeof telegramId !== 'number' || update.from?.is_bot || chatId !== telegramId
+  ) return;
+  const result = await botRequest<{ success: boolean }>('reminders/snooze', { telegramId: String(telegramId), minutes });
+  await telegramRequest('answerCallbackQuery', {
+    callback_query_id: update.id,
+    text: result.success ? `Напомним через ${minutes === 15 ? '15 минут' : 'час'}.` : 'Напоминания отключены.',
+  });
+};
 
 const confirmCode = async (code: string, telegramId: string) => {
   const response = await fetch(`${backendUrl}/api/internal/telegram/confirm`, {
@@ -58,7 +111,7 @@ const poll = async () => {
     try {
       const updates = await telegramRequest<TelegramUpdate[]>(
         'getUpdates',
-        { offset: nextOffset, timeout: longPollTimeoutSeconds, allowed_updates: ['message'] },
+        { offset: nextOffset, timeout: longPollTimeoutSeconds, allowed_updates: ['message', 'callback_query'] },
         controller.signal,
       );
       retryDelayMs = 1_000;
@@ -72,6 +125,18 @@ const poll = async () => {
             console.error('[telegram-bot] Message handling failed');
           }
         }
+        if (update.callback_query) {
+          try {
+            await handleSnooze(update.callback_query);
+          } catch {
+            console.error('[telegram-bot] Reminder action failed');
+          }
+        }
+      }
+      try {
+        await notifyDueReminders();
+      } catch {
+        console.error('[telegram-bot] Reminder delivery check failed');
       }
     } catch {
       if (stopping) break;
