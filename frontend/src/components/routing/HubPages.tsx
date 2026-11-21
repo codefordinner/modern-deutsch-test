@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { ArrowRight, BookOpenCheck, LogOut, Settings, ShieldCheck, SunMoon, Target } from 'lucide-react';
 import { APP_TABS, TAB_LABELS } from '../../config/tabs';
 import type { AppTab, ScoredTab } from '../../config/tabs';
 import type { Scores } from '../../hooks/useScores';
-import { useDailyCount, useStudyPrefs } from '../../utils/studyPrefs';
+import { MAX_DAILY_GOAL, useDailyCount, useStudyPrefs } from '../../utils/studyPrefs';
 import { tabHref } from '../../hooks/useHashRoute';
+import { markSyncSettingsChanged } from '../../utils/srsSync';
 
 const descriptions: Partial<Record<AppTab, string>> = {
   words: 'Пополняйте словарный запас и повторяйте слова по карточкам.',
@@ -59,8 +61,10 @@ interface ProgressPageProps {
 }
 
 export function ProgressPage({ scores }: ProgressPageProps) {
-  const [{ dailyGoal }] = useStudyPrefs();
+  const [{ dailyGoal }, setPrefs] = useStudyPrefs();
   const answeredToday = useDailyCount();
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [goalDraft, setGoalDraft] = useState(String(dailyGoal));
   const total = Object.values(scores).reduce((sum, score) => sum + score.total, 0);
   const correct = Object.values(scores).reduce((sum, score) => sum + score.correct, 0);
   const accuracy = total ? Math.round((correct / total) * 100) : 0;
@@ -86,6 +90,45 @@ export function ProgressPage({ scores }: ProgressPageProps) {
             </div>
           )}
           {dailyGoal > 0 && goalProgress >= 100 && <p className="daily-goal-done">Цель выполнена — отлично! 🎉</p>}
+          {!isEditingGoal ? (
+            <button
+              className="btn-secondary progress-goal-edit"
+              type="button"
+              onClick={() => { setGoalDraft(String(dailyGoal)); setIsEditingGoal(true); }}
+            >
+              Изменить цель
+            </button>
+          ) : (
+            <form
+              className="progress-goal-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setPrefs({ dailyGoal: Number(goalDraft) });
+                markSyncSettingsChanged();
+                setIsEditingGoal(false);
+              }}
+            >
+              <label htmlFor="progress-daily-goal">Цель в ответах за день</label>
+              <span className="setting-toggle-desc">Укажите число от 0 до {MAX_DAILY_GOAL}. 0 — без цели.</span>
+              <input
+                className="text-input"
+                id="progress-daily-goal"
+                name="dailyGoal"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={MAX_DAILY_GOAL}
+                step={1}
+                required
+                value={goalDraft}
+                onChange={(event) => setGoalDraft(event.target.value)}
+              />
+              <div className="progress-goal-form-actions">
+                <button className="btn-primary" type="submit">Сохранить цель</button>
+                <button className="btn-secondary" type="button" onClick={() => setIsEditingGoal(false)}>Отмена</button>
+              </div>
+            </form>
+          )}
         </div>
       </section>
       <div className="progress-overview">

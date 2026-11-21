@@ -122,7 +122,7 @@
 | Экран/тренажёр | Компонент | Логика |
 |---|---|---|
 | Тренажёры | `TrainerCatalog` (`routing/HubPages.tsx`) | Каталог режимов по группам; выбранные тренажёры открываются по прежним hash-маршрутам |
-| Прогресс | `ProgressPage` (`routing/HubPages.tsx`) | Дневная цель и сводка счёта по scored-тренажёрам |
+| Прогресс | `ProgressPage` (`routing/HubPages.tsx`) | Дневная цель (изменяется прямо на странице) и сводка счёта по scored-тренажёрам |
 | Профиль | `ProfilePage` (`routing/HubPages.tsx`) | Ссылка на общие настройки, переключение темы, выход и (для администратора) ссылка на админку |
 | Числа | `NumbersTrainer` | `numbers-generator.ts` (`germanNumberVariants`), `answerMatch` |
 | Слова | `WordsTrainer` | `useWordsQuizEngine`, `wordCards.ts`, подсказка `wordHint.ts`; SRS-карточка = слово×направление×форма |

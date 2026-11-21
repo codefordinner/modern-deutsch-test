@@ -140,6 +140,37 @@
   white-space: nowrap;
 }
 
+.progress-goal-edit {
+  margin-top: 14px;
+}
+
+.progress-goal-form {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.progress-goal-form label {
+  font-weight: 650;
+}
+
+.progress-goal-form .text-input {
+  width: min(100%, 180px);
+  min-height: 44px;
+  font: inherit;
+  font-size: max(1rem, 1em);
+}
+
+.progress-goal-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+}
+
 .progress-overview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
