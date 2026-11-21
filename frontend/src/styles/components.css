@@ -49,12 +49,137 @@
 .reminder-settings {
   display: grid;
   gap: 0.65rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
 }
 
 .reminder-settings h3 {
   margin: 0;
+}
+
+.settings-page {
+  max-width: 760px;
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-page-content {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-page .text-input {
+  font-size: max(16px, 1rem);
+}
+
+.settings-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.85rem;
+  background: var(--bg-secondary);
+}
+
+.reminder-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.reminder-heading > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.reminder-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.reminder-switch input,
+.reminder-mode-option input {
+  accent-color: var(--accent-primary);
+}
+
+.reminder-mode {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reminder-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.65rem;
+  cursor: pointer;
+}
+
+.reminder-mode-option span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.reminder-mode-option small {
+  color: var(--text-secondary);
+}
+
+.reminder-schedule {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.7rem;
+}
+
+.reminder-schedule summary,
+.settings-disclosure summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-disclosure > summary {
+  list-style-position: inside;
+}
+
+.settings-disclosure[open] > summary {
+  margin-bottom: 0.2rem;
+}
+
+.settings-disclosure .setting-toggle {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-control {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-sync h3 {
+  margin: 0;
+}
+
+.reminder-save {
+  justify-self: start;
 }
 
 .setting-field-label {

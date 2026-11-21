@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
-import { GeneralSettingsModal } from './components/GeneralSettingsModal';
+import { GeneralSettingsPage } from './components/GeneralSettingsPage';
 import { TrainerContent } from './components/routing/TrainerContent';
 import { ToastHost } from './components/ToastHost';
 import { trackEvent } from './api/analytics';
@@ -229,21 +229,24 @@ export function App() {
       />
 
        <main className="app-container" id="main">
-         <TrainerContent
-           activeTab={activeTab}
-           onAnswer={handleAnswer}
-           scores={scores}
-           profileProps={{
-             isAdmin: Boolean(learner?.isAdmin),
-             onOpenSettings: () => setIsSettingsOpen(true),
-             onToggleTheme: () => setIsDark((value) => !value),
-             isDark,
-             onLogout: () => { void handleLearnerLogout(); },
-           }}
-         />
+         {activeTab === 'profile' && isSettingsOpen ? (
+           <GeneralSettingsPage onClose={() => setIsSettingsOpen(false)} isLearnerSignedIn={Boolean(learner)} />
+         ) : (
+           <TrainerContent
+              activeTab={activeTab}
+              onAnswer={handleAnswer}
+              scores={scores}
+              profileProps={{
+                isAdmin: Boolean(learner?.isAdmin),
+                onOpenSettings: () => setIsSettingsOpen(true),
+                onToggleTheme: () => setIsDark((value) => !value),
+                isDark,
+                onLogout: () => { void handleLearnerLogout(); },
+              }}
+            />
+         )}
        </main>
 
-      {isSettingsOpen && <GeneralSettingsModal onClose={() => setIsSettingsOpen(false)} isLearnerSignedIn={Boolean(learner)} />}
       {isOnboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
       {logoutError && <p className="telegram-login-error" role="alert">{logoutError}</p>}
 
