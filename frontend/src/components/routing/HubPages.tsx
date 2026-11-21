@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, BookOpenCheck, LogOut, Settings, SunMoon, Target } from 'lucide-react';
+import { ArrowRight, Bell, BookOpenCheck, LogOut, Settings, SunMoon, Target } from 'lucide-react';
 import { APP_TABS, TAB_LABELS } from '../../config/tabs';
 import type { AppTab, ScoredTab } from '../../config/tabs';
 import type { Scores } from '../../hooks/useScores';
@@ -158,12 +158,13 @@ export function ProgressPage({ scores }: ProgressPageProps) {
 interface ProfilePageProps {
   isAdmin: boolean;
   onOpenSettings: () => void;
+  onOpenReminders: () => void;
   onToggleTheme: () => void;
   isDark: boolean;
   onLogout: () => void;
 }
 
-export function ProfilePage({ isAdmin, onOpenSettings, onToggleTheme, isDark, onLogout }: ProfilePageProps) {
+export function ProfilePage({ isAdmin, onOpenSettings, onOpenReminders, onToggleTheme, isDark, onLogout }: ProfilePageProps) {
   return (
     <section className="hub-page" aria-labelledby="profile-title">
       <div className="hub-heading">
@@ -180,6 +181,11 @@ export function ProfilePage({ isAdmin, onOpenSettings, onToggleTheme, isDark, on
         <button className="profile-action" type="button" onClick={onOpenSettings}>
           <span className="profile-action-icon"><Settings size={19} aria-hidden="true" /></span>
           <span><strong>Настройки приложения</strong><small>Цель, звук, клавиатура и вид тренажёров</small></span>
+          <ArrowRight size={17} aria-hidden="true" />
+        </button>
+        <button className="profile-action" type="button" onClick={onOpenReminders}>
+          <span className="profile-action-icon"><Bell size={19} aria-hidden="true" /></span>
+          <span><strong>Напоминания</strong><small>Настроить дни и время уведомлений в Telegram</small></span>
           <ArrowRight size={17} aria-hidden="true" />
         </button>
         <button className="profile-action" type="button" onClick={onToggleTheme}>

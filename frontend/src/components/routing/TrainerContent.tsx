@@ -18,6 +18,7 @@ interface TrainerContentProps {
   profileProps: {
     isAdmin: boolean;
     onOpenSettings: () => void;
+    onOpenReminders: () => void;
     onToggleTheme: () => void;
     isDark: boolean;
     onLogout: () => void;

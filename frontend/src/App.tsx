@@ -34,6 +34,7 @@ export function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const [logoutError, setLogoutError] = useState('');
+  const [focusReminderSettings, setFocusReminderSettings] = useState(false);
   const miniAppAttempted = useRef(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -231,15 +232,26 @@ export function App() {
 
        <main className="app-container" id="main">
          {activeTab === 'profile' && isSettingsOpen ? (
-           <GeneralSettingsPage onClose={() => setIsSettingsOpen(false)} isLearnerSignedIn={Boolean(learner)} />
+            <GeneralSettingsPage
+              onClose={() => setIsSettingsOpen(false)}
+              isLearnerSignedIn={Boolean(learner)}
+              focusReminders={focusReminderSettings}
+            />
          ) : (
            <TrainerContent
               activeTab={activeTab}
               onAnswer={handleAnswer}
               scores={scores}
               profileProps={{
-                isAdmin: Boolean(learner?.isAdmin),
-                onOpenSettings: () => setIsSettingsOpen(true),
+                 isAdmin: Boolean(learner?.isAdmin),
+                 onOpenSettings: () => {
+                   setFocusReminderSettings(false);
+                   setIsSettingsOpen(true);
+                 },
+                 onOpenReminders: () => {
+                   setFocusReminderSettings(true);
+                   setIsSettingsOpen(true);
+                 },
                 onToggleTheme: () => setIsDark((value) => !value),
                 isDark,
                 onLogout: () => { void handleLearnerLogout(); },

@@ -1,24 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Bell, Focus, Keyboard, Languages, Layers, Palette, Plus, RefreshCw, Tag, Target, Type, Volume2, X } from 'lucide-react';
 import { useUISettings } from '../hooks/useUISettings';
 import { MAX_DAILY_GOAL, useStudyPrefs } from '../utils/studyPrefs';
 import { useSyncStatus } from '../hooks/useSrsSync';
-import { markSyncSettingsChanged } from '../utils/srsSync';
+import { getSyncStatus, markSyncSettingsChanged, syncNow } from '../utils/srsSync';
 import { getErrorMessage } from '../api/request';
 import { getReminderPreferences, saveReminderPreferences, type ReminderPreferences } from '../api/reminders';
-import { getLearnerAuthConfig } from '../api/telegramAuth';
 
 interface GeneralSettingsPageProps {
   onClose: () => void;
   isLearnerSignedIn: boolean;
+  focusReminders: boolean;
 }
 
 const WEEKDAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClose, isLearnerSignedIn }) => {
+export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClose, isLearnerSignedIn, focusReminders }) => {
   const [settings, updateSettings] = useUISettings();
   const [prefs, setPrefs] = useStudyPrefs();
   const syncStatus = useSyncStatus();
+  const [goalDraft, setGoalDraft] = useState(String(prefs.dailyGoal));
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [goalStatus, setGoalStatus] = useState('');
+  const [goalError, setGoalError] = useState('');
   const [reminders, setReminders] = useState<ReminderPreferences>({
     mode: 'off',
     times: ['09:00'],
@@ -28,18 +32,24 @@ export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClos
   const [reminderStatus, setReminderStatus] = useState('');
   const [reminderError, setReminderError] = useState('');
   const [remindersLoading, setRemindersLoading] = useState(true);
-  const [botUrl, setBotUrl] = useState<string | null>(null);
+  const reminderSettingsRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!isLearnerSignedIn) return;
-    Promise.all([getReminderPreferences(), getLearnerAuthConfig()])
-      .then(([value, config]) => {
-        setReminders(value);
-        setBotUrl(config.botUrl ?? null);
-      })
+    getReminderPreferences()
+      .then(setReminders)
       .catch((error: unknown) => setReminderError(getErrorMessage(error, 'Не удалось загрузить настройки напоминаний.')))
       .finally(() => setRemindersLoading(false));
   }, [isLearnerSignedIn]);
+
+  useEffect(() => {
+    if (!focusReminders) return;
+    const frame = window.requestAnimationFrame(() => {
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      reminderSettingsRef.current?.scrollIntoView({ behavior, block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusReminders]);
 
   const updateReminder = (partial: Partial<ReminderPreferences>) => {
     setReminderStatus('');
@@ -60,6 +70,20 @@ export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClos
     }
   };
 
+  const saveDailyGoal = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setGoalStatus('');
+    setGoalError('');
+    setPrefs({ dailyGoal: Number(goalDraft) });
+    markSyncSettingsChanged();
+    setGoalSaving(true);
+    await syncNow();
+    const status = getSyncStatus();
+    if (status.state === 'error') setGoalError(status.message);
+    else setGoalStatus('Цель сохранена.');
+    setGoalSaving(false);
+  };
+
   return (
     <section className="hub-page settings-page" aria-labelledby="general-settings-title">
       <button type="button" className="settings-back" onClick={onClose}>
@@ -72,34 +96,47 @@ export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClos
       </div>
 
       <div className="settings-page-content">
-        <section className="settings-card" aria-labelledby="goal-setting-title">
+        <form className="settings-card" aria-labelledby="goal-setting-title" method="post" onSubmit={(event) => void saveDailyGoal(event)}>
           <label className="setting-toggle-title" htmlFor="daily-goal-input" id="goal-setting-title">
             <Target size={16} /> Цель на день
           </label>
           <input
             id="daily-goal-input"
+            name="dailyGoal"
             type="number"
             inputMode="numeric"
             className="text-input w-full"
             min={0}
             max={MAX_DAILY_GOAL}
-            value={prefs.dailyGoal}
-            onChange={(event) => { setPrefs({ dailyGoal: Number(event.target.value) }); markSyncSettingsChanged(); }}
+            step={1}
+            required
+            value={goalDraft}
+            onChange={(event) => {
+              setGoalDraft(event.target.value);
+              setGoalStatus('');
+              setGoalError('');
+            }}
           />
           <span className="setting-toggle-desc">Ответы во всех тренажёрах. 0 — без цели.</span>
-        </section>
+          {goalError && <p className="status-msg status-msg--error" role="alert">{goalError}</p>}
+          {goalStatus && <p className="status-msg status-msg--success" role="status">{goalStatus}</p>}
+          <button type="submit" className="btn-secondary" disabled={goalSaving}>
+            {goalSaving ? 'Сохраняем…' : 'Сохранить цель'}
+          </button>
+        </form>
 
         {isLearnerSignedIn && (
           <form
             className="settings-card reminder-settings"
             aria-labelledby="reminder-settings-title"
+            ref={reminderSettingsRef}
             method="post"
             onSubmit={(event) => { event.preventDefault(); void saveReminders(); }}
           >
             <div className="reminder-heading">
               <div>
                 <h3 id="reminder-settings-title" className="setting-toggle-title"><Bell size={16} /> Напоминания в Telegram</h3>
-                <span className="setting-toggle-desc">Сообщение от бота поможет не забыть о занятиях.</span>
+                  <span className="setting-toggle-desc">Напоминания приходят от Telegram-бота, через который вы вошли в аккаунт.</span>
               </div>
               <label className="reminder-switch">
                 <input
@@ -140,7 +177,6 @@ export const GeneralSettingsPage: React.FC<GeneralSettingsPageProps> = ({ onClos
                     <span><strong>Каждый выбранный день</strong><small>Напоминать независимо от числа ответов.</small></span>
                   </label>
                 </fieldset>
-                {botUrl && <p className="setting-toggle-desc">Сначала запустите бота в Telegram: <a href={botUrl} target="_blank" rel="noreferrer">открыть бота</a>.</p>}
                 <details className="reminder-schedule">
                   <summary>Расписание: дни и время</summary>
                   <fieldset className="reminder-days">

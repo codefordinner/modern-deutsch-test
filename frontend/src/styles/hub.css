@@ -265,6 +265,10 @@
   cursor: pointer;
 }
 
+.reminder-settings {
+  scroll-margin-top: 16px;
+}
+
 .profile-action > span:nth-child(2) {
   display: grid;
   flex: 1;

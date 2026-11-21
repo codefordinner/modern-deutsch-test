@@ -57,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           <div className="header-actions">
-            {activeTab !== 'profile' && dailyGoal > 0 && (
+            {dailyGoal > 0 && (
               <span
                 className={`daily-chip ${answeredToday >= dailyGoal ? 'is-done' : ''}`}
                 title={`Цель на сегодня: ${answeredToday} из ${dailyGoal} ответов`}
