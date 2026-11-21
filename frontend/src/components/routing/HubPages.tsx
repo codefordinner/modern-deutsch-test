@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, BookOpenCheck, LogOut, Settings, ShieldCheck, SunMoon, Target } from 'lucide-react';
+import { ArrowRight, BookOpenCheck, LogOut, Settings, SunMoon, Target } from 'lucide-react';
 import { APP_TABS, TAB_LABELS } from '../../config/tabs';
 import type { AppTab, ScoredTab } from '../../config/tabs';
 import type { Scores } from '../../hooks/useScores';
@@ -187,13 +187,6 @@ export function ProfilePage({ isAdmin, onOpenSettings, onToggleTheme, isDark, on
           <span><strong>Оформление</strong><small>Сейчас включена {isDark ? 'тёмная' : 'светлая'} тема</small></span>
           <ArrowRight size={17} aria-hidden="true" />
         </button>
-        {isAdmin && (
-          <a className="profile-action" href={tabHref('admin')}>
-            <span className="profile-action-icon"><ShieldCheck size={19} aria-hidden="true" /></span>
-            <span><strong>Админка</strong><small>Управление словарём и приложением</small></span>
-            <ArrowRight size={17} aria-hidden="true" />
-          </a>
-        )}
         <button className="profile-action profile-action--danger" type="button" onClick={onLogout}>
           <span className="profile-action-icon"><LogOut size={19} aria-hidden="true" /></span>
           <span><strong>Выйти из аккаунта</strong><small>Завершить сеанс на этом устройстве</small></span>

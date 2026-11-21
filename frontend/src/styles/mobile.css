@@ -91,6 +91,23 @@ button, a, select, label, input, .mode-pill {
   .stat-cards { grid-template-columns: 1fr 1fr; }
   .hbar-count { width: 32px; }
   .digital-display { font-size: 30px; padding: 10px 20px; }
+
+  .onboarding-content {
+    gap: 10px;
+  }
+  .onboarding-content p,
+  .onboarding-content h4,
+  .onboarding-content ol {
+    margin-block: 0;
+  }
+  .onboarding-content p,
+  .onboarding-content li {
+    line-height: 1.45;
+  }
+  .onboarding-content ol {
+    display: grid;
+    gap: 7px;
+  }
 }
 
 /* Wide tables scroll inside their own frame */

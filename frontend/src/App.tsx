@@ -226,6 +226,7 @@ export function App() {
     <div className="app-shell">
       <Navbar
         activeTab={activeTab}
+        isAdmin={Boolean(learner?.isAdmin)}
       />
 
        <main className="app-container" id="main">

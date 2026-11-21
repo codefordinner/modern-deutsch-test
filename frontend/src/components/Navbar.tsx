@@ -7,17 +7,19 @@ import { useDailyCount, useStudyPrefs } from '../utils/studyPrefs';
 
 interface NavbarProps {
   activeTab: AppTab;
+  isAdmin: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
+  isAdmin,
 }) => {
   const [{ dailyGoal }] = useStudyPrefs();
   const answeredToday = useDailyCount();
-  const visibleTabs = APP_TABS.filter((tab) => tab.surface === 'primary');
+  const visibleTabs = APP_TABS.filter((tab) => tab.surface === 'primary' || (isAdmin && tab.id === 'admin'));
   const activePrimary = getTabDefinition(activeTab).surface === 'trainer'
     ? 'trainers'
-    : activeTab === 'admin' ? 'profile' : activeTab;
+    : activeTab;
 
   return (
     <>
