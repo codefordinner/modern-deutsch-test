@@ -26,6 +26,8 @@ test('welcomes a new private-chat user instead of treating the first /start as a
   assert.equal(handled, true);
   assert.match(replies[0], /Привет!/);
   assert.match(replies[0], /BlitzDeutsch/);
+  assert.match(replies[0], /Рад видеть вас здесь/);
+  assert.doesNotMatch(replies[0], /вернитесь на сайт|Чтобы начать/i);
   assert.doesNotMatch(replies[0], /неверн|не найден|истёк/i);
 });
 
